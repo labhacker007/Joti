@@ -2,7 +2,7 @@
 Comprehensive IOC (Indicator of Compromise) Types Definition for Cybersecurity.
 
 This file serves as the authoritative guardrail for IOC extraction across the entire
-Orion platform - both manual and automated extraction processes.
+Parshu platform - both manual and automated extraction processes.
 
 Categories:
 1. Network Indicators

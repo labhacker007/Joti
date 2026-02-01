@@ -1,4 +1,4 @@
-// Orion Theme Definitions
+// Parshu Theme Definitions
 // Six complete themes with light/dark modes + Hacker/Cyber mode overlays
 
 export const themes = {

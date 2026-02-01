@@ -623,7 +623,7 @@ function NavBar() {
           fontSize: 20,
           ...(isDark ? { filter: 'drop-shadow(0 0 8px var(--primary))' } : {}),
         }} />
-        <span>Orion</span>
+        <span>Parshu</span>
       </div>
       
       {user && (

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple script to run the Orion backend server.
+Simple script to run the Parshu backend server.
 Run this from the project root: python3 run_backend.py
 """
 import os
@@ -21,7 +21,7 @@ os.environ["GENAI_PROVIDER"] = "ollama"
 os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434"
 
 print("=" * 50)
-print("  Starting Orion Backend Server")
+print("  Starting Parshu Backend Server")
 print("=" * 50)
 print()
 print(f"  Working directory: {script_dir}")

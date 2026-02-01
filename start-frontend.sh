@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Orion - Frontend Startup Script
+# Parshu - Frontend Startup Script
 
 echo "========================================"
-echo "  Starting Orion Frontend"
+echo "  Starting Parshu Frontend"
 echo "========================================"
 echo ""
 

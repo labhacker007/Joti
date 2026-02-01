@@ -95,7 +95,7 @@ function Login() {
         title={
           <div className="login-header">
             <ThunderboltOutlined className="login-logo" />
-            <div className="login-title">Orion</div>
+            <div className="login-title">Parshu</div>
             <div className="login-subtitle">Threat Intelligence Platform</div>
           </div>
         }
@@ -142,7 +142,7 @@ function Login() {
               ]}
             >
               <Input 
-                placeholder="admin@orion.local or admin" 
+                placeholder="admin@parshu.local or admin" 
                 disabled={loading} 
                 size="large" 
               />

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Comprehensive Feature Testing Script for Orion Platform
+# Comprehensive Feature Testing Script for Parshu Platform
 # Tests all implemented features as an expert tester
 
 set -e
@@ -305,7 +305,7 @@ echo ""
 if [ $FAILED_TESTS -eq 0 ]; then
     echo -e "${GREEN}✓ ALL TESTS PASSED!${NC}"
     echo ""
-    echo "The Orion platform is functioning correctly."
+    echo "The Parshu platform is functioning correctly."
     exit 0
 else
     echo -e "${RED}✗ SOME TESTS FAILED${NC}"

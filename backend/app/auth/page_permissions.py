@@ -397,7 +397,7 @@ DEFAULT_ROLE_PAGE_PERMISSIONS = {
     "VIEWER": [
         # Feed / News - VIEWER can only access news and feeds
         PagePermission.VIEW_FEED.value,
-        # Chatbot / Orion AI
+        # Chatbot / Parshu AI
         PagePermission.USE_CHATBOT.value,
         PagePermission.VIEW_CHATBOT_HISTORY.value
     ]

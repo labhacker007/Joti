@@ -393,7 +393,7 @@ function Dashboard() {
         <div>
           <Title level={4} className="dashboard-title">
             <ThunderboltOutlined />
-            Orion Command Center
+            Parshu Command Center
           </Title>
           {lastUpdated && (
             <div className="dashboard-subtitle">

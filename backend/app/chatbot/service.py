@@ -583,7 +583,7 @@ def get_chatbot(db_session=None) -> ParshuChatbot:
     """Get or create chatbot instance, optionally with a database session for RAG."""
     global _chatbot_instance
     if _chatbot_instance is None:
-        _chatbot_instance = OrionChatbot(db_session=db_session)
+        _chatbot_instance = ParshuChatbot(db_session=db_session)
     elif db_session:
         # Update the db session for RAG support
         _chatbot_instance.db_session = db_session
@@ -592,4 +592,4 @@ def get_chatbot(db_session=None) -> ParshuChatbot:
 
 def create_chatbot_with_rag(db_session) -> ParshuChatbot:
     """Create a new chatbot instance with RAG support (for request-scoped usage)."""
-    return OrionChatbot(db_session=db_session)
+    return ParshuChatbot(db_session=db_session)

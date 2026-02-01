@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Orion Status Check Script
+# Parshu Status Check Script
 # Run this to diagnose why the application isn't loading data
 
 echo "========================================"
-echo "  Orion Platform Status Check"
+echo "  Parshu Platform Status Check"
 echo "========================================"
 echo ""
 

@@ -2980,7 +2980,7 @@ const GuardrailsManager = () => {
 # =======================
 
 [BASE INSTRUCTIONS]
-You are a specialized cybersecurity AI assistant for the Orion platform.
+You are a specialized cybersecurity AI assistant for the Parshu platform.
 Your primary functions include threat intelligence analysis, IOC extraction, 
 and security query generation.
 

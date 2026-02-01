@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Orion - Quick Development Startup Script
+# Parshu - Quick Development Startup Script
 # This starts the backend with SQLite (no Docker needed)
 
 echo "========================================"
-echo "  Starting Orion Platform (Dev Mode)"
+echo "  Starting Parshu Platform (Dev Mode)"
 echo "========================================"
 echo ""
 

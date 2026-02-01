@@ -1187,7 +1187,7 @@ async def get_rag_guide(
     Get comprehensive guide for setting up and using the RAG system.
     """
     return {
-        "title": "Orion RAG (Retrieval-Augmented Generation) Guide",
+        "title": "Parshu RAG (Retrieval-Augmented Generation) Guide",
         "version": "1.0",
         "sections": [
             {
@@ -1469,7 +1469,7 @@ async def crawl_github_repo(
     }
 
 
-@router.post("/self-document", summary="Create self-documentation from Orion codebase")
+@router.post("/self-document", summary="Create self-documentation from Parshu codebase")
 async def create_self_documentation(
     background_tasks: BackgroundTasks,
     include_code: bool = True,
@@ -1479,16 +1479,16 @@ async def create_self_documentation(
     db: Session = Depends(get_db)
 ):
     """
-    Create knowledge base documentation from the Orion application itself.
+    Create knowledge base documentation from the Parshu application itself.
     
     This allows the chatbot to answer questions about:
-    - How Orion works internally
-    - Troubleshooting Orion issues
-    - Customizing and extending Orion
-    - Understanding Orion's architecture
+    - How Parshu works internally
+    - Troubleshooting Parshu issues
+    - Customizing and extending Parshu
+    - Understanding Parshu's architecture
     
     Note: This requires the codebase to be accessible from the backend container.
-    For production, use the GitHub crawler with your Orion fork URL.
+    For production, use the GitHub crawler with your Parshu fork URL.
     """
     import os
     from pathlib import Path
@@ -1501,13 +1501,13 @@ async def create_self_documentation(
     if not (base_path / "app").exists():
         raise HTTPException(
             status_code=400,
-            detail="Codebase not accessible. Use GitHub crawler with your Orion repository URL instead."
+            detail="Codebase not accessible. Use GitHub crawler with your Parshu repository URL instead."
         )
     
     # Create document entry
     doc = KnowledgeDocument(
-        title="Orion Application Documentation (Self-Generated)",
-        description="Auto-generated documentation from the Orion codebase for admin and engineer support",
+        title="Parshu Application Documentation (Self-Generated)",
+        description="Auto-generated documentation from the Parshu codebase for admin and engineer support",
         doc_type=KnowledgeDocumentType.PRODUCT_DOCUMENTATION,
         source_type="local",
         source_url="local://orion-codebase",
