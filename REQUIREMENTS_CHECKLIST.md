@@ -1,4 +1,4 @@
-# Orion Requirements Checklist (Last 20 User Inputs)
+# Parshu Requirements Checklist (Last 20 User Inputs)
 
 ## ADMIN PORTAL
 
@@ -87,7 +87,7 @@
 
 ## CHATBOT
 
-### 11. Orion AI Chatbot
+### 11. Parshu AI Chatbot
 - [x] Uses GenAI provider (Ollama/OpenAI/Anthropic)
 - [x] Uses knowledge base via RAG
 - [x] Applies guardrails to responses

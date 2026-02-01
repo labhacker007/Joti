@@ -53,7 +53,7 @@ get_token() {
 }
 
 echo "=================================================="
-echo "  ORION PLATFORM - COMPREHENSIVE FEATURE TESTING"
+echo "  PARSHU PLATFORM - COMPREHENSIVE FEATURE TESTING"
 echo "=================================================="
 echo ""
 

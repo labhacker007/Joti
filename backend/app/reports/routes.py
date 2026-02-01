@@ -1239,7 +1239,7 @@ def export_report_pdf(
         canvas.setFont('Helvetica', 8)
         canvas.drawString(72, 18, f"Generated: {report.generated_at.strftime('%B %d, %Y at %H:%M UTC')}")
         canvas.drawCentredString(306, 18, confidentiality)
-        canvas.drawRightString(540, 18, "ORION PLATFORM")
+        canvas.drawRightString(540, 18, "PARSHU PLATFORM")
         
         canvas.restoreState()
     

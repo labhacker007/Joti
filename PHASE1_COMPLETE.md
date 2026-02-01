@@ -1,4 +1,4 @@
-# Orion Advanced Features - Phase 1 Complete ✅
+# Parshu Advanced Features - Phase 1 Complete ✅
 
 ## Summary
 
@@ -181,8 +181,8 @@ SERVICENOW_ASSIGNMENT_GROUP=security-team
 
 **Email Settings**
 ```bash
-SMTP_FROM_EMAIL=orion@yourcompany.com
-SMTP_FROM_NAME=Orion Platform
+SMTP_FROM_EMAIL=Parshu@yourcompany.com
+SMTP_FROM_NAME=Parshu Platform
 ```
 
 ---

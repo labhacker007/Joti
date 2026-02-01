@@ -1,4 +1,4 @@
-# Orion Platform - Comprehensive Improvements V2
+# Parshu Platform - Comprehensive Improvements V2
 
 **Date:** 2026-01-23  
 **Status:** ✅ DEPLOYED AND TESTED  
@@ -330,7 +330,7 @@ http://localhost:3000/feed
 5. Check article cards have "Duplicate" badge
 
 # API Test
-docker logs orion-backend-1 2>&1 | grep -i duplicate
+docker logs Parshu-backend-1 2>&1 | grep -i duplicate
 
 # Should see:
 duplicate_check_failed   # If error occurs
@@ -420,10 +420,10 @@ http://localhost:3000/admin
 
 ### **All Services Healthy**
 ```
-✅ orion-frontend-1   Up and healthy
-✅ orion-backend-1    Up and healthy
-✅ orion-postgres-1   Up and healthy
-✅ orion-redis-1      Up and healthy
+✅ Parshu-frontend-1   Up and healthy
+✅ Parshu-backend-1    Up and healthy
+✅ Parshu-postgres-1   Up and healthy
+✅ Parshu-redis-1      Up and healthy
 ```
 
 ### **Build Results**
@@ -581,7 +581,7 @@ content_threshold = 0.75  # 75% content similarity
 ### **Duplicates Not Being Detected**
 ```bash
 # Check backend logs
-docker logs orion-backend-1 2>&1 | grep -i duplicate
+docker logs Parshu-backend-1 2>&1 | grep -i duplicate
 
 # Verify duplicate_checker is imported
 # Check ingestion logs for errors
@@ -594,10 +594,10 @@ docker logs orion-backend-1 2>&1 | grep -i duplicate
 ### **Version History Empty**
 ```bash
 # Run migration
-docker exec orion-backend-1 alembic upgrade head
+docker exec Parshu-backend-1 alembic upgrade head
 
 # Check if table exists
-docker exec orion-postgres-1 psql -U orion_user -d orion_db \
+docker exec Parshu-postgres-1 psql -U Parshu_user -d Parshu_db \
   -c "SELECT * FROM report_versions;"
 
 # If table doesn't exist, migration didn't run
@@ -611,7 +611,7 @@ docker exec orion-postgres-1 psql -U orion_user -d orion_db \
 # Hard refresh: Cmd+Shift+R (Mac) / Ctrl+Shift+R (Windows)
 
 # Check frontend logs
-docker logs orion-frontend-1
+docker logs Parshu-frontend-1
 
 # Rebuild if needed
 docker-compose build frontend && docker-compose up -d

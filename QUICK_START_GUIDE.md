@@ -50,7 +50,7 @@
 1. Ingest articles from a source
 2. Add same article again (different source)
 3. Check backend logs:
-   docker logs orion-backend-1 2>&1 | grep "duplicate"
+   docker logs Parshu-backend-1 2>&1 | grep "duplicate"
 4. Expected: "duplicate_detected_skipping" message
 5. Article count doesn't increase
 ```
@@ -58,7 +58,7 @@
 **See It In Action:**
 ```bash
 # Check logs for duplicate detection
-docker logs orion-backend-1 2>&1 | grep -i "duplicate" | tail -20
+docker logs Parshu-backend-1 2>&1 | grep -i "duplicate" | tail -20
 
 # Look for messages like:
 # "duplicate_detected_skipping" - Article was skipped
@@ -299,11 +299,11 @@ curl http://localhost:8000/health
 # Expected: {"status":"healthy"}
 
 # 4. Check duplicate detection
-docker logs orion-backend-1 2>&1 | grep "DuplicateChecker"
+docker logs Parshu-backend-1 2>&1 | grep "DuplicateChecker"
 # Expected: Import successful, no errors
 
 # 5. Check version control
-docker exec orion-postgres-1 psql -U orion_user -d orion_db \
+docker exec Parshu-postgres-1 psql -U Parshu_user -d Parshu_db \
   -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name='report_versions';"
 # Expected: 1 (table exists)
 ```
@@ -346,7 +346,7 @@ docker exec orion-postgres-1 psql -U orion_user -d orion_db \
 ### **Feed page not loading?**
 ```bash
 # Check frontend logs
-docker logs orion-frontend-1 2>&1 | tail -50
+docker logs Parshu-frontend-1 2>&1 | tail -50
 
 # Rebuild and restart
 docker-compose build frontend
@@ -359,27 +359,27 @@ Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
 ### **Duplicates not being detected?**
 ```bash
 # Check if duplicate_checker is working
-docker logs orion-backend-1 2>&1 | grep "duplicate_check"
+docker logs Parshu-backend-1 2>&1 | grep "duplicate_check"
 
 # Verify file exists
-docker exec orion-backend-1 ls -la /app/app/articles/duplicate_checker.py
+docker exec Parshu-backend-1 ls -la /app/app/articles/duplicate_checker.py
 
 # Check threshold settings
-docker exec orion-backend-1 grep -n "similarity_threshold" \
+docker exec Parshu-backend-1 grep -n "similarity_threshold" \
   /app/app/integrations/sources.py
 ```
 
 ### **Version control not saving?**
 ```bash
 # Check if table exists
-docker exec orion-postgres-1 psql -U orion_user -d orion_db \
+docker exec Parshu-postgres-1 psql -U Parshu_user -d Parshu_db \
   -c "\dt report_versions"
 
 # If not, run migration
-docker exec orion-backend-1 alembic upgrade head
+docker exec Parshu-backend-1 alembic upgrade head
 
 # Check for errors
-docker logs orion-backend-1 2>&1 | grep -i "version"
+docker logs Parshu-backend-1 2>&1 | grep -i "version"
 ```
 
 ### **User Management tab not showing?**
@@ -401,32 +401,32 @@ docker-compose build frontend && docker-compose up -d frontend
 ### **Duplicate Detection**
 ```bash
 # Total duplicates detected today
-docker logs orion-backend-1 2>&1 | grep "duplicate_detected" | wc -l
+docker logs Parshu-backend-1 2>&1 | grep "duplicate_detected" | wc -l
 
 # Duplicate detection success rate
-docker logs orion-backend-1 2>&1 | \
+docker logs Parshu-backend-1 2>&1 | \
   grep -E "duplicate_detected|duplicate_check_failed"
 ```
 
 ### **Version Control**
 ```bash
 # Total versions created
-docker exec orion-postgres-1 psql -U orion_user -d orion_db \
+docker exec Parshu-postgres-1 psql -U Parshu_user -d Parshu_db \
   -c "SELECT COUNT(*) FROM report_versions;"
 
 # Reports with multiple versions
-docker exec orion-postgres-1 psql -U orion_user -d orion_db \
+docker exec Parshu-postgres-1 psql -U Parshu_user -d Parshu_db \
   -c "SELECT report_id, COUNT(*) FROM report_versions GROUP BY report_id HAVING COUNT(*) > 1;"
 ```
 
 ### **User Activity**
 ```bash
 # Active users
-docker exec orion-postgres-1 psql -U orion_user -d orion_db \
+docker exec Parshu-postgres-1 psql -U Parshu_user -d Parshu_db \
   -c "SELECT COUNT(*) FROM users WHERE is_active=true;"
 
 # User by role
-docker exec orion-postgres-1 psql -U orion_user -d orion_db \
+docker exec Parshu-postgres-1 psql -U Parshu_user -d Parshu_db \
   -c "SELECT role, COUNT(*) FROM users GROUP BY role;"
 ```
 
@@ -449,6 +449,6 @@ docker exec orion-postgres-1 psql -U orion_user -d orion_db \
 **Need help?**
 - Full docs: `COMPLETE_ENHANCEMENTS_SUMMARY.md`
 - API reference: http://localhost:8000/docs
-- Check logs: `docker logs orion-backend-1`
+- Check logs: `docker logs Parshu-backend-1`
 
-**Enjoy your enhanced Orion platform!** 🚀
+**Enjoy your enhanced Parshu platform!** 🚀

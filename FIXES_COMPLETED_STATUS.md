@@ -1,4 +1,4 @@
-# Orion Platform - Fixes Completed Status
+# Parshu Platform - Fixes Completed Status
 
 **Date:** 2026-01-23  
 **Session:** Knowledge Base, RAG, and IOC Fixes
@@ -270,7 +270,7 @@ User Request → Check Knowledge Base → Relevant Docs Retrieved
 ### If Knowledge Base Still Shows 403
 ```bash
 # Check backend logs
-docker logs orion-backend-1 2>&1 | grep -i "knowledge\|403"
+docker logs Parshu-backend-1 2>&1 | grep -i "knowledge\|403"
 
 # Verify user has valid token
 # In browser console:
@@ -283,10 +283,10 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/knowledge/
 ### If RAG Not Working
 ```bash
 # Check if db_session is passed
-docker logs orion-backend-1 2>&1 | grep -i "rag\|knowledge.*search"
+docker logs Parshu-backend-1 2>&1 | grep -i "rag\|knowledge.*search"
 
 # Verify documents in KB
-docker exec orion-postgres-1 psql -U orion_user -d orion_db \
+docker exec Parshu-postgres-1 psql -U Parshu_user -d Parshu_db \
   -c "SELECT id, title, status FROM knowledge_documents WHERE status='READY';"
 
 # Test KB search directly

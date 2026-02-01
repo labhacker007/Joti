@@ -1,4 +1,4 @@
-# Quick Login Guide - Orion Platform
+# Quick Login Guide - Parshu Platform
 
 **Status:** ✅ Login is working!
 

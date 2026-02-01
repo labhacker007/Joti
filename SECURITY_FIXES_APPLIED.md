@@ -1,4 +1,4 @@
-# Security Fixes Applied - Orion Platform
+# Security Fixes Applied - Parshu Platform
 
 **Date:** January 27, 2026  
 **Status:** Critical Security Issues Resolved
@@ -7,7 +7,7 @@
 
 ## Summary
 
-This document details all security fixes applied to the Orion platform following the comprehensive code review. All **CRITICAL** security issues have been addressed, and the platform is now significantly more secure.
+This document details all security fixes applied to the Parshu platform following the comprehensive code review. All **CRITICAL** security issues have been addressed, and the platform is now significantly more secure.
 
 ---
 
@@ -62,7 +62,7 @@ to_encode.update({
     "nbf": now,
     "jti": secrets.token_urlsafe(32),
     "iss": settings.APP_NAME,
-    "aud": "orion-api",
+    "aud": "Parshu-api",
 })
 ```
 
@@ -204,9 +204,9 @@ to_encode.update({
 
 3. **Set Database Credentials:**
    ```bash
-   POSTGRES_USER=orion_prod
+   POSTGRES_USER=Parshu_prod
    POSTGRES_PASSWORD=<generate-strong-password>
-   POSTGRES_DB=orion_production
+   POSTGRES_DB=Parshu_production
    ```
 
 4. **Update Docker Compose:**
