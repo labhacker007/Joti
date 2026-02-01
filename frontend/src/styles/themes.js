@@ -1,5 +1,5 @@
 // Parshu Theme Definitions
-// Six complete themes with light/dark modes + Hacker/Cyber mode overlays
+// Eight complete themes with light/dark modes + Hacker/Cyber mode overlays
 
 export const themes = {
   // ============================================
@@ -294,6 +294,106 @@ export const themes = {
       colorError: '#DC2626',
       colorInfo: '#7C3AED',
       borderRadius: 10,
+    },
+  },
+
+  // ============================================
+  // THEME 7: Obsidian Crimson (Dark) - Aggressive Threat Intel
+  // ============================================
+  'obsidian-crimson': {
+    id: 'obsidian-crimson',
+    name: 'Obsidian Crimson',
+    description: 'Aggressive dark theme with crimson accents for threat hunting',
+    mode: 'dark',
+    category: 'cyber',
+    colors: {
+      primary: '#EF4444',
+      primaryRgb: '239, 68, 68',
+      primaryHover: '#DC2626',
+      primaryLight: 'rgba(239, 68, 68, 0.15)',
+      primaryDark: '#B91C1C',
+      bgBody: '#0A0A0A',
+      bgCard: '#141414',
+      bgNavbar: '#050505',
+      bgElevated: '#1F1F1F',
+      textPrimary: '#FAFAFA',
+      textSecondary: '#A3A3A3',
+      textMuted: '#737373',
+      textInverse: '#0A0A0A',
+      success: '#22C55E',
+      successBg: 'rgba(34, 197, 94, 0.2)',
+      warning: '#F97316',
+      warningBg: 'rgba(249, 115, 22, 0.2)',
+      danger: '#EF4444',
+      dangerBg: 'rgba(239, 68, 68, 0.2)',
+      info: '#3B82F6',
+      infoBg: 'rgba(59, 130, 246, 0.2)',
+      border: '#262626',
+      iconPrimary: '#EF4444',
+      iconMuted: '#737373',
+      navText: '#FAFAFA',
+      navIcon: '#EF4444',
+      navHover: 'rgba(239, 68, 68, 0.15)',
+    },
+    antd: {
+      colorPrimary: '#EF4444',
+      colorSuccess: '#22C55E',
+      colorWarning: '#F97316',
+      colorError: '#EF4444',
+      colorInfo: '#3B82F6',
+      colorBgBase: '#0A0A0A',
+      colorTextBase: '#FAFAFA',
+      borderRadius: 10,
+    },
+  },
+
+  // ============================================
+  // THEME 8: Nord Aurora (Dark) - Modern Nordic
+  // ============================================
+  'nord-aurora': {
+    id: 'nord-aurora',
+    name: 'Nord Aurora',
+    description: 'Modern Nordic aurora-inspired theme with blue-green gradients',
+    mode: 'dark',
+    category: 'premium',
+    colors: {
+      primary: '#88C0D0',
+      primaryRgb: '136, 192, 208',
+      primaryHover: '#5E81AC',
+      primaryLight: 'rgba(136, 192, 208, 0.15)',
+      primaryDark: '#5E81AC',
+      bgBody: '#2E3440',
+      bgCard: '#3B4252',
+      bgNavbar: '#242933',
+      bgElevated: '#434C5E',
+      textPrimary: '#ECEFF4',
+      textSecondary: '#E5E9F0',
+      textMuted: '#D8DEE9',
+      textInverse: '#2E3440',
+      success: '#A3BE8C',
+      successBg: 'rgba(163, 190, 140, 0.2)',
+      warning: '#EBCB8B',
+      warningBg: 'rgba(235, 203, 139, 0.2)',
+      danger: '#BF616A',
+      dangerBg: 'rgba(191, 97, 106, 0.2)',
+      info: '#81A1C1',
+      infoBg: 'rgba(129, 161, 193, 0.2)',
+      border: '#4C566A',
+      iconPrimary: '#88C0D0',
+      iconMuted: '#D8DEE9',
+      navText: '#ECEFF4',
+      navIcon: '#88C0D0',
+      navHover: 'rgba(136, 192, 208, 0.2)',
+    },
+    antd: {
+      colorPrimary: '#88C0D0',
+      colorSuccess: '#A3BE8C',
+      colorWarning: '#EBCB8B',
+      colorError: '#BF616A',
+      colorInfo: '#81A1C1',
+      colorBgBase: '#2E3440',
+      colorTextBase: '#ECEFF4',
+      borderRadius: 8,
     },
   },
 };
