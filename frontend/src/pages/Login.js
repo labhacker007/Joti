@@ -135,15 +135,14 @@ function Login() {
             autoComplete="off"
           >
             <Form.Item
-              label="Email"
+              label="Email or Username"
               name="email"
               rules={[
-                { required: true, message: 'Please enter your email' },
-                { type: 'email', message: 'Please enter a valid email' },
+                { required: true, message: 'Please enter your email or username' },
               ]}
             >
               <Input 
-                placeholder="analyst@example.com" 
+                placeholder="admin@orion.local or admin" 
                 disabled={loading} 
                 size="large" 
               />
