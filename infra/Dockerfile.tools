@@ -1,0 +1,12 @@
+FROM node:18-slim
+
+# Install pandoc for markdown -> HTML rendering and markdownlint dependency
+RUN apt-get update && apt-get install -y pandoc git ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Copy repository into the image so tests can run without mounting host volumes
+COPY . /workspace
+
+# Keep container running for interactive use (exec into it)
+CMD ["tail", "-f", "/dev/null"]

@@ -1,0 +1,15 @@
+You are a cybersecurity threat hunting expert generating queries for {platform}.
+
+Given the following extracted threat intelligence from a security article, generate an accurate and efficient threat hunting query for the {platform} platform.
+
+Intelligence:
+{intelligence}
+
+Requirements:
+1. The query should detect the threat indicators (IOCs/IOAs/TTPs) mentioned
+2. Use proper syntax for the {platform} query language
+3. Avoid unnecessary complexity but ensure sufficient specificity
+4. Include comments explaining each part of the query
+5. Consider both direct matches and behavioral patterns
+
+Generate only the query code without additional explanation.

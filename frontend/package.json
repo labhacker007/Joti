@@ -1,0 +1,55 @@
+{
+  "name": "threat-intel-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "axios": "^1.6.0",
+    "zustand": "^4.4.0",
+    "antd": "^5.11.0",
+    "lucide-react": "^0.294.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "test:e2e": "playwright test",
+    "test:e2e:ci": "playwright test --reporter=github",
+    "playwright:install": "npx playwright install --with-deps"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "react-scripts": "5.0.1",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/jest-dom": "^6.1.0",
+    "@playwright/test": "^1.45.0",
+    "http-server": "^14.1.1"
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!(axios)/)"
+    ],
+    "moduleNameMapper": {
+      "^axios$": "<rootDir>/src/__mocks__/axios.js"
+    }
+  }
+}

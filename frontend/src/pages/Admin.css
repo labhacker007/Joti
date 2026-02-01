@@ -1,0 +1,363 @@
+/* Admin Page - Unified Theme System */
+
+.admin-container {
+  padding: var(--spacing-lg);
+  background: var(--bg-body);
+  min-height: calc(100vh - 56px);
+}
+
+.admin-header {
+  margin-bottom: var(--spacing-lg);
+}
+
+.admin-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.admin-title .anticon {
+  color: var(--primary);
+}
+
+/* Admin Card */
+.admin-card {
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
+}
+
+.admin-card .ant-card-head {
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--card-header-padding);
+}
+
+.admin-card .ant-card-head-title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Tabs styling */
+.admin-card .ant-tabs-tab {
+  font-size: var(--font-size-base);
+  color: var(--text-muted);
+  padding: 12px 16px;
+}
+
+.admin-card .ant-tabs-tab-active {
+  color: var(--primary) !important;
+}
+
+.admin-card .ant-tabs-tab:hover {
+  color: var(--primary);
+}
+
+.admin-card .ant-tabs-ink-bar {
+  background: var(--primary);
+}
+
+/* Stats Cards */
+.admin-stat-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  padding: var(--spacing-md);
+  text-align: center;
+  transition: var(--transition);
+}
+
+.admin-stat-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Clickable stat tiles in Overview */
+.stat-tile {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.stat-tile:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.admin-stat-card .ant-statistic-title {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.admin-stat-card .ant-statistic-content-value {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Health Status */
+.health-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  padding: var(--spacing-md);
+}
+
+.health-card .health-label {
+  font-weight: 500;
+  color: var(--text-primary);
+  text-transform: capitalize;
+  margin-bottom: 8px;
+}
+
+/* Settings Section */
+.settings-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.settings-card .ant-descriptions-item-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.settings-card .ant-descriptions-item-content {
+  color: var(--text-primary);
+}
+
+/* GenAI Status */
+.genai-provider-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  transition: var(--transition);
+}
+
+.genai-provider-card:hover {
+  border-color: var(--primary);
+}
+
+.genai-provider-card.active {
+  border-color: var(--success);
+  box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.1);
+}
+
+/* Ollama Setup */
+.ollama-setup-card {
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+}
+
+.ollama-model-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  text-align: center;
+  padding: var(--spacing-md);
+  transition: var(--transition);
+}
+
+.ollama-model-card:hover {
+  border-color: var(--primary);
+}
+
+.ollama-model-card.installed {
+  background: var(--success-bg);
+  border-color: var(--success);
+}
+
+/* Scheduler Jobs */
+.job-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.job-item:last-child {
+  border-bottom: none;
+}
+
+.job-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+
+.job-meta {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+/* Dark theme adjustments */
+.theme-dark .admin-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.theme-dark .admin-stat-card,
+.theme-dark .health-card,
+.theme-dark .settings-card,
+.theme-dark .genai-provider-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.theme-dark .ollama-setup-card {
+  background: var(--primary-light);
+}
+
+.theme-dark .ollama-model-card.installed {
+  background: var(--success-bg);
+}
+
+/* Data Retention Section - Container */
+.retention-section .ant-card-body {
+  padding: 16px !important;
+  overflow: hidden;
+}
+
+/* Data Retention Items */
+.retention-item {
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  height: 100%;
+  transition: all var(--transition);
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.retention-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.retention-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.retention-header .anticon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.retention-header .ant-typography {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.retention-value {
+  margin-bottom: 4px;
+}
+
+.retention-value .ant-input-number {
+  width: 100%;
+}
+
+.retention-value .ant-input-number-group-wrapper {
+  width: 100%;
+}
+
+.retention-value .ant-input-number-group-addon {
+  background: var(--bg-card);
+  font-size: 10px;
+  padding: 0 6px;
+}
+
+.retention-value .ant-input-number-input {
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+/* Retention description text */
+.retention-item > .ant-typography[type="secondary"] {
+  font-size: 10px;
+  line-height: 1.3;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ensure retention row doesn't overflow card - override Ant gutter margins */
+.ant-card .ant-row:has(.retention-item) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: 100%;
+}
+
+.ant-card .ant-row:has(.retention-item) > .ant-col {
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+}
+
+.ant-card .ant-row:has(.retention-item) > .ant-col:first-child {
+  padding-left: 0 !important;
+}
+
+.ant-card .ant-row:has(.retention-item) > .ant-col:last-child {
+  padding-right: 0 !important;
+}
+
+/* Dark Theme */
+.theme-dark .retention-section .ant-card-body {
+  padding: 16px !important;
+}
+
+.theme-dark .retention-item {
+  background: var(--bg-elevated);
+}
+
+.theme-dark .retention-value .ant-input-number-group-addon {
+  background: var(--bg-card);
+}
+
+/* Hacker Mode */
+body.hacker-mode .retention-item {
+  background: #1A1A1A;
+  border-color: #333;
+}
+
+body.hacker-mode .retention-item:hover {
+  border-color: #00FF41;
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
+}
+
+/* Cyber Mode */
+body.cyber-mode .retention-item {
+  background: var(--bg-elevated);
+  border-color: #1A1A3F;
+}
+
+body.cyber-mode .retention-item:hover {
+  border-color: #00F0FF;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .admin-container {
+    padding: var(--spacing-md);
+  }
+  
+  .admin-card .ant-tabs-tab {
+    padding: 10px 12px;
+    font-size: var(--font-size-sm);
+  }
+}

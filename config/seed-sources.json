@@ -1,0 +1,122 @@
+[
+  {
+    "name": "CISA Cybersecurity Advisories",
+    "url": "https://www.cisa.gov/uscert/ncas/alerts.xml",
+    "feed_type": "rss",
+    "description": "Official CISA cybersecurity alerts and advisories"
+  },
+  {
+    "name": "SANS Internet Storm Center",
+    "url": "https://isc.sans.edu/rssfeed.xml",
+    "feed_type": "rss",
+    "description": "Daily cyber attack trends and threat indicators from SANS ISC"
+  },
+  {
+    "name": "BleepingComputer",
+    "url": "https://www.bleepingcomputer.com/feed/",
+    "feed_type": "rss",
+    "description": "Breaking news on malware, ransomware, vulnerabilities, and data breaches"
+  },
+  {
+    "name": "Dark Reading",
+    "url": "https://www.darkreading.com/rss.xml",
+    "feed_type": "rss",
+    "description": "Comprehensive enterprise security news and analysis"
+  },
+  {
+    "name": "The Hacker News",
+    "url": "https://feeds.feedburner.com/TheHackersNews",
+    "feed_type": "rss",
+    "description": "Cybersecurity news, hacking, and security vulnerabilities"
+  },
+  {
+    "name": "SecurityWeek",
+    "url": "https://feeds.feedburner.com/securityweek",
+    "feed_type": "rss",
+    "description": "Cybersecurity news, insights, and expert analysis"
+  },
+  {
+    "name": "Infosecurity Magazine",
+    "url": "https://www.infosecurity-magazine.com/rss/news/",
+    "feed_type": "rss",
+    "description": "Information security news and analysis"
+  },
+  {
+    "name": "CyberScoop",
+    "url": "https://www.cyberscoop.com/feed/",
+    "feed_type": "rss",
+    "description": "News about cybersecurity policy, technology and operations"
+  },
+  {
+    "name": "The Record",
+    "url": "https://therecord.media/feed",
+    "feed_type": "rss",
+    "description": "Cybersecurity news from Recorded Future"
+  },
+  {
+    "name": "Krebs on Security",
+    "url": "https://krebsonsecurity.com/feed/",
+    "feed_type": "rss",
+    "description": "In-depth cybersecurity investigation and analysis by Brian Krebs"
+  },
+  {
+    "name": "Schneier on Security",
+    "url": "https://www.schneier.com/feed/atom/",
+    "feed_type": "atom",
+    "description": "Security research and commentary by Bruce Schneier"
+  },
+  {
+    "name": "Threatpost",
+    "url": "https://threatpost.com/feed/",
+    "feed_type": "rss",
+    "description": "Independent security news site covering vulnerabilities and threats"
+  },
+  {
+    "name": "Reddit Cybersecurity",
+    "url": "https://www.reddit.com/r/cybersecurity/.rss",
+    "feed_type": "rss",
+    "description": "Community-driven cybersecurity discussions and news"
+  },
+  {
+    "name": "Mandiant Blog",
+    "url": "https://www.mandiant.com/resources/blog/rss.xml",
+    "feed_type": "rss",
+    "description": "Threat research, APT analysis, and incident response from Mandiant"
+  },
+  {
+    "name": "Talos Intelligence",
+    "url": "https://blog.talosintelligence.com/feeds/posts/default",
+    "feed_type": "atom",
+    "description": "Threat intelligence and vulnerability research from Cisco Talos"
+  },
+  {
+    "name": "CrowdStrike Blog",
+    "url": "https://www.crowdstrike.com/blog/feed/",
+    "feed_type": "rss",
+    "description": "Threat hunting, adversary intelligence, and endpoint protection insights"
+  },
+  {
+    "name": "Palo Alto Unit 42",
+    "url": "https://unit42.paloaltonetworks.com/feed/",
+    "feed_type": "rss",
+    "description": "Threat research from Palo Alto Networks Unit 42"
+  },
+  {
+    "name": "Microsoft Security Blog",
+    "url": "https://www.microsoft.com/en-us/security/blog/feed/",
+    "feed_type": "rss",
+    "description": "Security research and threat intelligence from Microsoft"
+  },
+  {
+    "name": "Google Project Zero",
+    "url": "https://googleprojectzero.blogspot.com/feeds/posts/default",
+    "feed_type": "atom",
+    "description": "Zero-day vulnerability research from Google's elite security team"
+  },
+  {
+    "name": "Malwarebytes Labs",
+    "url": "https://blog.malwarebytes.com/feed/",
+    "feed_type": "rss",
+    "description": "Malware analysis, threat intelligence, and cybersecurity research"
+  }
+]

@@ -1,0 +1,58 @@
+/* Watchlist - Unified Theme System */
+
+.watchlist-container {
+  padding: var(--spacing-lg);
+  background: var(--bg-body);
+  min-height: calc(100vh - 56px);
+}
+
+.watchlist-header {
+  margin-bottom: var(--spacing-lg);
+}
+
+.watchlist-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.watchlist-title .anticon {
+  color: var(--warning);
+}
+
+.watchlist-card {
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
+}
+
+.watchlist-item {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.watchlist-item:hover {
+  background: var(--primary-light);
+}
+
+.watchlist-keyword {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+
+.watchlist-count {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.keyword-tag {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: var(--warning);
+}
