@@ -81,3 +81,13 @@ This file defines page/tab permissions and default role access for UI/navigation
 **Acceptance criteria**
 - No dead/unused permission-mapping code remains without explicit documentation and tests.
 
+---
+
+## Status update (2026-02-02)
+
+Mitigation applied to reduce RBAC drift between UI navigation, admin RBAC display, and backend “my permissions” output:
+
+- `backend/app/auth/unified_permissions.py` now derives page access from `PAGE_DEFINITIONS` and API permissions from `app.auth.rbac` (removes hard-coded parallel registries).
+- `backend/app/users/routes.py` now returns `all_permissions` (in addition to `api_permissions`) to match the frontend contract.
+- `backend/app/admin/routes.py` `/admin/rbac/pages/role/{role}` now returns page-level `all_permissions` (per-page) plus `granted_permissions` subset (defaults or persisted page permissions when present), instead of incorrectly returning API permissions as “page permissions”.
+- Regression tests added: `backend/tests/test_permissions_endpoints.py`.

@@ -1,51 +1,47 @@
-# Security Issues Inventory (Current)
+# Security Issues Inventory
 
-We are **not** done reviewing the entire repo. This list contains issues found so far in the files reviewed to date, plus a short “next files to review” backlog.
+Last updated: **2026-02-02**
 
-## Issues Found (reviewed files)
+Review coverage is still **partial** (we have not audited every file in the repo). This file tracks findings discovered so far and their current status.
 
-| File | Severity | Issue | What to fix (summary) |
-|---|---:|---|---|
-| `docker-compose.yml` | High | Default DB creds + default `SECRET_KEY` | Remove insecure defaults; require explicit env/secrets; fail-fast on weak/missing secrets |
-| `docker-compose.yml` | High | Postgres/Redis exposed on `0.0.0.0` | Remove host port publishing or bind to `127.0.0.1` only |
-| `docker-compose.yml` | Medium | Debug/reload enabled by default | Split dev/prod compose or use profiles; ensure prod has `DEBUG=false` and no `--reload` |
-| `docker-compose.yml` | Medium | Container → host access (`host-gateway`) | Make dev-only or run Ollama as a service container |
-| `docker-compose.yml` | Medium | Missing container hardening | Add `no-new-privileges`, drop caps, non-root, read-only FS (where compatible) |
-| `docker-compose.yml` | Low/Med | Supply-chain pinning (`latest`, no digests) | Pin by digest for prod; avoid `latest` model tags |
-| `infra/Dockerfile.backend` | High | Runs as root | Add non-root user and switch with `USER` |
-| `infra/Dockerfile.backend` | Med/High | Build toolchain shipped (e.g., `gcc`) | Use multi-stage build; keep runtime minimal |
-| `infra/Dockerfile.backend` | Medium | Weak dependency provenance controls | Pin base image digest; lock Python deps (hashes/lockfile); add SCA in CI |
-| `infra/Dockerfile.backend` | Low/Med | Tests copied into runtime image | Don’t copy tests into runtime image |
-| `infra/Dockerfile.backend` | Medium | `config/` copied into image (potential secret leak) | Ensure config is non-sensitive; move secrets to env/secret manager; add guardrails |
-| `backend/app/auth/page_permissions.py` | High | Multiple RBAC sources-of-truth (drift risk) | Consolidate permissions registry; add CI test to prevent drift |
-| `backend/app/auth/page_permissions.py` | Medium | `default_roles` can be misused to grant manage perms | Separate nav vs action perms; add guardrails for low-priv roles |
-| `backend/app/auth/page_permissions.py` | Low/Med | Roles are raw strings | Use a shared enum/validator; add tests |
-| `backend/app/auth/dependencies.py` | High | Impersonation trusts token claims | Verify impersonation eligibility against DB/permissions; harden claim model |
-| `backend/app/auth/dependencies.py` | Low/Med | Raw token error detail returned | Return generic 401; log details server-side |
-| `backend/app/auth/dependencies.py` | Low/Med | Inconsistent JWT `sub` typing | Standardize `sub` as string and cast explicitly |
-| `backend/app/genai/routes.py` | High | “Admin” endpoints not admin-protected | Lock down `/genai/admin/configs` and any `/admin/*` endpoints with `require_permission(...)` |
-| `backend/app/genai/routes.py` | Medium | Provider status info leakage + raw error strings | Restrict to admin or redact; don’t return raw exception text |
-| `backend/app/genai/routes.py` | Med/High | Potential SSRF via configurable provider base URL | Validate/allowlist base URLs; add egress controls |
-| `backend/app/genai/routes.py` | Medium | User-controlled `model` without allowlist enforcement | Enforce enabled/approved model allowlist per role/quota |
-| `backend/app/genai/routes.py` | Low/Med | Cost/DoS guardrails not clearly enforced at boundary | Add hard ceilings + rate limiting + quota checks before provider calls |
-| `backend/app/core/config.py` | High | Hard-coded default DB creds + `SECRET_KEY` | Remove credential-bearing defaults from code; fail-fast unless explicit dev flag |
-| `backend/app/core/config.py` | Medium | “Production mode” depends on `DEBUG` parsing | Use explicit `ENV` and let settings parse booleans |
-| `backend/app/core/config.py` | Medium | SSRF allowlist may not be enforced consistently | Centralize safe fetch + tests; ensure all outbound fetches use it |
-| `backend/app/core/config.py` | Medium | `OLLAMA_BASE_URL` default encourages host access | Make dev-only; require explicit config in prod |
-| `backend/app/main.py` | High | Unauthenticated `/setup/*` endpoints | Remove/disable in prod; protect with admin perm/bootstrap token in dev |
-| `backend/app/main.py` | Med/High | Startup schema mutation via raw SQL | Move to Alembic/deployment migrations |
-| `backend/app/main.py` | Medium | Auto-seeding DB at startup | Make opt-in dev-only flag |
-| `backend/app/main.py` | Medium | CSP includes `unsafe-eval`/`unsafe-inline` | Align CSP to UI needs; avoid `unsafe-eval` |
-| `backend/app/core/rate_limit.py` | High | High-cardinality rate-limit keys (memory DoS) | Normalize paths (route template), cleanup keys, avoid per-ID buckets |
-| `backend/app/core/rate_limit.py` | Medium | In-memory limiter doesn’t work in multi-worker | Use Redis/shared limiter |
-| `backend/app/core/rate_limit.py` | Medium | Not proxy-aware client IP | Use trusted proxy headers middleware/config |
+## Fixed / mitigated (so far)
+
+- [x] **High** `docker-compose.dev.yml`: removed default DB creds/default `SECRET_KEY`, bound DB/Redis ports to `127.0.0.1`, and separated dev vs prod compose.
+- [x] **Medium** `docker-compose.yml`: added a production-oriented compose without bind mounts and without default credentials.
+- [x] **High** `infra/Dockerfile.backend`: multi-stage build + non-root runtime user + removed build toolchain/tests from runtime image.
+- [x] **Medium** `infra/Dockerfile.frontend`: non-root runtime user.
+- [x] **High** `backend/app/core/config.py`: removed credential-bearing defaults; added explicit `ENV` + boolean `DEBUG`; fail-fast for missing `SECRET_KEY`/`DATABASE_URL` in prod; dev/test get safe defaults.
+- [x] **High** SSRF class of issues across `backend/app/knowledge/crawler.py`, `backend/app/ingestion/parser.py`, `backend/app/users/feeds.py`: centralized outbound URL validation + redirect validation + response size caps via `backend/app/core/ssrf.py` and `backend/app/core/fetch.py`.
+- [x] **High** `backend/app/main.py`: `/setup/*` disabled in prod and optionally gated by `SETUP_TOKEN`; CSP tightened (no `unsafe-eval`, limited `unsafe-inline` to docs only).
+- [x] **High** `backend/app/core/rate_limit.py`: normalized keys to prevent high-cardinality memory DoS; added proxy-aware client IP handling with trusted proxy allowlist; added Redis-backed limiter fallback; tests run with `ENV=test` and bypass middleware.
+- [x] **High** `backend/app/auth/dependencies.py`: impersonation claims now require DB role `ADMIN`, token decode details no longer leak, and API permission checks use a single source-of-truth (`app.auth.rbac`) plus per-user grants/denies and additional roles.
+- [x] **High** `backend/app/auth/saml.py` + `frontend/src/pages/Login.js`: SSO tokens no longer placed in query strings (moved to URL fragment); frontend accepts both for backward compatibility.
+- [x] **Medium** `backend/app/routers/__init__.py`: `/auth/register` now enforces a minimum password length (12+), and `/auth/login` no longer sleeps per request (dummy verify instead).
+- [x] **High** `backend/app/reports/routes.py`: replaced ad-hoc role checks with explicit permissions for edit/publish/unpublish; added `edit:reports` and `publish:reports` to RBAC.
+- [x] **High** `backend/app/reports/routes.py`: mitigated stored XSS in `GET /reports/{id}/export/html` via output encoding + strict URL/CSS sanitization + safe link rendering.
+- [x] **Medium/High** `backend/app/reports/routes.py`: mitigated CSV/Excel formula injection in `GET /reports/{id}/export/csv` via cell prefixing for dangerous leading characters.
+- [x] **Medium** `backend/app/articles/routes.py`: removed raw exception details from image-fetch error responses.
+- [x] **High** `backend/app/knowledge/routes.py`: restricted admin/global KB APIs to `manage:knowledge`, enforced doc ownership checks, prevented path traversal on upload, and fixed background-task DB session reuse.
+- [x] **Medium** `backend/app/iocs/routes.py`: removed raw exception details from multiple 500 responses.
+- [x] **High** `backend/app/genai/routes.py`: admin endpoints protected with `require_permission("manage:genai")`; provider status redacts sensitive fields for non-admins.
+- [x] **High** secrets-at-rest: dedicated encryption support added (`CONFIG_ENCRYPTION_KEY`) and decrypt is fail-closed (`backend/app/core/crypto.py`, used by `backend/app/admin/routes.py` and `backend/app/genai/provider.py`).
+- [x] **Medium** `backend/app/admin/routes.py`: removed raw exception strings from 500/502 responses and from `"error"/"reason"` JSON fields; added regression test.
+- [x] **High** RBAC drift reduction: `backend/app/auth/unified_permissions.py`, `backend/app/auth/page_permissions.py`, `backend/app/users/routes.py`, `backend/app/admin/routes.py`: unified page access + permission display for the UI and added regression tests for `/users/my-permissions` and `/admin/rbac/pages/role/{role}`.
+- [x] **Critical** `infra/k8s-manifests.yaml`: replaced with safer baseline (Secrets for creds, no public LoadBalancers, SecurityContexts/seccomp, PVC for Postgres, NetworkPolicies).
+
+Validation: `backend/.venv310/Scripts/python -m pytest -q` => **17 passed**.
+
+## Remaining (needs work)
+
+- [ ] **Low/Med** `docker-compose.dev.yml` + `infra/k8s-manifests.yaml`: supply-chain pinning (digests / immutable tags), image signing, CI SCA.
+- [ ] **Medium** `infra/Dockerfile.backend`: base image digest pinning and dependency locking (hashes/lockfile).
+- [ ] **Medium** `backend/app/genai/routes.py`: enforce a server-side model allowlist (per role/quota) before provider calls.
+- [ ] **Med/High** `backend/app/main.py`: startup schema mutation via raw SQL still exists (now dev-only); should be migrated to Alembic/deployment migrations.
 
 ## Next high-risk areas to review (not yet reviewed)
 
-If you want “review everything”, these are the next highest impact zones to audit:
-- AuthN/AuthZ enforcement: `backend/app/auth/dependencies.py`, JWT/session code, admin RBAC service/routes.
+- AuthN/AuthZ enforcement: JWT/session code, admin RBAC service/routes, all `require_permission(...)` usage.
 - Data access / IDOR: routes under `backend/app/*/routes.py` that accept IDs (articles, reports, knowledge, users).
-- GenAI execution layer: `backend/app/chatbot/service.py`, `backend/app/genai/provider.py`, prompt templates (`backend/app/genai/prompts.py`) for injection/exfiltration.
-- SSRF/external fetchers: ingestion tasks (`backend/app/ingestion/tasks.py`), feed connectors, notifications/webhooks (`backend/app/notifications/*`).
-- Secrets/config: `backend/app/core/config.py`, `env.example`, runtime secret loading patterns.
-- Infra: other Dockerfiles, Kubernetes manifests under `infra/`, CI/CD scripts, `.env*` handling.
+- GenAI execution: `backend/app/chatbot/service.py`, `backend/app/genai/unified_service.py`, prompt templates for injection/exfiltration.
+- Other outbound-call surfaces: `backend/app/ingestion/tasks.py`, notifications/webhooks under `backend/app/notifications/*`.
+- Secrets/config: `.env*` handling, secret loading patterns, config file hygiene under `config/`.

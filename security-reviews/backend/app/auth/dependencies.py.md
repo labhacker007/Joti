@@ -1,62 +1,41 @@
 # Security Review: `backend/app/auth/dependencies.py`
 
-Scope: authentication, authorization enforcement helpers, and role impersonation controls.
+Reviewed: 2026-02-02
 
-## Findings (what to fix)
+Scope: authentication (JWT validation), authorization enforcement (`require_permission`), and role impersonation controls.
 
-### 1) Impersonation trust model relies on token claims without independent authorization checks (High)
-**What I see**
-- `get_current_user()` honors token claims `is_impersonating`, `role`, `impersonator_username` and sets `_impersonation_context`.
-- There is **no** independent server-side check here that the authenticated user is allowed to impersonate (e.g., admin-only or a specific permission).
+## Key risks found
 
-**Why it matters**
-- The only thing preventing “role claim escalation” is the token issuance path.
-- If any token issuance bug exists (or token signing key leaks), impersonation becomes a privilege escalation amplifier.
-- Defense-in-depth: authn code should not blindly trust an impersonation claim; it should verify it.
+### 1) Impersonation claim trust (High)
 
-**Fix**
-- Only honor impersonation claims when *both* are true:
-  1) The token indicates impersonation, and
-  2) The **actual user in the DB** has an explicit permission/flag (e.g., `can_impersonate_roles` or `Permission.MANAGE_RBAC`).
-- Prefer encoding impersonation in a dedicated claim set, e.g.:
-  - `impersonator_id`, `assumed_role`, `original_role`, `impersonation_session_id`
-  - and validate these claims against DB state/audit policy.
-
-**Acceptance criteria**
-- A non-admin user cannot activate impersonation even if a token contains the impersonation fields.
-- Impersonation is rejected if the DB says the user is not allowed to impersonate.
-
----
-
-### 2) Inconsistent `sub` typing (string vs int) can cause subtle auth failures (Low/Medium)
-**What I see**
-- `get_current_user()` treats `payload["sub"]` as an `int` and passes it directly into `User.id` query.
-- Other parts of the app create tokens with `"sub": str(user.id)` (string) and sometimes with `"sub": user.id` (int).
+**What was happening**
+- Tokens containing `is_impersonating` + `role` could influence the effective role used for authorization.
 
 **Why it matters**
-- Inconsistent typing can lead to “user not found” failures or unexpected behavior depending on DB/driver coercion.
-- Auth bugs often turn into security bugs during future refactors.
+- If impersonation claims are honored without an independent server-side authorization check, any token issuance bug (or key compromise) becomes a privilege escalation amplifier.
 
 **Fix**
-- Standardize JWT `sub` to a string everywhere (OIDC convention), and cast to int explicitly before DB query:
-  - `user_id = int(payload["sub"])` with strict error handling.
+- Impersonation claims are only honored if the **actual DB role** is `ADMIN`.
 
-**Acceptance criteria**
-- Tokens issued by all flows have consistent claim types.
+### 2) Inconsistent JWT `sub` typing (Low/Medium)
 
----
-
-### 3) Returning raw token decode errors in HTTP responses (Low/Medium)
-**What I see**
-- `decode_token()` raises `ValueError(f\"Invalid token claims: {str(e)}\")`, and `get_current_user()` returns `detail=str(e)` for `ValueError`.
+**What was happening**
+- Some flows issued `sub` as a string; code paths assumed it could be used as an `int`.
 
 **Why it matters**
-- Token validation error strings can leak details useful for attackers (issuer/audience mismatch, claim values, etc.).
+- Inconsistent typing causes brittle auth behavior and increases risk during refactors.
 
 **Fix**
-- Log detailed errors server-side.
-- Return a generic `401` message (e.g., `"Invalid token"`) to clients.
+- `sub` is now cast defensively to `int` and invalid values are rejected with a generic 401.
 
-**Acceptance criteria**
-- Client-facing auth errors do not expose claim validation details.
+### 3) Multiple permission sources-of-truth (High)
 
+**What was happening**
+- Authorization checks combined multiple systems (new/legacy), creating drift risk and unexpected grants.
+
+**Fix**
+- `require_permission` now uses a single source-of-truth for API authorization: `app.auth.rbac.has_permission(...)` (plus per-user `custom_permissions` and `additional_roles`).
+
+## Validation
+
+- Backend tests: `backend/.venv310/Scripts/python -m pytest -q` (passes as of 2026-02-02).

@@ -4,16 +4,15 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      # Development defaults - override in production via .env
-      POSTGRES_USER: ${POSTGRES_USER:-app_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app_pass}
-      POSTGRES_DB: ${POSTGRES_DB:-app_db}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app_user"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,7 +20,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -35,11 +34,11 @@ services:
       context: .
       dockerfile: infra/Dockerfile.backend
     environment:
-      # Development defaults - override in production via .env
-      DATABASE_URL: postgresql://${POSTGRES_USER:-app_user}:${POSTGRES_PASSWORD:-app_pass}@postgres:5432/${POSTGRES_DB:-app_db}
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production-minimum-32-chars}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      SECRET_KEY: ${SECRET_KEY}
       DEBUG: "${DEBUG:-true}"
+      ENV: ${ENV:-dev}
       CORS_ORIGINS: http://localhost:3000,http://localhost:8000
       # GenAI - Use Ollama (local) by default for all GenAI features
       GENAI_PROVIDER: ollama
@@ -69,7 +68,7 @@ services:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()"]
       interval: 10s
       timeout: 5s
       retries: 5

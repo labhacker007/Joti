@@ -1,11 +1,11 @@
 ﻿# Security Review Index
 
-Generated: 2026-02-01
+Generated: 2026-02-02
 
 ## Progress
 
-- Tracked files: 293
-- Reviewed so far: 7
+- Tracked files: 304
+- Reviewed so far: 15
 
 Reviewed reports live under security-reviews/ mirroring file paths.
 
@@ -15,12 +15,12 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 - [ ] `backend/app/__init__.py`
 - [ ] `backend/app/admin/__init__.py`
 - [ ] `backend/app/admin/rbac_service.py`
-- [ ] `backend/app/admin/routes.py`
+- [x] `backend/app/admin/routes.py`
 - [ ] `backend/app/analytics/__init__.py`
 - [ ] `backend/app/analytics/routes.py`
 - [ ] `backend/app/articles/__init__.py`
 - [ ] `backend/app/articles/duplicate_checker.py`
-- [ ] `backend/app/articles/routes.py`
+- [x] `backend/app/articles/routes.py`
 - [ ] `backend/app/articles/schemas.py`
 - [ ] `backend/app/articles/service.py`
 - [ ] `backend/app/audit/__init__.py`
@@ -31,11 +31,11 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 - [ ] `backend/app/auth/comprehensive_permissions.py`
 - [x] `backend/app/auth/dependencies.py`
 - [x] `backend/app/auth/page_permissions.py`
-- [ ] `backend/app/auth/rbac.py`
-- [ ] `backend/app/auth/saml.py`
+- [x] `backend/app/auth/rbac.py`
+- [x] `backend/app/auth/saml.py`
 - [ ] `backend/app/auth/schemas.py`
-- [ ] `backend/app/auth/security.py`
-- [ ] `backend/app/auth/unified_permissions.py`
+- [x] `backend/app/auth/security.py`
+- [x] `backend/app/auth/unified_permissions.py`
 - [ ] `backend/app/automation/__init__.py`
 - [ ] `backend/app/automation/engine.py`
 - [ ] `backend/app/automation/routes.py`
@@ -50,7 +50,7 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 - [x] `backend/app/core/config.py`
 - [ ] `backend/app/core/database.py`
 - [ ] `backend/app/core/logging.py`
-- [ ] `backend/app/core/rate_limit.py`
+- [x] `backend/app/core/rate_limit.py`
 - [ ] `backend/app/extraction/__init__.py`
 - [ ] `backend/app/extraction/extractor.py`
 - [ ] `backend/app/extraction/ioc_types.py`
@@ -59,7 +59,7 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 - [ ] `backend/app/genai/models.py`
 - [ ] `backend/app/genai/prompts.py`
 - [ ] `backend/app/genai/prompts/hunt_query_v1.txt`
-- [ ] `backend/app/genai/provider.py`
+- [x] `backend/app/genai/provider.py`
 - [x] `backend/app/genai/routes.py`
 - [ ] `backend/app/genai/testing.py`
 - [ ] `backend/app/genai/unified_service.py`
@@ -74,7 +74,7 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 - [ ] `backend/app/hunts/routes.py`
 - [ ] `backend/app/hunts/tracking.py`
 - [ ] `backend/app/ingestion/__init__.py`
-- [ ] `backend/app/ingestion/parser.py`
+- [x] `backend/app/ingestion/parser.py`
 - [ ] `backend/app/ingestion/tasks.py`
 - [ ] `backend/app/integrations/__init__.py`
 - [ ] `backend/app/integrations/refresh_settings.py`
@@ -85,11 +85,11 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 - [ ] `backend/app/intelligence/orchestrator.py`
 - [ ] `backend/app/intelligence/routes.py`
 - [ ] `backend/app/intelligence/similarity.py`
-- [ ] `backend/app/iocs/routes.py`
+- [x] `backend/app/iocs/routes.py`
 - [ ] `backend/app/knowledge/__init__.py`
-- [ ] `backend/app/knowledge/crawler.py`
-- [ ] `backend/app/knowledge/routes.py`
-- [ ] `backend/app/knowledge/service.py`
+- [x] `backend/app/knowledge/crawler.py`
+- [x] `backend/app/knowledge/routes.py`
+- [x] `backend/app/knowledge/service.py`
 - [x] `backend/app/main.py`
 - [ ] `backend/app/models.py`
 - [ ] `backend/app/models_agentic.py`
@@ -98,13 +98,13 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 - [ ] `backend/app/notifications/provider.py`
 - [ ] `backend/app/notifications/servicenow.py`
 - [ ] `backend/app/reports/__init__.py`
-- [ ] `backend/app/reports/routes.py`
+- [x] `backend/app/reports/routes.py`
 - [ ] `backend/app/reports/version_control.py`
-- [ ] `backend/app/routers/__init__.py`
+- [x] `backend/app/routers/__init__.py`
 - [ ] `backend/app/seeds.py`
 - [ ] `backend/app/users/__init__.py`
-- [ ] `backend/app/users/feeds.py`
-- [ ] `backend/app/users/routes.py`
+- [x] `backend/app/users/feeds.py`
+- [x] `backend/app/users/routes.py`
 - [ ] `backend/app/watchlist/__init__.py`
 - [ ] `backend/app/watchlist/routes.py`
 - [ ] `backend/create_genai_tables.sql`
@@ -213,7 +213,7 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 - [ ] `frontend/src/pages/IntelNews.css`
 - [ ] `frontend/src/pages/IntelNews.js`
 - [ ] `frontend/src/pages/Login.css`
-- [ ] `frontend/src/pages/Login.js`
+- [x] `frontend/src/pages/Login.js`
 - [ ] `frontend/src/pages/NewsFeeds.css`
 - [ ] `frontend/src/pages/NewsFeeds.js`
 - [ ] `frontend/src/pages/NewsIntel.css`
@@ -234,12 +234,13 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 ## Infra
 
 - [x] `docker-compose.yml`
+- [x] `docker-compose.dev.yml`
 - [x] `infra/Dockerfile.backend`
-- [ ] `infra/Dockerfile.frontend`
+- [x] `infra/Dockerfile.frontend`
 - [ ] `infra/Dockerfile.frontend.dev`
 - [ ] `infra/Dockerfile.tools`
-- [ ] `infra/k8s-manifests.yaml`
-- [ ] `infra/namespace.yaml`
+- [x] `infra/k8s-manifests.yaml`
+- [x] `infra/namespace.yaml`
 
 ## Repo Root + Other
 
@@ -305,6 +306,17 @@ Reviewed reports live under security-reviews/ mirroring file paths.
 - [ ] `run_backend.py`
 - [ ] `SECURITY.md`
 - [ ] `SECURITY_FIXES_APPLIED.md`
+- [ ] `security-reviews/backend/app/auth/dependencies.py.md`
+- [ ] `security-reviews/backend/app/auth/page_permissions.py.md`
+- [ ] `security-reviews/backend/app/core/config.py.md`
+- [ ] `security-reviews/backend/app/core/rate_limit.py.md`
+- [ ] `security-reviews/backend/app/genai/routes.py.md`
+- [ ] `security-reviews/backend/app/main.py.md`
+- [ ] `security-reviews/docker-compose.yml.md`
+- [ ] `security-reviews/infra/Dockerfile.backend.md`
+- [ ] `security-reviews/ISSUES.md`
+- [ ] `security-reviews/METHODOLOGY.md`
+- [ ] `security-reviews/REVIEW_INDEX.md`
 - [ ] `Start Orion.command`
 - [ ] `start-dev.sh`
 - [ ] `start-frontend.sh`
