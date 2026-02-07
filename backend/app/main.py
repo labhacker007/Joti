@@ -208,6 +208,18 @@ app.include_router(user_categories_router)
 from app.users.content import router as user_content_router
 app.include_router(user_content_router)
 
+# Article Summarization (GenAI)
+from app.articles.summarization import router as article_summarization_router
+app.include_router(article_summarization_router)
+
+# Article Reports (PDF/Word export)
+from app.articles.reports import router as article_reports_router
+app.include_router(article_reports_router)
+
+# Article Bookmarks & Read Tracking
+from app.articles.bookmarks import router as article_bookmarks_router
+app.include_router(article_bookmarks_router)
+
 # Admin Default Feeds
 from app.admin.default_feeds import router as default_feeds_router
 app.include_router(default_feeds_router)
