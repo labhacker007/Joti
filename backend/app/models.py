@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime, timedelta
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, JSON, Enum as SQLEnum, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, JSON, Enum as SQLEnum, UniqueConstraint, Index, Float
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -966,7 +966,7 @@ class FetchedContent(Base):
     title = Column(Text, nullable=True)
     content = Column(Text, nullable=True)  # Extracted text content
     content_format = Column(String(20), nullable=True)  # html, pdf, docx, csv, xlsx, txt
-    metadata = Column(JSON, nullable=True)  # Format-specific metadata
+    content_metadata = Column(JSON, nullable=True)  # Format-specific metadata
 
     # GenAI analysis (optional)
     executive_summary = Column(Text, nullable=True)
@@ -1147,4 +1147,248 @@ class ArticleHuntTracking(Base):
     __table_args__ = (
         UniqueConstraint("article_id", "hunt_id", name="uq_article_hunt_tracking"),
         Index("idx_article_hunt_tracking_status", "generation_status", "launch_status"),
+    )
+
+
+# ============================================================================
+# GENAI ADMIN MANAGEMENT - Prompts, Skills, Guardrails
+# ============================================================================
+
+class Prompt(Base):
+    """Versioned prompt templates for GenAI functions."""
+    __tablename__ = "prompts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    function_type = Column(String(50), nullable=False, index=True)  # "summarization", "ioc_extraction", etc.
+
+    # Template with variables
+    template = Column(Text, nullable=False)
+
+    # Version control
+    version = Column(Integer, default=1)
+    is_active = Column(Boolean, default=True, index=True)
+    parent_id = Column(Integer, ForeignKey("prompts.id"), nullable=True)
+
+    # Metadata
+    model_id = Column(String(100), nullable=True)  # e.g., "gpt-4o-mini", "llama3.2"
+    temperature = Column(Float, default=0.7)
+    max_tokens = Column(Integer, default=500)
+
+    # Audit
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Tags for organization
+    tags = Column(JSON, nullable=True)
+
+    # Relationships
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    parent = relationship("Prompt", remote_side=[id], backref="versions")
+    variables = relationship("PromptVariable", back_populates="prompt", cascade="all, delete-orphan")
+    skills = relationship("PromptSkill", back_populates="prompt", cascade="all, delete-orphan")
+    guardrails = relationship("PromptGuardrail", back_populates="prompt", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("idx_prompt_function_type", "function_type"),
+        Index("idx_prompt_active", "is_active"),
+    )
+
+
+class PromptVariable(Base):
+    """Variables used in prompt templates."""
+    __tablename__ = "prompt_variables"
+
+    id = Column(Integer, primary_key=True)
+    prompt_id = Column(Integer, ForeignKey("prompts.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(50), nullable=False)
+    type = Column(String(20), default="string")  # string, number, boolean, array
+    default_value = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    is_required = Column(Boolean, default=True)
+
+    # Relationship
+    prompt = relationship("Prompt", back_populates="variables")
+
+    __table_args__ = (
+        Index("idx_prompt_variable_prompt", "prompt_id"),
+    )
+
+
+class Skill(Base):
+    """Reusable skills/instructions for prompts."""
+    __tablename__ = "skills"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+
+    # The actual skill instruction
+    instruction = Column(Text, nullable=False)
+
+    # Categorization
+    category = Column(String(50), nullable=True)  # "persona", "formatting", "domain_expertise"
+
+    # Audit
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True, index=True)
+
+    # Relationship
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+    __table_args__ = (
+        Index("idx_skill_active", "is_active"),
+    )
+
+
+class Guardrail(Base):
+    """Validation rules for LLM outputs."""
+    __tablename__ = "guardrails"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+
+    # Guardrail type
+    type = Column(String(50), nullable=False, index=True)
+    # Types: "length", "toxicity", "pii", "format", "keywords_required", "keywords_forbidden"
+
+    # Configuration (JSON)
+    config = Column(JSON, nullable=False)
+
+    # Action on failure
+    action = Column(String(20), default="retry")  # "retry", "reject", "fix", "log"
+    max_retries = Column(Integer, default=2)
+
+    # Audit
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True, index=True)
+
+    # Relationship
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+    __table_args__ = (
+        Index("idx_guardrail_type", "type"),
+        Index("idx_guardrail_active", "is_active"),
+    )
+
+
+class PromptSkill(Base):
+    """Many-to-many: Prompts <-> Skills."""
+    __tablename__ = "prompt_skills"
+
+    id = Column(Integer, primary_key=True)
+    prompt_id = Column(Integer, ForeignKey("prompts.id", ondelete="CASCADE"), nullable=False)
+    skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
+    order = Column(Integer, default=0)  # Order in which skills are applied
+
+    prompt = relationship("Prompt", back_populates="skills")
+    skill = relationship("Skill")
+
+    __table_args__ = (
+        UniqueConstraint("prompt_id", "skill_id", name="uq_prompt_skill"),
+        Index("idx_prompt_skill_prompt", "prompt_id"),
+    )
+
+
+class PromptGuardrail(Base):
+    """Many-to-many: Prompts <-> Guardrails."""
+    __tablename__ = "prompt_guardrails"
+
+    id = Column(Integer, primary_key=True)
+    prompt_id = Column(Integer, ForeignKey("prompts.id", ondelete="CASCADE"), nullable=False)
+    guardrail_id = Column(Integer, ForeignKey("guardrails.id", ondelete="CASCADE"), nullable=False)
+    order = Column(Integer, default=0)  # Order in which guardrails are checked
+
+    prompt = relationship("Prompt", back_populates="guardrails")
+    guardrail = relationship("Guardrail")
+
+    __table_args__ = (
+        UniqueConstraint("prompt_id", "guardrail_id", name="uq_prompt_guardrail"),
+        Index("idx_prompt_guardrail_prompt", "prompt_id"),
+    )
+
+
+class GenAIFunctionConfig(Base):
+    """Configuration for each GenAI function."""
+    __tablename__ = "genai_function_configs"
+
+    id = Column(Integer, primary_key=True)
+    function_name = Column(String(100), unique=True, nullable=False, index=True)
+    # e.g., "executive_summary", "technical_summary", "ioc_extraction", "qa_chat"
+
+    display_name = Column(String(100), nullable=True)
+    description = Column(Text, nullable=True)
+
+    # Active prompt for this function
+    active_prompt_id = Column(Integer, ForeignKey("prompts.id"), nullable=True)
+
+    # Model assignment
+    primary_model_id = Column(String(100), nullable=True)  # Can override global primary
+    secondary_model_id = Column(String(100), nullable=True)  # Fallback
+
+    # Cost tracking
+    total_requests = Column(Integer, default=0)
+    total_tokens = Column(Integer, default=0)
+    total_cost = Column(Float, default=0.0)
+
+    # Audit
+    updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    active_prompt = relationship("Prompt", foreign_keys=[active_prompt_id])
+    updated_by = relationship("User", foreign_keys=[updated_by_id])
+
+    __table_args__ = (
+        Index("idx_function_config_name", "function_name"),
+    )
+
+
+class PromptExecutionLog(Base):
+    """Log every prompt execution for debugging."""
+    __tablename__ = "prompt_execution_logs"
+
+    id = Column(Integer, primary_key=True)
+    prompt_id = Column(Integer, ForeignKey("prompts.id"), nullable=True)
+    function_name = Column(String(100), nullable=True, index=True)
+
+    # Input
+    input_variables = Column(JSON, nullable=True)
+    final_prompt = Column(Text, nullable=True)
+
+    # Model
+    model_used = Column(String(100), nullable=True)
+    temperature = Column(Float, nullable=True)
+    max_tokens = Column(Integer, nullable=True)
+
+    # Output
+    response = Column(Text, nullable=True)
+    tokens_used = Column(Integer, nullable=True)
+    cost = Column(Float, nullable=True)
+
+    # Guardrails
+    guardrails_passed = Column(Boolean, default=True)
+    guardrail_failures = Column(JSON, nullable=True)
+    retry_count = Column(Integer, default=0)
+
+    # Timing
+    execution_time_ms = Column(Integer, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # User
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    prompt = relationship("Prompt")
+    user = relationship("User")
+
+    __table_args__ = (
+        Index("idx_execution_log_function", "function_name"),
+        Index("idx_execution_log_timestamp", "timestamp"),
+        Index("idx_execution_log_user", "user_id"),
     )

@@ -4,7 +4,7 @@ Allows users to bookmark articles and track reading progress.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean, String, Text, UniqueConstraint, Index
 from app.core.database import get_db, Base
 from app.auth.dependencies import get_current_user
 from app.models import User
