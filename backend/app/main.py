@@ -200,6 +200,14 @@ app.include_router(user_feeds_router)
 from app.users.watchlist import router as user_watchlist_router
 app.include_router(user_watchlist_router)
 
+# User Categories
+from app.users.categories import router as user_categories_router
+app.include_router(user_categories_router)
+
+# User Content Fetching
+from app.users.content import router as user_content_router
+app.include_router(user_content_router)
+
 # Admin Default Feeds
 from app.admin.default_feeds import router as default_feeds_router
 app.include_router(default_feeds_router)

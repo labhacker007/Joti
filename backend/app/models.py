@@ -915,6 +915,80 @@ class EnvironmentContext(Base):
 
 
 # ============================================================================
+# USER CATEGORIES - Custom categories for organizing feeds
+# ============================================================================
+
+class Category(Base):
+    """
+    User-defined categories for organizing custom feeds.
+    Allows users to create custom categories, assign colors/icons,
+    and organize their feeds via drag & drop.
+    """
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(100), nullable=False)
+    color = Column(String(7), nullable=True)  # Hex color like "#FF5733"
+    icon = Column(String(50), nullable=True)  # Icon name (e.g., "RssOutlined", "BookOutlined")
+    sort_order = Column(Integer, default=0)  # For drag-drop ordering
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", backref="categories")
+    feeds = relationship("UserFeed", back_populates="category_obj", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_user_category_name"),
+        Index("idx_category_user", "user_id"),
+    )
+
+
+# ============================================================================
+# FETCHED CONTENT - Multi-format content from user-provided URLs
+# ============================================================================
+
+class FetchedContent(Base):
+    """
+    Stores content fetched from user-provided URLs in various formats.
+    Supports HTML, PDF, Word documents, CSV files, and other formats.
+    """
+    __tablename__ = "fetched_content"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    feed_id = Column(Integer, ForeignKey("user_feeds.id", ondelete="SET NULL"), nullable=True)
+
+    # Content details
+    url = Column(String(2048), nullable=False, index=True)
+    title = Column(Text, nullable=True)
+    content = Column(Text, nullable=True)  # Extracted text content
+    content_format = Column(String(20), nullable=True)  # html, pdf, docx, csv, xlsx, txt
+    metadata = Column(JSON, nullable=True)  # Format-specific metadata
+
+    # GenAI analysis (optional)
+    executive_summary = Column(Text, nullable=True)
+    technical_summary = Column(Text, nullable=True)
+    iocs = Column(JSON, nullable=True)  # Extracted IOCs
+
+    # Audit
+    fetched_at = Column(DateTime, default=datetime.utcnow, index=True)
+    analyzed_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    user = relationship("User", backref="fetched_contents")
+    feed = relationship("UserFeed", backref="fetched_contents")
+
+    __table_args__ = (
+        Index("idx_fetched_content_user", "user_id"),
+        Index("idx_fetched_content_feed", "feed_id"),
+        Index("idx_fetched_content_format", "content_format"),
+    )
+
+
+# ============================================================================
 # USER CUSTOM FEEDS - Personal RSS/Atom feeds per user
 # ============================================================================
 
@@ -933,8 +1007,9 @@ class UserFeed(Base):
     name = Column(String(255), nullable=False)
     url = Column(String(2048), nullable=False)
     description = Column(Text, nullable=True)
-    category = Column(String(100), default="custom")  # custom, news, vendor, research, etc.
-    feed_type = Column(String(50), default="rss")  # rss, atom
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    category = Column(String(100), default="custom")  # Legacy field, kept for backward compatibility
+    feed_type = Column(String(50), default="rss")  # rss, atom, html
     
     # Status
     is_active = Column(Boolean, default=True)
@@ -950,9 +1025,10 @@ class UserFeed(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relationship
+    # Relationships
     user = relationship("User", backref="custom_feeds")
-    
+    category_obj = relationship("Category", back_populates="feeds")
+
     __table_args__ = (
         UniqueConstraint("user_id", "url", name="uq_user_feed_url"),
         Index("idx_user_feed_user", "user_id"),
