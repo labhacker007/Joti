@@ -6,7 +6,7 @@ from app.models import UserRole
 class Permission(str, Enum):
     """Fine-grained permissions for Jyoti - News Feed Aggregator.
 
-    Note: Many permissions are placeholders for compatibility with the full Parshu platform.
+    Note: Many permissions are placeholders for future expansion.
     The Jyoti application only uses a subset of these permissions.
     """
 

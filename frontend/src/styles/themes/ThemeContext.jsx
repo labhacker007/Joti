@@ -34,7 +34,7 @@ export const THEMES = {
 };
 
 const DEFAULT_THEME = 'dark';
-const THEME_STORAGE_KEY = 'parshu-theme-v1';
+const THEME_STORAGE_KEY = 'jyoti-theme-v1';
 
 // Create context
 const ThemeContext = createContext({

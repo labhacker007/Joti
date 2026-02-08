@@ -137,7 +137,7 @@ async def validate_feed_url(
         result = await safe_fetch_text_async(
             url,
             policy=policy,
-            headers={'User-Agent': 'Parshu Feed Reader/1.0'},
+            headers={'User-Agent': 'Jyoti Feed Reader/1.0'},
             timeout_seconds=15.0,
             max_bytes=2_000_000,
         )

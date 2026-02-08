@@ -339,10 +339,10 @@ const ConstellationBackground = ({ color }) => {
 };
 
 // ============================================
-// PARSHU LOGO COMPONENT
+// JYOTI LOGO COMPONENT
 // ============================================
-const ParshuLogo = ({ size = 48, color }) => (
-  <div className="parshu-logo" style={{ width: size, height: size }}>
+const JyotiLogo = ({ size = 48, color }) => (
+  <div className="jyoti-logo" style={{ width: size, height: size }}>
     <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path 
         d="M50 5L93.3013 30V80L50 95L6.69873 80V30L50 5Z" 
@@ -506,7 +506,7 @@ function Login() {
   };
 
   return (
-    <div className="parshu-login" style={{ background: currentTheme.colors.loginBgGradient }}>
+    <div className="jyoti-login" style={{ background: currentTheme.colors.loginBgGradient }}>
       {/* Animated Background */}
       {renderBackground()}
 
@@ -514,9 +514,9 @@ function Login() {
       <div className="login-content">
         {/* Logo & Brand */}
         <div className="login-brand">
-          <ParshuLogo size={56} color={accentColor} />
+          <JyotiLogo size={56} color={accentColor} />
           <Title level={3} className="brand-title" style={{ color: currentTheme.colors.textPrimary }}>
-            HuntSphere
+            Jyoti
           </Title>
           <Text className="brand-subtitle" style={{ color: currentTheme.colors.textSecondary }}>
             Continuous AI-Powered TI to Hunt
@@ -731,7 +731,7 @@ function Login() {
         {/* Footer */}
         <div className="login-footer">
           <Text style={{ color: currentTheme.colors.textMuted }}>
-            © 2026 HuntSphere. All rights reserved.
+            © 2026 Jyoti. All rights reserved.
           </Text>
         </div>
       </div>

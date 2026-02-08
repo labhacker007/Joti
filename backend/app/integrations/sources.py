@@ -689,7 +689,7 @@ def ingest_custom_feed(
         fetch_result = safe_fetch_text_sync(
             payload.url,
             policy=policy,
-            headers={"User-Agent": "Parshu Custom Feed/1.0"},
+            headers={"User-Agent": "Jyoti Feed Reader/1.0"},
             timeout_seconds=30.0,
             max_bytes=10_000_000
         )
