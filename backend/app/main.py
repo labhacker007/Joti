@@ -236,6 +236,10 @@ app.include_router(genai_functions_router)
 from app.admin.prompts import router as prompts_router
 app.include_router(prompts_router)
 
+# Admin Guardrails Management (GenAI Day 5)
+from app.admin.guardrails import router as guardrails_router
+app.include_router(guardrails_router)
+
 # Source Refresh Settings
 from app.integrations.refresh_settings import router as refresh_settings_router
 app.include_router(refresh_settings_router)
