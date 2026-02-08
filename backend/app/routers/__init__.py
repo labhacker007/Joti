@@ -190,6 +190,53 @@ def refresh_token(refresh_request: TokenRefreshRequest):
         )
 
 
+@router.post("/change-password")
+def change_password(
+    request_body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change password for authenticated user."""
+    current_password = request_body.get("current_password")
+    new_password = request_body.get("new_password")
+
+    if not current_password or not new_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Both current_password and new_password are required"
+        )
+
+    if len(new_password) < 12:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 12 characters long"
+        )
+
+    if not current_user.hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OAuth users cannot change password"
+        )
+
+    if not verify_password(current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect"
+        )
+
+    if current_password == new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password"
+        )
+
+    current_user.hashed_password = hash_password(new_password)
+    db.commit()
+
+    logger.info("password_changed", user_id=current_user.id)
+    return {"message": "Password changed successfully"}
+
+
 @router.get("/{provider}/login")
 async def oauth_login(provider: str, request: Request):
     """Initiate OAuth login flow for Google or Microsoft."""

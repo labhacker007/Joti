@@ -23,14 +23,12 @@ import {
 
 const navigation = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Articles', path: '/articles', icon: FileText },
-  { name: 'Hunts', path: '/hunts', icon: Target },
-  { name: 'Intelligence', path: '/intel', icon: Shield },
-  { name: 'Knowledge Base', path: '/knowledge', icon: BookOpen },
-  { name: 'Connectors', path: '/connectors', icon: Zap },
-  { name: 'Analytics', path: '/analytics', icon: BarChart3 },
-  { name: 'Users', path: '/users', icon: Users },
-  { name: 'Settings', path: '/settings', icon: Settings },
+  { name: 'News Feeds', path: '/news', icon: FileText },
+  { name: 'Sources', path: '/sources', icon: Database, adminOnly: true },
+  { name: 'Watchlist', path: '/watchlist', icon: Target },
+  { name: 'Audit Logs', path: '/audit', icon: Shield, adminOnly: true },
+  { name: 'Admin', path: '/admin', icon: Settings, adminOnly: true },
+  { name: 'Profile', path: '/profile', icon: Users },
 ];
 
 export function NewSidebar({ 
@@ -44,8 +42,7 @@ export function NewSidebar({
 
   // Filter navigation based on role
   const filteredNav = navigation.filter(item => {
-    if (item.path === '/users' && userRole !== 'admin') return false;
-    if (item.path === '/settings' && !['admin', 'manager'].includes(userRole)) return false;
+    if (item.adminOnly && userRole !== 'admin' && userRole !== 'ADMIN') return false;
     return true;
   });
 

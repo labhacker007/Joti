@@ -36,7 +36,7 @@
 | **ADMIN** | Full platform access: manage users, sources, watchlists, GenAI config, audit logs |
 | **USER** | Personal access: view articles, manage own feeds/watchlist/categories/bookmarks |
 
-### 2.2 Granular Permissions (188 fine-grained permissions)
+### 2.2 Granular Permissions (137 fine-grained permissions)
 | Permission Category | Admin | User |
 |---------------------|-------|------|
 | Read Articles | Yes | Yes |
@@ -388,7 +388,7 @@
 | SAML SSO (Enterprise) | Enterprise only ($$$) | Included |
 | 2FA/OTP | Yes | Yes |
 | Admin User Management | No | Yes |
-| Role-Based Access Control | No | Yes (Admin/User + 188 permissions) |
+| Role-Based Access Control | No | Yes (Admin/User + 137 permissions) |
 | Personal Watchlist | Yes (AI) | Yes |
 | Global Admin Watchlist | No | Yes |
 | Article Summarization | AI only (Leo) | Multi-provider AI |

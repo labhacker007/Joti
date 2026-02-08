@@ -277,11 +277,45 @@ def health_check():
     }
 
 
-# DEBUG ENDPOINTS REMOVED FOR SECURITY
-# These endpoints exposed sensitive data without authentication
-# Use proper authenticated endpoints instead:
-# - GET /sources/ for feed sources
-# - GET /articles/triage for articles
+# Prometheus-compatible metrics endpoint
+@app.get("/metrics")
+def metrics():
+    """Prometheus-compatible metrics endpoint."""
+    from app.core.database import SessionLocal
+    from app.models import User, FeedSource, Article
+    import time
+
+    db = SessionLocal()
+    try:
+        user_count = db.query(User).count()
+        source_count = db.query(FeedSource).count()
+        article_count = db.query(Article).count()
+        active_sources = db.query(FeedSource).filter(FeedSource.is_active == True).count()
+    except Exception:
+        user_count = source_count = article_count = active_sources = 0
+    finally:
+        db.close()
+
+    lines = [
+        "# HELP jyoti_users_total Total number of users",
+        "# TYPE jyoti_users_total gauge",
+        f"jyoti_users_total {user_count}",
+        "# HELP jyoti_sources_total Total number of feed sources",
+        "# TYPE jyoti_sources_total gauge",
+        f"jyoti_sources_total {source_count}",
+        "# HELP jyoti_sources_active Active feed sources",
+        "# TYPE jyoti_sources_active gauge",
+        f"jyoti_sources_active {active_sources}",
+        "# HELP jyoti_articles_total Total number of articles",
+        "# TYPE jyoti_articles_total gauge",
+        f"jyoti_articles_total {article_count}",
+        "# HELP jyoti_up Application is running",
+        "# TYPE jyoti_up gauge",
+        "jyoti_up 1",
+    ]
+
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain")
 
 
 @app.get("/")
