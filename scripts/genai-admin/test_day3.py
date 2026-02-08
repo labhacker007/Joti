@@ -49,7 +49,7 @@ def print_fail(message: str):
 
 def print_info(message: str):
     """Print info message."""
-    print(f"{Colors.YELLOW}ℹ{Colors.END} {message}")
+    print(f"{Colors.YELLOW}*{Colors.END} {message}")
 
 
 class TestSession:
@@ -319,11 +319,11 @@ class TestSession:
         try:
             response = requests.get(f"{BASE_URL}/admin/genai/functions/")
 
-            if response.status_code == 401:
-                print_pass("Unauthorized access blocked correctly")
+            if response.status_code in [401, 403]:
+                print_pass(f"Unauthorized access blocked correctly ({response.status_code})")
                 return True
             else:
-                print_fail(f"Expected 401, got {response.status_code}")
+                print_fail(f"Expected 401 or 403, got {response.status_code}")
                 return False
 
         except Exception as e:

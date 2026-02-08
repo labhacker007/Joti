@@ -121,7 +121,7 @@ def calculate_statistics(
     # Get execution logs
     logs = db.query(PromptExecutionLog).filter(
         PromptExecutionLog.function_name == function_name,
-        PromptExecutionLog.executed_at >= cutoff_date
+        PromptExecutionLog.timestamp >= cutoff_date
     ).all()
 
     if not logs:
@@ -136,9 +136,9 @@ def calculate_statistics(
         }
 
     total_requests = len(logs)
-    total_tokens = sum(log.total_tokens or 0 for log in logs)
+    total_tokens = sum(log.tokens_used or 0 for log in logs)
     total_cost = sum(log.cost or 0.0 for log in logs)
-    successful = sum(1 for log in logs if log.success)
+    successful = sum(1 for log in logs if log.guardrails_passed)
 
     return {
         "total_requests": total_requests,
@@ -185,9 +185,9 @@ async def list_function_configs(
         # Get last used timestamp
         last_log = db.query(PromptExecutionLog).filter(
             PromptExecutionLog.function_name == config.function_name
-        ).order_by(PromptExecutionLog.executed_at.desc()).first()
+        ).order_by(PromptExecutionLog.timestamp.desc()).first()
 
-        last_used = last_log.executed_at if last_log else None
+        last_used = last_log.timestamp if last_log else None
 
         response.append(FunctionConfigResponse(
             id=config.id,
@@ -246,7 +246,7 @@ async def get_function_config(
     # Get last used timestamp
     last_log = db.query(PromptExecutionLog).filter(
         PromptExecutionLog.function_name == function_name
-    ).order_by(PromptExecutionLog.executed_at.desc()).first()
+    ).order_by(PromptExecutionLog.timestamp.desc()).first()
 
     return FunctionConfigResponse(
         id=config.id,
@@ -264,7 +264,7 @@ async def get_function_config(
         updated_at=config.updated_at,
         avg_tokens_per_request=avg_tokens,
         avg_cost_per_request=avg_cost,
-        last_used=last_log.executed_at if last_log else None
+        last_used=last_log.timestamp if last_log else None
     )
 
 
@@ -482,26 +482,26 @@ async def get_function_stats(
 
     requests_24h = db.query(func.count(PromptExecutionLog.id)).filter(
         PromptExecutionLog.function_name == function_name,
-        PromptExecutionLog.executed_at >= day_ago
+        PromptExecutionLog.timestamp >= day_ago
     ).scalar() or 0
 
     requests_7d = db.query(func.count(PromptExecutionLog.id)).filter(
         PromptExecutionLog.function_name == function_name,
-        PromptExecutionLog.executed_at >= week_ago
+        PromptExecutionLog.timestamp >= week_ago
     ).scalar() or 0
 
     requests_30d = db.query(func.count(PromptExecutionLog.id)).filter(
         PromptExecutionLog.function_name == function_name,
-        PromptExecutionLog.executed_at >= month_ago
+        PromptExecutionLog.timestamp >= month_ago
     ).scalar() or 0
 
     # Calculate detailed statistics
     stats = calculate_statistics(db, function_name, days)
 
     # Calculate average duration
-    avg_duration = db.query(func.avg(PromptExecutionLog.duration_ms)).filter(
+    avg_duration = db.query(func.avg(PromptExecutionLog.execution_time_ms)).filter(
         PromptExecutionLog.function_name == function_name,
-        PromptExecutionLog.executed_at >= now - timedelta(days=days)
+        PromptExecutionLog.timestamp >= now - timedelta(days=days)
     ).scalar()
 
     return UsageStats(
