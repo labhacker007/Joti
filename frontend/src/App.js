@@ -1,8 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
-// Theme system
-import { ThemeProvider } from './styles/themes/ThemeContext';
+// Theme & Timezone providers
+import { ThemeProvider } from './context/ThemeContext';
+import { TimezoneProvider } from './context/TimezoneContext';
 import './styles/themes/theme-variables.css';
 import './styles/themes/theme-components.css';
 
@@ -40,6 +41,7 @@ function AppLayout() {
 function App() {
   return (
     <ThemeProvider>
+      <TimezoneProvider>
       <Router>
         <Routes>
           {/* Public */}
@@ -66,6 +68,7 @@ function App() {
           <Route path="*" element={<Navigate to="/news" replace />} />
         </Routes>
       </Router>
+      </TimezoneProvider>
     </ThemeProvider>
   );
 }
