@@ -89,8 +89,9 @@ function ProtectedRoute({ children, requiredPageKey = null, requiredRole = null 
     checkPermissions();
   }, [checkPermissions, isImpersonating, assumedRole]);
 
-  // Not logged in - redirect to login
+  // Not logged in - redirect to login (MUST be first check before rendering loading)
   if (!accessToken) {
+    console.log('[ProtectedRoute] No token - redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
