@@ -1,0 +1,42 @@
+# Cursor IDE ignore patterns
+# Files and folders that Cursor should ignore
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Environment files (don't sync these)
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build output
+dist/
+build/
+.next/
+
+# Logs
+*.log
+logs/
+
+# Old references
+Documents/Pulser/Parshu/

@@ -1,0 +1,102 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "JOTI - Kimi Cyber-Kinetic"
+    }
+  ],
+  "settings": {
+    // Editor Settings
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": true
+    },
+
+    // Git Settings
+    "git.enabled": true,
+    "git.ignoreLimitWarning": false,
+    "git.autorefresh": true,
+    "git.autofetch": true,
+    "git.defaultCloneDirectory": "C:\\Projects",
+
+    // Remote Repository Settings (Joti GitHub)
+    "remotehub.remoteSourceConnections": [
+      {
+        "repository": "https://github.com/labhacker007/Joti.git",
+        "builtInGitProvider": "builtin",
+        "label": "JOTI - GitHub"
+      }
+    ],
+
+    // Terminal Settings
+    "terminal.integrated.shell.windows": "cmd.exe",
+    "terminal.integrated.cwd": "${workspaceFolder}",
+
+    // Search Settings
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/__pycache__": true,
+      "**/venv": true,
+      "**/.git": true
+    },
+
+    // Files Settings
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/*.pyc": true,
+      "**/node_modules": true,
+      ".DS_Store": true,
+      "Thumbs.db": true
+    },
+
+    // Python Settings
+    "python.linting.enabled": true,
+    "python.formatting.provider": "black",
+    "[python]": {
+      "editor.defaultFormatter": "ms-python.python",
+      "editor.formatOnSave": true
+    },
+
+    // JavaScript/TypeScript Settings
+    "[javascript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+
+    // Extensions
+    "extensions.ignoreRecommendations": false
+  },
+
+  "extensions": {
+    "recommendations": [
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "esbenp.prettier-vscode",
+      "dbaeumer.vscode-eslint",
+      "eamodio.gitlens",
+      "GitHub.copilot",
+      "ms-vscode-remote.remote-containers",
+      "ms-vscode.docker"
+    ]
+  },
+
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Python: Backend",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceFolder}/backend/app/main.py",
+        "console": "integratedTerminal",
+        "justMyCode": true
+      }
+    ]
+  }
+}
