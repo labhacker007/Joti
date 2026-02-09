@@ -18,7 +18,6 @@ import {
   BgColorsOutlined,
   GlobalOutlined,
   ClockCircleOutlined,
-  FontSizeOutlined,
   SwapOutlined,
   ExclamationCircleOutlined,
   RollbackOutlined,
@@ -46,15 +45,7 @@ function NavBar() {
     restoreRole,
     loadImpersonationState 
   } = useAuthStore();
-  const { currentTheme, currentThemeId, setTheme, themes, isDark, fontSizePreference, setFontSize, fontSizeOptions } = useTheme();
-  
-  // Simple theme toggle handler
-  const handleThemeToggle = () => {
-    const themeOrder = ['daylight', 'command-center', 'aurora'];
-    const currentIndex = themeOrder.indexOf(currentThemeId);
-    const nextTheme = themeOrder[(currentIndex + 1) % themeOrder.length];
-    setTheme(nextTheme);
-  };
+  const { theme, setTheme, themeEmoji, themeLabel } = useTheme();
   const { setTimezone, getTimezoneAbbr } = useTimezone();
   const navigate = useNavigate();
   const location = useLocation();
@@ -314,86 +305,74 @@ function NavBar() {
 
   const getRoleColor = (role) => {
     const colors = {
-      ADMIN: isDark ? '#EC4899' : '#DC2626',
-      TI: currentTheme.colors.primary,
-      TH: currentTheme.colors.success,
-      IR: currentTheme.colors.warning,
-      VIEWER: currentTheme.colors.textMuted,
+      ADMIN: '#EC4899',  // Magenta for admin
+      VIEWER: '#666666', // Gray for viewer
     };
-    return colors[role] || currentTheme.colors.textMuted;
+    return colors[role] || '#666666';
   };
 
-  // Theme selector menu for all users - grouped by category
+  // Theme selector menu - simplified for Kimi 6-theme system
   const themeMenuItems = [
-    // Professional themes
     {
-      key: 'professional-header',
-      label: <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Professional</span>,
-      disabled: true,
-    },
-    ...themes.filter(t => t.category === 'professional').map(t => ({
-      key: t.id,
+      key: 'midnight',
       label: (
         <Space>
-          <div style={{
-            width: 16,
-            height: 16,
-            borderRadius: 4,
-            background: t.colors.primary,
-            border: `2px solid ${t.id === currentTheme.id ? currentTheme.colors.primary : 'transparent'}`,
-          }} />
-          <span style={{ fontWeight: t.id === currentTheme.id ? 600 : 400 }}>{t.name}</span>
-          {t.id === currentTheme.id && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
+          <span>🌙 Midnight</span>
+          {theme === 'midnight' && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
         </Space>
       ),
-      onClick: () => setTheme(t.id),
-    })),
-    // Cyber themes
-    {
-      key: 'cyber-header',
-      label: <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Cyber Security</span>,
-      disabled: true,
+      onClick: () => setTheme('midnight'),
     },
-    ...themes.filter(t => t.category === 'cyber').map(t => ({
-      key: t.id,
+    {
+      key: 'daylight',
       label: (
         <Space>
-          <div style={{
-            width: 16,
-            height: 16,
-            borderRadius: 4,
-            background: t.colors.primary,
-            border: `2px solid ${t.id === currentTheme.id ? currentTheme.colors.primary : 'transparent'}`,
-          }} />
-          <span style={{ fontWeight: t.id === currentTheme.id ? 600 : 400 }}>{t.name}</span>
-          {t.id === currentTheme.id && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
+          <span>☀️ Daylight</span>
+          {theme === 'daylight' && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
         </Space>
       ),
-      onClick: () => setTheme(t.id),
-    })),
-    // Premium themes
-    {
-      key: 'premium-header',
-      label: <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Premium</span>,
-      disabled: true,
+      onClick: () => setTheme('daylight'),
     },
-    ...themes.filter(t => t.category === 'premium').map(t => ({
-      key: t.id,
+    {
+      key: 'command-center',
       label: (
         <Space>
-          <div style={{
-            width: 16,
-            height: 16,
-            borderRadius: 4,
-            background: t.colors.primary,
-            border: `2px solid ${t.id === currentTheme.id ? currentTheme.colors.primary : 'transparent'}`,
-          }} />
-          <span style={{ fontWeight: t.id === currentTheme.id ? 600 : 400 }}>{t.name}</span>
-          {t.id === currentTheme.id && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
+          <span>🖥️ Command Center</span>
+          {theme === 'command-center' && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
         </Space>
       ),
-      onClick: () => setTheme(t.id),
-    })),
+      onClick: () => setTheme('command-center'),
+    },
+    {
+      key: 'aurora',
+      label: (
+        <Space>
+          <span>🌌 Aurora</span>
+          {theme === 'aurora' && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
+        </Space>
+      ),
+      onClick: () => setTheme('aurora'),
+    },
+    {
+      key: 'red-alert',
+      label: (
+        <Space>
+          <span>🚨 Red Alert</span>
+          {theme === 'red-alert' && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
+        </Space>
+      ),
+      onClick: () => setTheme('red-alert'),
+    },
+    {
+      key: 'matrix',
+      label: (
+        <Space>
+          <span>💻 Matrix</span>
+          {theme === 'matrix' && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
+        </Space>
+      ),
+      onClick: () => setTheme('matrix'),
+    },
   ];
 
   // Timezone options for profile menu
@@ -486,28 +465,6 @@ function NavBar() {
         </Space>
       ),
       children: timezoneMenuItems,
-    },
-    // Font size selector - available to all users
-    {
-      key: 'fontsize',
-      label: (
-        <Space>
-          <FontSizeOutlined />
-          <span>Font Size: {fontSizeOptions[fontSizePreference]?.label || 'Default'}</span>
-        </Space>
-      ),
-      children: Object.entries(fontSizeOptions).map(([key, value]) => ({
-        key: `font-${key}`,
-        label: (
-          <Space>
-            <span style={{ fontWeight: fontSizePreference === key ? 600 : 400 }}>
-              {value.label}
-            </span>
-            {fontSizePreference === key && <Tag color="blue" style={{ marginLeft: 8 }}>Active</Tag>}
-          </Space>
-        ),
-        onClick: () => setFontSize(key),
-      })),
     },
     { type: 'divider' },
     // Role switching for ACTUAL admins only (not based on assumed role)
@@ -655,7 +612,7 @@ function NavBar() {
         <ThunderboltOutlined className="logo-icon" style={{
           color: 'var(--primary)',
           fontSize: 20,
-          ...(isDark ? { filter: 'drop-shadow(0 0 8px var(--primary))' } : {}),
+          filter: 'drop-shadow(0 0 8px var(--primary))',
         }} />
         <span>Joti</span>
       </div>
@@ -681,14 +638,15 @@ function NavBar() {
       
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
         {/* Theme Toggle Button */}
-        <Button
-          type="text"
-          onClick={handleThemeToggle}
-          style={{ color: 'var(--nav-icon)' }}
-          title={`Current: ${currentThemeId} (Click to switch)`}
-        >
-          {currentThemeId === 'daylight' ? '☀️' : currentThemeId === 'command-center' ? '🖥️' : '🌙'}
-        </Button>
+        <Dropdown menu={{ items: themeMenuItems }} trigger={['click']} placement="bottomRight">
+          <Button
+            type="text"
+            style={{ color: 'var(--nav-icon)' }}
+            title={`Current theme: ${themeLabel}`}
+          >
+            {themeEmoji}
+          </Button>
+        </Dropdown>
         
         {user ? (
           <Dropdown 
