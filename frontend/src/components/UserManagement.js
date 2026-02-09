@@ -17,13 +17,8 @@ const { Option } = Select;
 const { Text } = Typography;
 
 const ROLES = [
-  { value: 'ADMIN', label: 'Admin', color: 'red', description: 'Full system access' },
-  { value: 'EXECUTIVE', label: 'Executive', color: 'gold', description: 'C-Suite/CISO - Reports & dashboards' },
-  { value: 'MANAGER', label: 'Manager', color: 'magenta', description: 'Team lead - Reports & metrics oversight' },
-  { value: 'TI', label: 'Threat Intelligence Analyst', color: 'blue', description: 'Triage and analyze articles' },
-  { value: 'TH', label: 'Threat Hunter', color: 'purple', description: 'Execute hunts' },
-  { value: 'IR', label: 'Incident Responder', color: 'orange', description: 'View and respond to threats' },
-  { value: 'VIEWER', label: 'Viewer', color: 'default', description: 'Read-only access' },
+  { value: 'ADMIN', label: 'Admin', color: 'red', description: 'Full system access - manage sources, users, global watchlist' },
+  { value: 'VIEWER', label: 'Viewer', color: 'blue', description: 'Standard user - view feeds, manage personal watchlist' },
 ];
 
 export default function UserManagement({ onUserChange }) {
@@ -143,7 +138,7 @@ export default function UserManagement({ onUserChange }) {
   }
 
   function getRoleInfo(roleName) {
-    return ROLES.find(r => r.value === roleName) || ROLES[4];
+    return ROLES.find(r => r.value === roleName) || ROLES[1];
   }
 
   const columns = [

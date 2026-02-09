@@ -1,13 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/index';
 
-// API URL configuration - MUST be set via environment variable in production
-const API_URL = process.env.REACT_APP_API_URL || (() => {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('REACT_APP_API_URL must be set in production environment');
-  }
-  return 'http://localhost:8000';
-})();
+// API URL configuration
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const client = axios.create({
   baseURL: API_URL,

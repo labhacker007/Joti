@@ -10,7 +10,7 @@ import {
   RocketOutlined,
   EyeOutlined
 } from '@ant-design/icons';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 import './ThemeManager.css';
 
 const { Title, Text, Paragraph } = Typography;

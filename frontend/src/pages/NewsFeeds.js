@@ -20,8 +20,8 @@ import {
 } from '@ant-design/icons';
 import { sourcesAPI, articlesAPI, adminAPI, userFeedsAPI } from '../api/client';
 import { useAuthStore } from '../store';
-import { useTheme } from '../context/ThemeContext';
-import { useTimezone } from '../context/TimezoneContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useTimezone } from '../contexts/TimezoneContext';
 import './NewsFeeds.css';
 
 const { Sider, Content } = Layout;
@@ -33,7 +33,10 @@ function NewsFeeds() {
   const { user } = useAuthStore();
   const { currentTheme, isDark } = useTheme();
   const { formatDateTime, getRelativeTime } = useTimezone();
-  
+
+  // Responsive design state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
   // State
   const [loading, setLoading] = useState(true);
   const [sources, setSources] = useState([]);
@@ -48,7 +51,7 @@ function NewsFeeds() {
   });
   const [showHighPriorityOnly, setShowHighPriorityOnly] = useState(false);
   const [savedArticles, setSavedArticles] = useState([]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isMobile); // Auto-collapse on mobile
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addFeedOpen, setAddFeedOpen] = useState(false);
   const [userFeeds, setUserFeeds] = useState([]);
@@ -209,6 +212,23 @@ function NewsFeeds() {
       setLoading(false);
     }
   }, [user?.id]);
+
+  // Handle responsive design - collapse sidebar on mobile
+  useEffect(() => {
+    const handleResize = () => {
+      const newIsMobile = window.innerWidth < 768;
+      setIsMobile(newIsMobile);
+      // Collapse sidebar on mobile, expand on desktop
+      if (newIsMobile && !sidebarCollapsed) {
+        setSidebarCollapsed(true);
+      } else if (!newIsMobile && sidebarCollapsed) {
+        setSidebarCollapsed(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     fetchData(true); // Show errors on initial load

@@ -51,7 +51,7 @@ def register(user_create: UserCreate, db: Session = Depends(get_db)):
         username=user_create.username,
         hashed_password=hash_password(user_create.password),
         full_name=user_create.full_name,
-        role=UserRole.USER,  # Default role for Jyoti
+        role=UserRole.VIEWER,  # Default role for Jyoti
         is_saml_user=False
     )
 
@@ -296,7 +296,7 @@ async def oauth_callback(
                 oauth_subject=oauth_subject,
                 oauth_email=email,
                 oauth_picture=picture,
-                role=UserRole.USER,  # Default role
+                role=UserRole.VIEWER,  # Default role
                 is_active=True,
                 hashed_password=None  # OAuth users don't have passwords
             )

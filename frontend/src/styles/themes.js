@@ -408,7 +408,7 @@ export const themes = {
       // Background Hierarchy
       bgBody: '#F8FAFC',
       bgCard: '#FFFFFF',
-      bgNavbar: '#F1F5F9',
+      bgNavbar: '#FFFFFF',
       bgElevated: '#FFFFFF',
       bgOverlay: 'rgba(248, 250, 252, 0.95)',
       
@@ -478,7 +478,7 @@ export const themes = {
       // Navbar
       navText: '#0F172A',
       navIcon: '#0369A1',
-      navHover: 'rgba(3, 105, 161, 0.1)',
+      navHover: 'rgba(3, 105, 161, 0.08)',
       
       // Glassmorphism (subtle in light mode)
       glassBg: 'rgba(255, 255, 255, 0.8)',
@@ -959,4 +959,4 @@ export const applyNeonMode = (theme) => {
   };
 };
 
-export const DEFAULT_THEME = 'command-center';
+export const DEFAULT_THEME = 'daylight';

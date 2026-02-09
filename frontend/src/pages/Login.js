@@ -4,18 +4,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LoginOutlined,
   LockOutlined,
-  SafetyOutlined,
   EyeOutlined,
   EyeInvisibleOutlined,
-  CheckCircleFilled,
-  SafetyCertificateFilled,
-  LockFilled,
   GoogleOutlined,
   WindowsOutlined
 } from '@ant-design/icons';
 import { authAPI } from '../api/client';
 import { useAuthStore } from '../store/index';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 import './Login.css';
 
 const { Text, Title } = Typography;
@@ -338,48 +334,6 @@ const ConstellationBackground = ({ color }) => {
   return <canvas ref={canvasRef} className="login-animated-bg" />;
 };
 
-// ============================================
-// JYOTI LOGO COMPONENT
-// ============================================
-const JyotiLogo = ({ size = 48, color }) => (
-  <div className="jyoti-logo" style={{ width: size, height: size }}>
-    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path 
-        d="M50 5L93.3013 30V80L50 95L6.69873 80V30L50 5Z" 
-        stroke={color} 
-        strokeWidth="3"
-        fill="none"
-        className="logo-hex"
-      />
-      <path 
-        d="M50 15L83.3013 35V75L50 85L16.6987 75V35L50 15Z" 
-        stroke={color} 
-        strokeWidth="1.5"
-        fill="none"
-        opacity="0.4"
-      />
-      <path 
-        d="M35 35V75M35 35H55C62 35 67 40 67 47C67 54 62 59 55 59H35" 
-        stroke={color} 
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="logo-p"
-      />
-      <circle cx="72" cy="65" r="5" fill={color} className="logo-dot" />
-    </svg>
-  </div>
-);
-
-// ============================================
-// SECURITY BADGE COMPONENT
-// ============================================
-const SecurityBadge = ({ icon: Icon, label, color }) => (
-  <div className="security-badge" style={{ color: color + '99' }}>
-    <Icon style={{ color: color }} />
-    <span>{label}</span>
-  </div>
-);
 
 // ============================================
 // MAIN LOGIN COMPONENT
@@ -393,8 +347,8 @@ function Login() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { setAuth, setTokens, setUser } = useAuthStore();
-  const { currentTheme } = useTheme();
+  const { setTokens, setUser } = useAuthStore();
+  const { currentTheme, setTheme } = useTheme();
 
   // Get accent color from theme
   const accentColor = currentTheme.colors.loginAccentColor || currentTheme.colors.primary;
@@ -443,28 +397,47 @@ function Login() {
     setError('');
 
     try {
+      console.log('[LOGIN] Attempting login with username:', values.username);
+      console.log('[LOGIN] API URL:', process.env.REACT_APP_API_URL || 'http://localhost:8000');
+
       const response = await authAPI.login({
-        email: values.username,  // Backend expects 'email' field but accepts username or email
+        email: values.username,
         password: values.password,
       });
 
-      if (response.data?.access_token) {
-        setTokens(response.data.access_token, response.data.refresh_token);
-        setUser(response.data.user);
-        setAuth(true);
+      console.log('[LOGIN] Response received:', response.status, response.data?.user?.username);
 
-        const from = location.state?.from?.pathname || '/dashboard';
-        navigate(from, { replace: true });
+      if (response.data?.access_token) {
+        console.log('[LOGIN] Got access token, setting auth...');
+        setTokens(response.data.access_token, response.data.refresh_token);
+        console.log('[LOGIN] Tokens set');
+
+        setUser(response.data.user);
+        console.log('[LOGIN] User set');
+
+        const from = location.state?.from?.pathname || '/news';
+        console.log('[LOGIN] Redirecting to:', from);
+
+        // Use setTimeout to ensure state is updated before navigation
+        setTimeout(() => {
+          navigate(from, { replace: true });
+        }, 100);
+      } else {
+        console.error('[LOGIN] No access token in response:', response.data);
+        setError('Login failed: No token received');
       }
     } catch (err) {
+      console.error('[LOGIN ERROR] Full error:', err);
+      console.error('[LOGIN ERROR] Status:', err.response?.status);
+      console.error('[LOGIN ERROR] Data:', err.response?.data);
       // Handle different error response formats
       let errorMsg = 'Invalid credentials. Please try again.';
       if (err.response?.data) {
         if (typeof err.response.data === 'string') {
           errorMsg = err.response.data;
         } else if (err.response.data.detail) {
-          errorMsg = typeof err.response.data.detail === 'string' 
-            ? err.response.data.detail 
+          errorMsg = typeof err.response.data.detail === 'string'
+            ? err.response.data.detail
             : JSON.stringify(err.response.data.detail);
         } else if (err.response.data.msg) {
           errorMsg = err.response.data.msg;
@@ -474,6 +447,7 @@ function Login() {
       } else if (err.message) {
         errorMsg = err.message;
       }
+      console.error('[LOGIN] Setting error:', errorMsg);
       setError(errorMsg);
     } finally {
       setLoading(false);
@@ -506,20 +480,56 @@ function Login() {
   };
 
   return (
-    <div className="jyoti-login" style={{ background: currentTheme.colors.loginBgGradient }}>
+    <div className="joti-login" style={{ background: currentTheme.colors.loginBgGradient }}>
       {/* Animated Background */}
       {renderBackground()}
 
+      {/* Theme Switcher (Top Right) */}
+      <div style={{
+        position: 'fixed',
+        top: 16,
+        right: 16,
+        zIndex: 1000,
+        display: 'flex',
+        gap: 8,
+      }}>
+        <select
+          value={currentTheme.id}
+          onChange={(e) => setTheme(e.target.value)}
+          style={{
+            background: currentTheme.colors.bgElevated,
+            color: currentTheme.colors.textPrimary,
+            border: `1px solid ${currentTheme.colors.borderDefault}`,
+            borderRadius: 6,
+            padding: '6px 12px',
+            fontSize: 12,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          <option value="command-center">Command Center</option>
+          <option value="red-alert">Red Alert</option>
+          <option value="aurora">Aurora</option>
+          <option value="daylight">Daylight</option>
+          <option value="midnight">Midnight</option>
+          <option value="matrix">Matrix</option>
+        </select>
+      </div>
+
       {/* Content Container */}
       <div className="login-content">
-        {/* Logo & Brand */}
+        {/* Brand */}
         <div className="login-brand">
-          <JyotiLogo size={56} color={accentColor} />
-          <Title level={3} className="brand-title" style={{ color: currentTheme.colors.textPrimary }}>
-            Jyoti
+          <Title level={2} className="brand-title" style={{
+            color: currentTheme.colors.textPrimary,
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
+            marginBottom: 4,
+          }}>
+            Joti
           </Title>
           <Text className="brand-subtitle" style={{ color: currentTheme.colors.textSecondary }}>
-            Continuous AI-Powered TI to Hunt
+            News Feed Aggregator
           </Text>
         </div>
 
@@ -574,10 +584,10 @@ function Login() {
                   window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/auth/google/login`;
                 }}
                 style={{
-                  background: currentTheme.colors.mode === 'dark' ? 'rgba(255,255,255,0.05)' : '#ffffff',
+                  background: currentTheme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : '#ffffff',
                   borderColor: currentTheme.colors.borderDefault,
                   color: currentTheme.colors.textPrimary,
-                  boxShadow: `0 2px 8px ${currentTheme.colors.mode === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'}`,
+                  height: 44,
                 }}
               >
                 Sign in with Google
@@ -593,10 +603,10 @@ function Login() {
                   window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/auth/microsoft/login`;
                 }}
                 style={{
-                  background: currentTheme.colors.mode === 'dark' ? 'rgba(255,255,255,0.05)' : '#ffffff',
+                  background: currentTheme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : '#ffffff',
                   borderColor: currentTheme.colors.borderDefault,
                   color: currentTheme.colors.textPrimary,
-                  boxShadow: `0 2px 8px ${currentTheme.colors.mode === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'}`,
+                  height: 44,
                 }}
               >
                 Sign in with Microsoft
@@ -636,7 +646,7 @@ function Login() {
                 placeholder="Username or email"
                 size="large"
                 style={{
-                  background: currentTheme.colors.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  background: 'transparent',
                   borderColor: currentTheme.colors.borderDefault,
                   color: currentTheme.colors.textPrimary,
                 }}
@@ -663,7 +673,7 @@ function Login() {
                   )
                 }
                 style={{
-                  background: currentTheme.colors.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  background: 'transparent',
                   borderColor: currentTheme.colors.borderDefault,
                   color: currentTheme.colors.textPrimary,
                 }}
@@ -705,35 +715,8 @@ function Login() {
             )}
           </Form>
 
-          {/* Security Badges */}
-          <div 
-            className="security-badges"
-            style={{ borderColor: currentTheme.colors.borderSubtle }}
-          >
-            <SecurityBadge 
-              icon={LockFilled} 
-              label="TLS 1.3" 
-              color={accentColor}
-            />
-            <SecurityBadge 
-              icon={SafetyCertificateFilled} 
-              label="AES-256" 
-              color={accentColor}
-            />
-            <SecurityBadge 
-              icon={CheckCircleFilled} 
-              label="SOC 2" 
-              color={accentColor}
-            />
-          </div>
         </div>
 
-        {/* Footer */}
-        <div className="login-footer">
-          <Text style={{ color: currentTheme.colors.textMuted }}>
-            © 2026 Jyoti. All rights reserved.
-          </Text>
-        </div>
       </div>
     </div>
   );

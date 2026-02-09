@@ -21,7 +21,9 @@ import ConfigurationManager from '../components/ConfigurationManager';
 import GuardrailsManager from '../components/GuardrailsManager';
 import SimpleAccessManager from '../components/SimpleAccessManager';
 import ThemeManager from '../components/ThemeManager';
-import { useTimezone } from '../context/TimezoneContext';
+import Sources from './Sources';
+import Watchlist from './Watchlist';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { adminAPI } from '../api/client';
 import './Admin.css';
 
@@ -29,7 +31,7 @@ const { Title, Text, Paragraph } = Typography;
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 // Documentation Component
-function JyotiDocumentation({ setActiveTab, availableModels }) {
+function JotiDocumentation({ setActiveTab, availableModels }) {
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiResponse, setAiResponse] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -68,7 +70,7 @@ function JyotiDocumentation({ setActiveTab, availableModels }) {
       } else {
         // Provide helpful fallback response based on question
         const fallbackResponses = {
-          'ollama': 'To set up Ollama:\n1. Install Ollama: brew install ollama (Mac) or follow docs.ollama.ai\n2. Start Ollama: ollama serve\n3. Pull a model: ollama pull llama3\n4. In Jyoti Admin → Configuration, set Ollama URL to http://host.docker.internal:11434 (if using Docker)',
+          'ollama': 'To set up Ollama:\n1. Install Ollama: brew install ollama (Mac) or follow docs.ollama.ai\n2. Start Ollama: ollama serve\n3. Pull a model: ollama pull llama3\n4. In Joti Admin → Configuration, set Ollama URL to http://host.docker.internal:11434 (if using Docker)',
           'servicenow': 'To configure ServiceNow:\n1. Go to Admin → Configuration → Notifications\n2. Enter your ServiceNow instance URL\n3. Add username and password for API access\n4. Test the connection\n5. Enable "Create tickets on hunt failure" in Automation settings',
           'hunt': 'Hunt query troubleshooting:\n1. Check if platform connector is configured (Admin → Configuration)\n2. Verify API credentials are valid\n3. Ensure article has extracted IOCs\n4. Review Audit Logs for specific errors\n5. Try Preview Query first before executing',
           'feed': 'Feed/RSS troubleshooting:\n1. Verify feed URL is valid (test in browser)\n2. Check Sources page - is the feed active?\n3. Manually click "Fetch Feeds" to test\n4. Check Scheduler is running in Admin → Scheduler\n5. Review backend logs for parsing errors',
@@ -98,7 +100,7 @@ function JyotiDocumentation({ setActiveTab, availableModels }) {
       key: 'getting-started',
       title: 'Getting Started', 
       desc: 'Initial setup and configuration',
-      content: 'Welcome to Jyoti! Start by:\n1. Setting up GenAI (Admin → Configuration → GenAI)\n2. Adding RSS feed sources (Sources page)\n3. Configuring hunt platform connectors\n4. Creating user accounts with appropriate roles'
+      content: 'Welcome to Joti! Start by:\n1. Setting up GenAI (Admin → Configuration → GenAI)\n2. Adding RSS feed sources (Sources page)\n3. Configuring hunt platform connectors\n4. Creating user accounts with appropriate roles'
     },
     { 
       key: 'genai',
@@ -216,7 +218,7 @@ function JyotiDocumentation({ setActiveTab, availableModels }) {
                     }
                   >
                     <Paragraph type="secondary">
-                      Ask questions about Jyoti configuration, troubleshooting, or how to use features.
+                      Ask questions about Joti configuration, troubleshooting, or how to use features.
                     </Paragraph>
                     
                     <Input.TextArea 
@@ -306,7 +308,7 @@ function JyotiDocumentation({ setActiveTab, availableModels }) {
         {
           key: 'architecture',
           label: <span><ClusterOutlined /> Architecture</span>,
-          children: <Paragraph>Jyoti uses a FastAPI + React + PostgreSQL + Redis architecture. See <a href="/docs" target="_blank">API Docs</a> for endpoint reference.</Paragraph>
+          children: <Paragraph>Joti uses a FastAPI + React + PostgreSQL + Redis architecture. See <a href="/docs" target="_blank">API Docs</a> for endpoint reference.</Paragraph>
         },
         {
           key: 'metrics',
@@ -1003,7 +1005,7 @@ function Admin() {
                 </div>
               </Col>
               <Col span={4}>
-                <div className="stat-tile" onClick={() => navigate('/sources')} style={{ cursor: 'pointer' }}>
+                <div className="stat-tile" onClick={() => setActiveTab('sources')} style={{ cursor: 'pointer' }}>
                   <Statistic title="Feed Sources" value={stats?.total_sources || 0} />
                 </div>
               </Col>
@@ -1013,7 +1015,7 @@ function Admin() {
                 </div>
               </Col>
               <Col span={4}>
-                <div className="stat-tile" onClick={() => navigate('/watchlist')} style={{ cursor: 'pointer' }}>
+                <div className="stat-tile" onClick={() => setActiveTab('watchlist')} style={{ cursor: 'pointer' }}>
                   <Statistic title="Watchlist" value={stats?.active_watchlist_keywords || 0} prefix={<EyeOutlined />} />
                 </div>
               </Col>
@@ -1518,7 +1520,7 @@ function Admin() {
                               content: (
                                 <div>
                                   <p><strong>Current Version:</strong> {settings.app_version}</p>
-                                  <p><strong>Application:</strong> Jyoti News Feed Platform</p>
+                                  <p><strong>Application:</strong> Joti News Feed Platform</p>
                                   <p style={{ marginTop: 16 }}>Check the repository for the latest releases and changelog.</p>
                                 </div>
                               )
@@ -1899,7 +1901,7 @@ function Admin() {
                     
                     <Title level={5} style={{ color: '#fa8c16' }}>⚠️ Important: Docker Networking</Title>
                     <Paragraph>
-                      <strong>Jyoti runs in Docker.</strong> This means "localhost" inside Jyoti refers to the container itself,
+                      <strong>Joti runs in Docker.</strong> This means "localhost" inside Joti refers to the container itself,
                       NOT your host machine where Ollama runs. Use the correct URL:
                     </Paragraph>
                     
@@ -1945,7 +1947,7 @@ function Admin() {
                           description: <Text code>ollama pull llama3:latest</Text>
                         },
                         {
-                          title: 'Configure in Jyoti',
+                          title: 'Configure in Joti',
                           description: (
                             <div>
                               URL: <Text code>http://host.docker.internal:11434</Text>
@@ -1959,7 +1961,7 @@ function Admin() {
                     
                     <Divider style={{ margin: '12px 0' }} />
                     
-                    <Title level={5}>How Jyoti Uses Ollama</Title>
+                    <Title level={5}>How Joti Uses Ollama</Title>
                     <List 
                       size="small"
                       dataSource={[
@@ -2691,12 +2693,22 @@ function Admin() {
     {
       key: 'documentation',
       label: <span><BookOutlined /> Documentation</span>,
-      children: <JyotiDocumentation setActiveTab={setActiveTab} availableModels={availableModels} />,
+      children: <JotiDocumentation setActiveTab={setActiveTab} availableModels={availableModels} />,
     },
     {
       key: 'appearance',
       label: <span><BgColorsOutlined /> Appearance</span>,
       children: <ThemeManager />,
+    },
+    {
+      key: 'sources',
+      label: <span><ApiOutlined /> Feed Sources</span>,
+      children: <Sources />,
+    },
+    {
+      key: 'watchlist',
+      label: <span><EyeOutlined /> Watchlist</span>,
+      children: <Watchlist />,
     },
   ];
 

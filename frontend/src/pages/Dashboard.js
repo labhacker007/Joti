@@ -18,8 +18,8 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { articlesAPI, sourcesAPI, watchlistAPI } from '../api/client';
-import { useTheme } from '../context/ThemeContext';
-import { useTimezone } from '../context/TimezoneContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { useAuthStore } from '../store';
 import { useRefreshSettings } from '../components/SourceRefreshSettings';
 import './Dashboard.css';
@@ -242,7 +242,7 @@ function Dashboard() {
       <div className="dashboard-header">
         <div>
           <Title level={4} className="dashboard-title">
-            <RocketOutlined /> Jyoti Dashboard
+            <RocketOutlined /> Joti Dashboard
           </Title>
           {lastUpdated && (
             <div className="dashboard-subtitle">

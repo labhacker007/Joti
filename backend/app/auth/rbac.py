@@ -6,197 +6,248 @@ from app.models import UserRole
 class Permission(str, Enum):
     """Fine-grained permissions for Jyoti - News Feed Aggregator.
 
-    Note: Many permissions are placeholders for future expansion.
-    The Jyoti application only uses a subset of these permissions.
+    Jyoti is a lightweight news aggregator with two roles: ADMIN and VIEWER.
+    This simplified permission set focuses only on news/feeds functionality.
+
+    NOTE: All legacy Parshu permissions are mapped to basic Jyoti permissions
+    to maintain backward compatibility with existing code that hasn't been refactored.
     """
 
-    # Articles
+    # ============================================
+    # CORE JYOTI PERMISSIONS
+    # ============================================
     READ_ARTICLES = "read:articles"
-    ANALYZE_ARTICLES = "analyze:articles"
-    TRIAGE_ARTICLES = "triage:articles"
-    ARTICLES_VIEW = "articles:view"
-    ARTICLES_VIEW_CONTENT = "articles:view_content"
-    ARTICLES_VIEW_DETAILS = "articles:view_details"
-    ARTICLES_VIEW_INTELLIGENCE = "articles:view_intelligence"
-    ARTICLES_VIEW_HUNTS = "articles:view_hunts"
-    ARTICLES_VIEW_COMMENTS = "articles:view_comments"
-    ARTICLES_EDIT = "articles:edit"
-    ARTICLES_DELETE = "articles:delete"
-    ARTICLES_CREATE = "articles:create"
-    ARTICLES_ASSIGN = "articles:assign"
-    ARTICLES_CHANGE_STATUS = "articles:change_status"
-    ARTICLES_ADD_TAGS = "articles:add_tags"
-    ARTICLES_ADD_COMMENT = "articles:add_comment"
-    ARTICLES_EDIT_COMMENT = "articles:edit_comment"
-    ARTICLES_DELETE_COMMENT = "articles:delete_comment"
-    ARTICLES_EXPORT = "articles:export"
-    ARTICLES_BULK_ACTION = "articles:bulk_action"
-    ARTICLES_TRIAGE = "articles:triage"
+    EXPORT_ARTICLES = "export:articles"
+    MANAGE_SOURCES = "manage:sources"
+    MANAGE_GLOBAL_WATCHLIST = "manage:global_watchlist"
+    MANAGE_PERSONAL_WATCHLIST = "manage:personal_watchlist"
+    MANAGE_USER_FEEDS = "manage:user_feeds"
+    MANAGE_USERS = "manage:users"
+    VIEW_AUDIT_LOGS = "view:audit_logs"
 
-    # Intelligence (placeholders)
-    READ_INTELLIGENCE = "read:intelligence"
-    EXTRACT_INTELLIGENCE = "extract:intelligence"
-    INTELLIGENCE_VIEW = "intelligence:view"
-    INTELLIGENCE_CREATE = "intelligence:create"
-    INTELLIGENCE_EDIT = "intelligence:edit"
-    INTELLIGENCE_DELETE = "intelligence:delete"
-    INTELLIGENCE_EXPORT = "intelligence:export"
-    INTELLIGENCE_EXTRACT = "intelligence:extract"
-    INTELLIGENCE_ENRICH = "intelligence:enrich"
-    INTELLIGENCE_MARK_FALSE_POSITIVE = "intelligence:mark_false_positive"
+    # ============================================
+    # LEGACY PERMISSIONS (Mapped for backward compatibility)
+    # ============================================
+    # Articles
+    ANALYZE_ARTICLES = "read:articles"
+    TRIAGE_ARTICLES = "read:articles"
+    ARTICLES_VIEW = "read:articles"
+    ARTICLES_VIEW_CONTENT = "read:articles"
+    ARTICLES_VIEW_DETAILS = "read:articles"
+    ARTICLES_VIEW_INTELLIGENCE = "read:articles"
+    ARTICLES_VIEW_HUNTS = "read:articles"
+    ARTICLES_VIEW_COMMENTS = "read:articles"
+    ARTICLES_EDIT = "read:articles"
+    ARTICLES_DELETE = "read:articles"
+    ARTICLES_CREATE = "read:articles"
+    ARTICLES_ASSIGN = "read:articles"
+    ARTICLES_CHANGE_STATUS = "read:articles"
+    ARTICLES_ADD_TAGS = "read:articles"
+    ARTICLES_ADD_COMMENT = "read:articles"
+    ARTICLES_EDIT_COMMENT = "read:articles"
+    ARTICLES_DELETE_COMMENT = "read:articles"
+    ARTICLES_EXPORT = "export:articles"
+    ARTICLES_BULK_ACTION = "read:articles"
+    ARTICLES_TRIAGE = "read:articles"
 
-    # IOCs (placeholders)
-    IOC_VIEW = "ioc:view"
-    IOC_CREATE = "ioc:create"
-    IOC_EDIT = "ioc:edit"
-    IOC_DELETE = "ioc:delete"
-    IOC_EXPORT = "ioc:export"
-    IOC_SEARCH = "ioc:search"
-    IOC_ENRICH = "ioc:enrich"
-    IOC_VIEW_TIMELINE = "ioc:view_timeline"
+    # Intelligence
+    READ_INTELLIGENCE = "read:articles"
+    EXTRACT_INTELLIGENCE = "read:articles"
+    INTELLIGENCE_VIEW = "read:articles"
+    INTELLIGENCE_CREATE = "read:articles"
+    INTELLIGENCE_EDIT = "read:articles"
+    INTELLIGENCE_DELETE = "read:articles"
+    INTELLIGENCE_EXPORT = "export:articles"
+    INTELLIGENCE_EXTRACT = "read:articles"
+    INTELLIGENCE_ENRICH = "read:articles"
+    INTELLIGENCE_MARK_FALSE_POSITIVE = "read:articles"
+    DELETE_ARTICLE_INTELLIGENCE = "read:articles"
+    EDIT_ARTICLE_INTELLIGENCE = "read:articles"
+    DELETE_INTELLIGENCE = "read:articles"
+    EDIT_INTELLIGENCE = "read:articles"
+    EXPORT_INTELLIGENCE = "export:articles"
+
+    # IOCs
+    IOC_VIEW = "read:articles"
+    IOC_CREATE = "read:articles"
+    IOC_EDIT = "read:articles"
+    IOC_DELETE = "read:articles"
+    IOC_EXPORT = "export:articles"
+    IOC_SEARCH = "read:articles"
+    IOC_ENRICH = "read:articles"
+    IOC_VIEW_TIMELINE = "read:articles"
 
     # Sources
-    READ_SOURCES = "read:sources"
-    MANAGE_SOURCES = "manage:sources"
-    SOURCES_VIEW = "sources:view"
-    SOURCES_CREATE = "sources:create"
-    SOURCES_EDIT = "sources:edit"
-    SOURCES_DELETE = "sources:delete"
-    SOURCES_ENABLE = "sources:enable"
-    SOURCES_DISABLE = "sources:disable"
-    SOURCES_TEST = "sources:test"
-    SOURCES_INGEST = "sources:ingest"
+    READ_SOURCES = "read:articles"
+    SOURCES_VIEW = "read:articles"
+    SOURCES_CREATE = "manage:sources"
+    SOURCES_EDIT = "manage:sources"
+    SOURCES_DELETE = "manage:sources"
+    SOURCES_ENABLE = "manage:sources"
+    SOURCES_DISABLE = "manage:sources"
+    SOURCES_TEST = "manage:sources"
+    SOURCES_INGEST = "manage:sources"
+    VIEW_SOURCES = "read:articles"
+    MANAGE_FEED_SOURCES = "manage:sources"
 
     # Feed
-    FEED_VIEW = "feed:view"
-    FEED_READ = "feed:read"
-    FEED_SEARCH = "feed:search"
-    FEED_FILTER = "feed:filter"
-    FEED_STAR = "feed:star"
-    FEED_ADD_SOURCE = "feed:add_source"
-    FEED_REMOVE_SOURCE = "feed:remove_source"
-    FEED_MANAGE_SOURCES = "feed:manage_sources"
+    FEED_VIEW = "read:articles"
+    FEED_READ = "read:articles"
+    FEED_SEARCH = "read:articles"
+    FEED_FILTER = "read:articles"
+    FEED_STAR = "read:articles"
+    FEED_ADD_SOURCE = "manage:user_feeds"
+    FEED_REMOVE_SOURCE = "manage:user_feeds"
+    FEED_MANAGE_SOURCES = "manage:user_feeds"
+    VIEW_FEED = "read:articles"
 
     # Watchlist
-    MANAGE_GLOBAL_WATCHLIST = "manage:global_watchlist"
-    MANAGE_USER_WATCHLIST = "manage:user_watchlist"
-    MANAGE_WATCHLISTS = "manage:watchlists"
-    WATCHLIST_VIEW = "watchlist:view"
-    WATCHLIST_CREATE = "watchlist:create"
-    WATCHLIST_EDIT = "watchlist:edit"
-    WATCHLIST_DELETE = "watchlist:delete"
-    WATCHLIST_IMPORT = "watchlist:import"
-    WATCHLIST_EXPORT = "watchlist:export"
+    MANAGE_WATCHLIST = "manage:global_watchlist"
+    MANAGE_WATCHLISTS = "manage:global_watchlist"
+    WATCHLIST_VIEW = "manage:personal_watchlist"
+    WATCHLIST_CREATE = "manage:personal_watchlist"
+    WATCHLIST_EDIT = "manage:personal_watchlist"
+    WATCHLIST_DELETE = "manage:personal_watchlist"
+    WATCHLIST_IMPORT = "manage:personal_watchlist"
+    WATCHLIST_EXPORT = "export:articles"
+    VIEW_WATCHLIST = "manage:personal_watchlist"
 
-    # User Feeds
-    MANAGE_USER_FEEDS = "manage:user_feeds"
+    # Hunts (legacy, not used in Jyoti)
+    HUNTS_VIEW = "manage:users"
+    HUNTS_CREATE = "manage:users"
+    HUNTS_EDIT = "manage:users"
+    HUNTS_DELETE = "manage:users"
+    HUNTS_EXECUTE = "manage:users"
+    HUNTS_STOP = "manage:users"
+    HUNTS_SCHEDULE = "manage:users"
+    HUNTS_CLONE = "manage:users"
+    HUNTS_VIEW_RESULTS = "manage:users"
+    HUNTS_EXPORT_RESULTS = "manage:users"
+    CREATE_HUNTS = "manage:users"
+    DELETE_HUNTS = "manage:users"
+    EDIT_HUNTS = "manage:users"
+    EXECUTE_HUNTS = "manage:users"
+    VIEW_HUNTS = "manage:users"
+    VIEW_HUNT_RESULTS = "manage:users"
+    CREATE_REPORTS = "manage:users"
 
-    # Hunts (placeholders)
-    HUNTS_VIEW = "hunts:view"
-    HUNTS_CREATE = "hunts:create"
-    HUNTS_EDIT = "hunts:edit"
-    HUNTS_DELETE = "hunts:delete"
-    HUNTS_EXECUTE = "hunts:execute"
-    HUNTS_STOP = "hunts:stop"
-    HUNTS_SCHEDULE = "hunts:schedule"
-    HUNTS_CLONE = "hunts:clone"
-    HUNTS_VIEW_RESULTS = "hunts:view_results"
-    HUNTS_EXPORT_RESULTS = "hunts:export_results"
+    # Reports (legacy, not used in Jyoti)
+    REPORTS_VIEW = "manage:users"
+    REPORTS_CREATE = "manage:users"
+    REPORTS_EDIT = "manage:users"
+    REPORTS_DELETE = "manage:users"
+    REPORTS_PUBLISH = "manage:users"
+    REPORTS_SHARE = "manage:users"
+    REPORTS_EXPORT = "manage:users"
+    REPORTS_GENERATE = "manage:users"
+    REPORTS_APPROVE = "manage:users"
+    REPORTS_VIEW_DRAFT = "manage:users"
+    DELETE_REPORTS = "manage:users"
+    EDIT_REPORTS = "manage:users"
+    EXPORT_REPORTS = "manage:users"
+    PUBLISH_REPORTS = "manage:users"
+    SHARE_REPORTS = "manage:users"
+    VIEW_REPORTS = "manage:users"
 
-    # Reports (placeholders)
-    REPORTS_VIEW = "reports:view"
-    REPORTS_CREATE = "reports:create"
-    REPORTS_EDIT = "reports:edit"
-    REPORTS_DELETE = "reports:delete"
-    REPORTS_PUBLISH = "reports:publish"
-    REPORTS_SHARE = "reports:share"
-    REPORTS_EXPORT = "reports:export"
-    REPORTS_GENERATE = "reports:generate"
-    REPORTS_APPROVE = "reports:approve"
-    REPORTS_VIEW_DRAFT = "reports:view_draft"
-
-    # Connectors (placeholders)
-    MANAGE_CONNECTORS = "manage:connectors"
-    CONNECTORS_VIEW = "connectors:view"
-    CONNECTORS_CREATE = "connectors:create"
-    CONNECTORS_EDIT = "connectors:edit"
-    CONNECTORS_DELETE = "connectors:delete"
-    CONNECTORS_ENABLE = "connectors:enable"
-    CONNECTORS_DISABLE = "connectors:disable"
-    CONNECTORS_TEST = "connectors:test"
-    CONNECTORS_VIEW_LOGS = "connectors:view_logs"
+    # Connectors (legacy, not used in Jyoti)
+    MANAGE_CONNECTORS = "manage:users"
+    CONNECTORS_VIEW = "manage:users"
+    CONNECTORS_CREATE = "manage:users"
+    CONNECTORS_EDIT = "manage:users"
+    CONNECTORS_DELETE = "manage:users"
+    CONNECTORS_ENABLE = "manage:users"
+    CONNECTORS_DISABLE = "manage:users"
+    CONNECTORS_TEST = "manage:users"
+    CONNECTORS_VIEW_LOGS = "manage:users"
+    TEST_CONNECTORS = "manage:users"
+    VIEW_CONNECTORS = "manage:users"
 
     # Audit
-    AUDIT_VIEW = "audit:view"
-    VIEW_AUDIT_LOGS = "view:audit_logs"
-    AUDIT_EXPORT = "audit:export"
-    AUDIT_SEARCH = "audit:search"
-    AUDIT_VIEW_DETAILS = "audit:view_details"
+    AUDIT_VIEW = "view:audit_logs"
+    AUDIT_EXPORT = "view:audit_logs"
+    AUDIT_SEARCH = "view:audit_logs"
+    AUDIT_VIEW_DETAILS = "view:audit_logs"
+    VIEW_AUDIT = "view:audit_logs"
+    EXPORT_AUDIT = "view:audit_logs"
 
-    # Dashboard
-    DASHBOARD_VIEW = "dashboard:view"
-    DASHBOARD_VIEW_STATS = "dashboard:view_stats"
-    DASHBOARD_VIEW_CHARTS = "dashboard:view_charts"
-    DASHBOARD_EXPORT = "dashboard:export"
+    # Dashboard (legacy, not used in Jyoti)
+    DASHBOARD_VIEW = "read:articles"
+    DASHBOARD_VIEW_STATS = "read:articles"
+    DASHBOARD_VIEW_CHARTS = "read:articles"
+    DASHBOARD_EXPORT = "export:articles"
+    VIEW_DASHBOARD = "read:articles"
 
-    # Chatbot (placeholders)
-    CHATBOT_USE = "chatbot:use"
-    CHATBOT_VIEW_HISTORY = "chatbot:view_history"
-    CHATBOT_CLEAR_HISTORY = "chatbot:clear_history"
-    CHATBOT_PROVIDE_FEEDBACK = "chatbot:provide_feedback"
+    # Chatbot (legacy, not used in Jyoti)
+    CHATBOT_USE = "read:articles"
+    CHATBOT_VIEW_HISTORY = "read:articles"
+    CHATBOT_CLEAR_HISTORY = "read:articles"
+    CHATBOT_PROVIDE_FEEDBACK = "read:articles"
+    USE_CHATBOT = "read:articles"
+    VIEW_CHATBOT_HISTORY = "read:articles"
 
     # Admin Users
-    MANAGE_USERS = "manage:users"
-    MANAGE_RBAC = "manage:rbac"
-    ADMIN_USERS_VIEW = "admin:users:view"
-    ADMIN_USERS_CREATE = "admin:users:create"
-    ADMIN_USERS_EDIT = "admin:users:edit"
-    ADMIN_USERS_DELETE = "admin:users:delete"
-    ADMIN_USERS_CHANGE_ROLE = "admin:users:change_role"
-    ADMIN_USERS_RESET_PASSWORD = "admin:users:reset_password"
+    ADMIN_USERS_VIEW = "manage:users"
+    ADMIN_USERS_CREATE = "manage:users"
+    ADMIN_USERS_EDIT = "manage:users"
+    ADMIN_USERS_DELETE = "manage:users"
+    ADMIN_USERS_CHANGE_ROLE = "manage:users"
+    ADMIN_USERS_RESET_PASSWORD = "manage:users"
 
     # Admin RBAC
-    ADMIN_RBAC_VIEW = "admin:rbac:view"
-    ADMIN_RBAC_EDIT_ROLES = "admin:rbac:edit_roles"
-    ADMIN_RBAC_EDIT_PERMISSIONS = "admin:rbac:edit_permissions"
-    ADMIN_RBAC_USER_OVERRIDES = "admin:rbac:user_overrides"
+    ADMIN_RBAC_VIEW = "manage:users"
+    ADMIN_RBAC_EDIT_ROLES = "manage:users"
+    ADMIN_RBAC_EDIT_PERMISSIONS = "manage:users"
+    ADMIN_RBAC_USER_OVERRIDES = "manage:users"
+    MANAGE_RBAC = "manage:users"
+    VIEW_ADMIN = "manage:users"
 
     # Admin System
-    ADMIN_SYSTEM_VIEW = "admin:system:view"
-    ADMIN_SYSTEM_EDIT = "admin:system:edit"
-    ADMIN_SYSTEM_BACKUP = "admin:system:backup"
-    ADMIN_SYSTEM_RESTORE = "admin:system:restore"
+    ADMIN_SYSTEM_VIEW = "manage:users"
+    ADMIN_SYSTEM_EDIT = "manage:users"
+    ADMIN_SYSTEM_BACKUP = "manage:users"
+    ADMIN_SYSTEM_RESTORE = "manage:users"
+    MANAGE_SYSTEM = "manage:users"
 
     # Admin GenAI
-    ADMIN_GENAI_VIEW = "admin:genai:view"
-    ADMIN_GENAI_EDIT = "admin:genai:edit"
-    ADMIN_GENAI_TEST = "admin:genai:test"
-    ADMIN_GENAI_VIEW_LOGS = "admin:genai:view_logs"
+    ADMIN_GENAI_VIEW = "manage:users"
+    ADMIN_GENAI_EDIT = "manage:users"
+    ADMIN_GENAI_TEST = "manage:users"
+    ADMIN_GENAI_VIEW_LOGS = "manage:users"
+    MANAGE_GENAI = "manage:users"
 
     # Admin Guardrails
-    ADMIN_GUARDRAILS_VIEW = "admin:guardrails:view"
-    ADMIN_GUARDRAILS_EDIT = "admin:guardrails:edit"
-    ADMIN_GUARDRAILS_TEST = "admin:guardrails:test"
+    ADMIN_GUARDRAILS_VIEW = "manage:users"
+    ADMIN_GUARDRAILS_EDIT = "manage:users"
+    ADMIN_GUARDRAILS_TEST = "manage:users"
 
     # Admin Knowledge Base
-    ADMIN_KB_VIEW = "admin:kb:view"
-    ADMIN_KB_UPLOAD = "admin:kb:upload"
-    ADMIN_KB_DELETE = "admin:kb:delete"
-    ADMIN_KB_REPROCESS = "admin:kb:reprocess"
+    ADMIN_KB_VIEW = "manage:users"
+    ADMIN_KB_UPLOAD = "manage:users"
+    ADMIN_KB_DELETE = "manage:users"
+    ADMIN_KB_REPROCESS = "manage:users"
+    MANAGE_KNOWLEDGE = "manage:users"
 
     # General Admin
-    ADMIN_ACCESS = "admin:access"
+    ADMIN_ACCESS = "manage:users"
+    ASSIGN_ARTICLES = "read:articles"
+    VIEW_ARTICLE_COMMENTS = "read:articles"
+    VIEW_ARTICLE_CONTENT = "read:articles"
+    VIEW_ARTICLE_HUNTS = "read:articles"
+    VIEW_ARTICLE_INTELLIGENCE = "read:articles"
+    VIEW_ARTICLES = "read:articles"
+    DELETE_ARTICLES = "read:articles"
+    EDIT_ARTICLES = "read:articles"
 
 
 ROLE_PERMISSIONS = {
-    # ADMIN: Full access to all features
+    # ADMIN: Full access - manage sources, users, global watchlist
     UserRole.ADMIN: [p.value for p in Permission],  # All permissions
 
-    # USER: Standard user with personal feeds and watchlist management
-    UserRole.USER: [
+    # VIEWER: Standard user - read feeds, manage personal watchlist/feeds
+    UserRole.VIEWER: [
         Permission.READ_ARTICLES.value,
-        Permission.READ_SOURCES.value,
-        Permission.MANAGE_USER_WATCHLIST.value,
+        Permission.EXPORT_ARTICLES.value,
+        Permission.MANAGE_PERSONAL_WATCHLIST.value,
         Permission.MANAGE_USER_FEEDS.value,
     ],
 }

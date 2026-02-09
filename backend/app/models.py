@@ -29,8 +29,8 @@ class HuntTriggerType(str, Enum):
 
 
 class UserRole(str, Enum):
-    ADMIN = "ADMIN"  # Full access: manage sources, users, global watchlist
-    USER = "USER"    # Standard user: view feeds, manage personal feeds/watchlist
+    ADMIN = "ADMIN"      # Full access: manage sources, users, global watchlist
+    VIEWER = "VIEWER"    # Standard user: view feeds, manage personal feeds/watchlist
 
 
 class ExtractedIntelligenceType(str, Enum):
@@ -66,7 +66,7 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=True)  # Null if OAuth/SAML auth
     full_name = Column(String, nullable=True)
-    role = Column(SQLEnum(UserRole), default=UserRole.USER, nullable=False)  # Primary role
+    role = Column(SQLEnum(UserRole), default=UserRole.VIEWER, nullable=False)  # Primary role
 
     # Multiple roles support - JSON array of additional roles
     # e.g., ["TI", "TH"] means user has TI and TH in addition to primary role

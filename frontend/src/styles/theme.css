@@ -240,11 +240,12 @@ body {
   position: sticky;
   top: 0;
   z-index: 1000;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .jyoti-navbar .logo {
-  color: var(--text-inverse);
+  color: var(--nav-text);
   font-weight: 600;
   font-size: var(--font-size-lg);
   display: flex;
@@ -262,24 +263,39 @@ body {
 }
 
 /* Dark theme navbar menu - ensure icons and text are visible */
+.theme-dark .jyoti-navbar,
+.theme-dark .ant-layout-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .theme-dark .ant-menu-dark,
 .theme-dark .ant-menu-dark .ant-menu-sub {
   background: transparent !important;
+  border-bottom: none !important;
 }
 
 .theme-dark .ant-menu-dark .ant-menu-item,
 .theme-dark .ant-menu-dark .ant-menu-item a {
   color: rgba(255, 255, 255, 0.85) !important;
+  font-weight: 500;
+  padding: 0 12px !important;
+  height: 56px;
+  line-height: 56px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
 }
 
 .theme-dark .ant-menu-dark .ant-menu-item .anticon {
-  color: rgba(255, 255, 255, 0.75) !important;
+  color: var(--primary) !important;
+  margin-right: 8px;
 }
 
 .theme-dark .ant-menu-dark .ant-menu-item-selected,
 .theme-dark .ant-menu-dark .ant-menu-item-selected a {
   color: #fff !important;
-  background: rgba(var(--primary-rgb), 0.3) !important;
+  background: transparent !important;
+  border-bottom-color: var(--primary) !important;
+  font-weight: 600;
 }
 
 .theme-dark .ant-menu-dark .ant-menu-item-selected .anticon {
@@ -290,7 +306,7 @@ body {
 .theme-dark .ant-menu-dark .ant-menu-item:hover,
 .theme-dark .ant-menu-dark .ant-menu-item:hover a {
   color: #fff !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: transparent !important;
 }
 
 .theme-dark .ant-menu-dark .ant-menu-item:hover .anticon {
@@ -300,6 +316,10 @@ body {
 /* Ensure navbar buttons are visible in dark mode */
 .theme-dark .jyoti-navbar .ant-btn-text {
   color: rgba(255, 255, 255, 0.85) !important;
+  border-radius: 4px;
+  padding: 6px 12px;
+  height: auto;
+  font-weight: 500;
 }
 
 .theme-dark .jyoti-navbar .ant-btn-text:hover {
@@ -308,7 +328,102 @@ body {
 }
 
 .theme-dark .jyoti-navbar .ant-btn-text .anticon {
-  color: rgba(255, 255, 255, 0.85) !important;
+  color: inherit !important;
+}
+
+/* ============================================
+   LIGHT THEME (DAYLIGHT) - CRITICAL OVERRIDES
+   ============================================ */
+
+/* Light theme navbar menu - ensure icons and text are visible */
+.theme-light .jyoti-navbar,
+.theme-light .ant-layout-header {
+  border-bottom: 1px solid #E2E8F0 !important;
+}
+
+/* CRITICAL: Fix button visibility in light theme */
+.theme-light .ant-btn-text {
+  color: #0F172A !important;
+  background: transparent !important;
+}
+
+.theme-light .ant-btn-text:hover,
+.theme-light .ant-btn-text:focus {
+  color: #0369A1 !important;
+  background: rgba(3, 105, 161, 0.08) !important;
+}
+
+.theme-light .ant-btn-text:active {
+  color: #075985 !important;
+  background: rgba(3, 105, 161, 0.12) !important;
+}
+
+/* Fix theme toggle button visibility */
+.theme-light .jyoti-navbar .ant-btn {
+  color: #0F172A !important;
+}
+
+.theme-light .jyoti-navbar .ant-btn:hover {
+  color: #0369A1 !important;
+}
+
+.theme-light .ant-menu,
+.theme-light .ant-menu-light,
+.theme-light .ant-menu-light .ant-menu-sub {
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+.theme-light .ant-menu-item,
+.theme-light .ant-menu-light .ant-menu-item,
+.theme-light .ant-menu-light .ant-menu-item a {
+  color: #0F172A !important;
+  font-weight: 500;
+  padding: 0 12px !important;
+  height: 56px;
+  line-height: 56px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.theme-light .ant-menu-item .anticon,
+.theme-light .ant-menu-light .ant-menu-item .anticon {
+  color: #0369A1 !important;
+  margin-right: 8px;
+}
+
+.theme-light .ant-menu-item-selected,
+.theme-light .ant-menu-light .ant-menu-item-selected,
+.theme-light .ant-menu-light .ant-menu-item-selected a {
+  color: var(--primary) !important;
+  background: transparent !important;
+  border-bottom-color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.theme-light .ant-menu-item-selected .anticon,
+.theme-light .ant-menu-light .ant-menu-item-selected .anticon {
+  color: var(--primary) !important;
+}
+
+.theme-light .ant-menu-item:hover,
+.theme-light .ant-menu-light .ant-menu-item:hover,
+.theme-light .ant-menu-light .ant-menu-item:hover a {
+  color: var(--primary) !important;
+  background: transparent !important;
+}
+
+.theme-light .ant-menu-item:hover .anticon,
+.theme-light .ant-menu-light .ant-menu-item:hover .anticon {
+  color: var(--primary) !important;
+}
+
+/* Light theme button styles - secondary rules */
+.theme-light .jyoti-navbar .ant-btn-text {
+  border-radius: 4px;
+  padding: 6px 12px;
+  height: auto;
+  font-weight: 500;
 }
 
 /* ============================================

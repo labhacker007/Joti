@@ -2,10 +2,9 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
 // Theme & Timezone providers
-import { ThemeProvider } from './context/ThemeContext';
-import { TimezoneProvider } from './context/TimezoneContext';
-import './styles/themes/theme-variables.css';
-import './styles/themes/theme-components.css';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { TimezoneProvider } from './contexts/TimezoneContext';
+import './index.css';
 
 // Auth
 import Login from './pages/Login';
@@ -14,8 +13,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Pages - Jyoti core
 import Dashboard from './pages/Dashboard';
 import NewsFeeds from './pages/NewsFeeds';
-import Sources from './pages/Sources';
-import Watchlist from './pages/Watchlist';
 import Admin from './pages/Admin';
 import AuditLogs from './pages/AuditLogs';
 import UserProfile from './pages/UserProfile';
@@ -57,8 +54,6 @@ function App() {
             <Route path="/" element={<Navigate to="/news" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/news" element={<NewsFeeds />} />
-            <Route path="/sources" element={<Sources />} />
-            <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/profile" element={<UserProfile />} />
             <Route path="/audit" element={<AuditLogs />} />
             <Route path="/admin" element={<Admin />} />

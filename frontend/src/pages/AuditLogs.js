@@ -13,7 +13,7 @@ import {
   FileTextOutlined
 } from '@ant-design/icons';
 import { auditAPI } from '../api/client';
-import { useTimezone } from '../context/TimezoneContext';
+import { useTimezone } from '../contexts/TimezoneContext';
 import './AuditLogs.css';
 
 const { Title, Text } = Typography;

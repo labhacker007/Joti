@@ -1,10 +1,8 @@
 /* ============================================
-   PARSHU LOGIN - RESEARCH-BASED DESIGN
-   Based on: CrowdStrike, SentinelOne, Palo Alto, Fortinet
-   Principles: Minimalist, trust-focused, animated backgrounds
+   JOTI LOGIN
    ============================================ */
 
-.parshu-login {
+.joti-login {
   position: fixed;
   top: 0;
   left: 0;
@@ -59,30 +57,10 @@
   text-align: center;
 }
 
-.parshu-logo {
-  margin-bottom: 16px;
-  filter: drop-shadow(0 0 20px var(--primary-glow, rgba(14, 165, 233, 0.4)));
-}
-
-.parshu-logo svg {
-  animation: logo-pulse 4s ease-in-out infinite;
-}
-
-@keyframes logo-pulse {
-  0%, 100% { 
-    filter: drop-shadow(0 0 10px currentColor);
-    opacity: 1;
-  }
-  50% { 
-    filter: drop-shadow(0 0 25px currentColor);
-    opacity: 0.9;
-  }
-}
-
 .brand-title {
-  font-size: 28px !important;
+  font-size: 32px !important;
   font-weight: 700 !important;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   margin-bottom: 4px !important;
 }
 
@@ -90,6 +68,7 @@
   font-size: 14px;
   font-weight: 400;
   letter-spacing: 0.02em;
+  opacity: 0.8;
 }
 
 /* ============================================
@@ -104,7 +83,7 @@
   border: 1px solid;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 
+  box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
@@ -133,15 +112,23 @@
   padding: 12px 16px;
   transition: all 0.2s ease;
   border-width: 1px;
+  background: transparent !important;
 }
 
 .login-form .ant-input-affix-wrapper:hover {
   border-color: var(--primary);
+  background: transparent !important;
 }
 
 .login-form .ant-input-affix-wrapper-focused {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-light);
+  background: transparent !important;
+}
+
+.login-form .ant-input-affix-wrapper input {
+  background: transparent !important;
+  color: var(--text-primary) !important;
 }
 
 .login-form .ant-input {
@@ -191,7 +178,7 @@
   transform: translateY(0);
 }
 
-/* Secondary Button (SSO) */
+/* Secondary Button (SSO/OAuth) */
 .login-form .ant-btn-default {
   height: 44px;
   border-radius: 12px;
@@ -226,45 +213,6 @@
 }
 
 /* ============================================
-   SECURITY BADGES
-   ============================================ */
-
-.security-badges {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  margin-top: 28px;
-  padding-top: 24px;
-  border-top: 1px solid;
-}
-
-.security-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.security-badge svg {
-  font-size: 14px;
-}
-
-/* ============================================
-   FOOTER
-   ============================================ */
-
-.login-footer {
-  margin-top: 32px;
-  text-align: center;
-}
-
-.login-footer .ant-typography {
-  font-size: 12px;
-}
-
-/* ============================================
    LOADING STATE
    ============================================ */
 
@@ -285,26 +233,14 @@
   .login-content {
     padding: 16px;
   }
-  
+
   .login-card {
     padding: 32px 24px;
     border-radius: 16px;
   }
-  
+
   .brand-title {
     font-size: 24px !important;
-  }
-  
-  .security-badges {
-    gap: 16px;
-  }
-  
-  .security-badge {
-    font-size: 11px;
-  }
-  
-  .security-badge svg {
-    font-size: 12px;
   }
 }
 
@@ -314,7 +250,7 @@
 
 /* Light Mode (Daylight theme) */
 .theme-daylight .login-card {
-  box-shadow: 
+  box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
@@ -329,33 +265,9 @@
   background: #fff;
 }
 
-.theme-daylight .parshu-logo {
-  filter: drop-shadow(0 0 10px var(--primary-glow));
-}
-
 /* Matrix Theme - Enhanced glow */
-.theme-matrix .parshu-logo {
-  filter: drop-shadow(0 0 15px var(--primary));
-}
-
 .theme-matrix .login-card {
   border-color: var(--primary)30;
-}
-
-/* Red Alert Theme - Urgent feel */
-.theme-red-alert .parshu-logo {
-  animation: urgent-pulse 2s ease-in-out infinite;
-}
-
-@keyframes urgent-pulse {
-  0%, 100% { 
-    filter: drop-shadow(0 0 10px var(--primary));
-    transform: scale(1);
-  }
-  50% { 
-    filter: drop-shadow(0 0 30px var(--primary));
-    transform: scale(1.02);
-  }
 }
 
 /* Aurora Theme - Smooth gradients */
@@ -368,17 +280,9 @@
   font-family: var(--terminal-font);
 }
 
-.terminal-mode .security-badge {
-  font-family: var(--terminal-font);
-}
-
 /* Neon Mode Overrides */
-.neon-mode .parshu-logo {
-  filter: drop-shadow(0 0 20px var(--primary)) drop-shadow(0 0 40px var(--primary));
-}
-
 .neon-mode .login-card {
-  box-shadow: 
+  box-shadow:
     0 0 40px var(--primary-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
@@ -388,12 +292,7 @@
    ============================================ */
 
 @media (prefers-reduced-motion: reduce) {
-  .parshu-logo svg,
   .login-animated-bg {
-    animation: none;
-  }
-  
-  .theme-red-alert .parshu-logo {
     animation: none;
   }
 }
@@ -403,11 +302,11 @@
   .login-card {
     border-width: 2px;
   }
-  
+
   .login-form .ant-input-affix-wrapper {
     border-width: 2px;
   }
-  
+
   .login-form .ant-btn-primary {
     border: 2px solid currentColor;
   }

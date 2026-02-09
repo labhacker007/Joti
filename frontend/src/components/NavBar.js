@@ -28,8 +28,8 @@ import {
   MobileOutlined
 } from '@ant-design/icons';
 import { useAuthStore } from '../store';
-import { useTheme } from '../context/ThemeContext';
-import { useTimezone, TIMEZONE_OPTIONS } from '../context/TimezoneContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useTimezone, TIMEZONE_OPTIONS } from '../contexts/TimezoneContext';
 import { usersAPI } from '../api/client';
 
 const { Header } = Layout;
@@ -50,7 +50,7 @@ function NavBar() {
   
   // Simple theme toggle handler
   const handleThemeToggle = () => {
-    const themeOrder = ['dark', 'hacker', 'light'];
+    const themeOrder = ['daylight', 'command-center', 'aurora'];
     const currentIndex = themeOrder.indexOf(currentThemeId);
     const nextTheme = themeOrder[(currentIndex + 1) % themeOrder.length];
     setTheme(nextTheme);
@@ -572,14 +572,8 @@ function NavBar() {
     },
   ];
 
-  // Define all possible menu items with their page keys
+  // Define all possible menu items with their page keys - Joti only
   const allMenuItems = [
-    {
-      key: '/dashboard',
-      pageKey: 'dashboard',
-      icon: <DashboardOutlined />,
-      label: <Link to="/dashboard">Operations</Link>,
-    },
     {
       key: '/news',
       pageKey: 'feed',
@@ -587,46 +581,10 @@ function NavBar() {
       label: <Link to="/news">News & Feeds</Link>,
     },
     {
-      key: '/articles',
-      pageKey: 'articles',
-      icon: <FileTextOutlined />,
-      label: <Link to="/articles">Articles</Link>,
-    },
-    {
-      key: '/intelligence',
-      pageKey: 'intelligence',
-      icon: <SafetyOutlined />,
-      label: <Link to="/intelligence">Intelligence</Link>,
-    },
-    {
-      key: '/hunts',
-      pageKey: 'hunts',
-      icon: <ThunderboltOutlined />,
-      label: <Link to="/hunts">Threat Hunts</Link>,
-    },
-    {
-      key: '/reports',
-      pageKey: 'reports',
-      icon: <BarChartOutlined />,
-      label: <Link to="/reports">Reports</Link>,
-    },
-    {
-      key: '/sources',
-      pageKey: 'sources',
-      icon: <SyncOutlined />,
-      label: <Link to="/sources">Sources</Link>,
-    },
-    {
-      key: '/watchlist',
-      pageKey: 'watchlist',
-      icon: <EyeOutlined />,
-      label: <Link to="/watchlist">Watchlist</Link>,
-    },
-    {
-      key: '/audit',
-      pageKey: 'audit',
-      icon: <AuditOutlined />,
-      label: <Link to="/audit">Audit Logs</Link>,
+      key: '/profile',
+      pageKey: 'profile',
+      icon: <UserOutlined />,
+      label: <Link to="/profile">Profile</Link>,
     },
     {
       key: '/admin',
@@ -685,21 +643,21 @@ function NavBar() {
         background: 'var(--bg-navbar)',
         height: 56,
       }}>
-      <div className="logo" style={{ 
-        color: 'var(--text-inverse)', 
-        fontWeight: 600, 
+      <div className="logo" style={{
+        color: 'var(--nav-text)',
+        fontWeight: 600,
         marginRight: 32,
         fontSize: 18,
         display: 'flex',
         alignItems: 'center',
         gap: 8,
       }}>
-        <ThunderboltOutlined className="logo-icon" style={{ 
-          color: 'var(--primary)', 
+        <ThunderboltOutlined className="logo-icon" style={{
+          color: 'var(--primary)',
           fontSize: 20,
           ...(isDark ? { filter: 'drop-shadow(0 0 8px var(--primary))' } : {}),
         }} />
-        <span>Jyoti</span>
+        <span>Joti</span>
       </div>
       
       {user && (
@@ -723,13 +681,13 @@ function NavBar() {
       
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
         {/* Theme Toggle Button */}
-        <Button 
-          type="text" 
+        <Button
+          type="text"
           onClick={handleThemeToggle}
-          style={{ color: 'var(--text-inverse)' }}
+          style={{ color: 'var(--nav-icon)' }}
           title={`Current: ${currentThemeId} (Click to switch)`}
         >
-          {currentThemeId === 'hacker' ? '🖥️' : currentThemeId === 'light' ? '☀️' : '🌙'}
+          {currentThemeId === 'daylight' ? '☀️' : currentThemeId === 'command-center' ? '🖥️' : '🌙'}
         </Button>
         
         {user ? (
@@ -738,11 +696,11 @@ function NavBar() {
             trigger={['click']}
             placement="bottomRight"
           >
-            <Button 
-              type="text" 
-              style={{ 
-                color: 'var(--text-inverse)', 
-                height: 'auto', 
+            <Button
+              type="text"
+              style={{
+                color: 'var(--nav-text)',
+                height: 'auto',
                 padding: '6px 12px',
                 borderRadius: 6,
                 display: 'flex',
