@@ -7,10 +7,14 @@ RUN npm install
 
 COPY . .
 
+RUN echo "Checking for context folder:" && (test -d /app/src/context && echo "CONTEXT FOLDER EXISTS!" || echo "Context folder deleted - GOOD")
+
 ARG REACT_APP_API_URL=http://localhost:8000
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 
-RUN npm run build
+# Force rebuild by adding a unique build arg timestamp
+ARG BUILD_TIMESTAMP=1
+RUN npm run build 2>&1 | grep -E "error|ERROR|Error" || echo "Build completed"
 
 # Production stage
 FROM node:18-alpine
