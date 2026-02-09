@@ -45,19 +45,19 @@ class RateLimiter:
         
         # Endpoint-specific limits
         self.endpoint_limits = {
-            # Auth endpoints - stricter limits
-            "/auth/login": (5, 60),          # 5 requests per minute
-            "/auth/register": (3, 60),        # 3 requests per minute
-            "/auth/saml/login": (10, 60),     # 10 requests per minute
-            
+            # Auth endpoints - stricter limits (relaxed for development)
+            "/auth/login": (30, 60),          # 30 requests per minute (dev: increased from 5)
+            "/auth/register": (20, 60),        # 20 requests per minute (dev: increased from 3)
+            "/auth/saml/login": (30, 60),     # 30 requests per minute (dev: increased from 10)
+
             # GenAI endpoints - expensive operations
             "/hunts/generate": (20, 60),      # 20 requests per minute
             "/hunts/batch": (5, 60),          # 5 batch operations per minute
             "/automation/process": (10, 60),  # 10 processes per minute
-            
+
             # Ingestion - resource intensive
             "/sources/ingest-all": (2, 60),   # 2 per minute
-            
+
             # Reports - can be heavy
             "/reports/generate/auto": (5, 60),
         }
