@@ -1,0 +1,196 @@
+================================================================================
+  JOTI DOCKER - QUICK REFERENCE CARD
+================================================================================
+
+QUICK START
+-----------
+1. Windows:  JOTI-DOCKER-START.bat
+   Linux:    bash JOTI-DOCKER-START.sh
+
+2. Open browser: http://localhost:3000
+
+3. Login with: admin@joti.local / Joti123!@2026
+
+================================================================================
+MAIN ENDPOINTS
+================================================================================
+
+Frontend:        http://localhost:3000
+Backend API:     http://localhost:8000
+API Docs:        http://localhost:8000/docs
+API Health:      http://localhost:8000/health
+
+================================================================================
+DOCKER COMMANDS
+================================================================================
+
+Start (Dev):     docker-compose -f docker-compose.dev.yml up -d
+Start (Prod):    docker-compose up -d
+Stop:            docker-compose down
+Status:          docker-compose ps
+Logs:            docker-compose logs -f
+Logs Backend:    docker-compose logs -f backend
+Logs Frontend:   docker-compose logs -f frontend
+Rebuild:         docker-compose build --no-cache
+Clean Start:     docker-compose down -v && docker-compose up -d
+
+================================================================================
+LOGIN CREDENTIALS
+================================================================================
+
+Email:     admin@joti.local
+Password:  Joti123!@2026
+
+Change in: .env (ADMIN_EMAIL, ADMIN_PASSWORD)
+
+================================================================================
+DATABASE ACCESS
+================================================================================
+
+User:        joti_user
+Password:    joti_pass_2024
+Database:    joti_db
+Host:        localhost (when running locally)
+Port:        5432
+
+Connect:
+  docker exec -it joti-postgres-1 psql -U joti_user -d joti_db
+
+Query users:
+  SELECT id, email, username, role FROM public.user LIMIT 10;
+
+================================================================================
+COMMON ISSUES & FIXES
+================================================================================
+
+ISSUE: Can't access localhost:3000
+FIX:   1. Check Docker is running
+       2. Wait 60 seconds for frontend startup
+       3. Check logs: docker-compose logs -f frontend
+
+ISSUE: Login fails with "Invalid credentials"
+FIX:   1. Verify backend is running: curl http://localhost:8000/health
+       2. Check .env has correct ADMIN_EMAIL and ADMIN_PASSWORD
+       3. Check browser console for API errors (F12)
+
+ISSUE: Port 3000 or 8000 already in use
+FIX:   1. Stop containers: docker-compose down
+       2. Check what's using port: netstat -ano | findstr :3000
+       3. Kill the process or use different ports
+
+ISSUE: Services won't start
+FIX:   1. Clean start: docker-compose down -v
+       2. Rebuild: docker-compose build --no-cache
+       3. Start fresh: docker-compose up -d
+
+================================================================================
+CONFIGURATION
+================================================================================
+
+Edit .env to change:
+- POSTGRES_USER
+- POSTGRES_PASSWORD
+- ADMIN_EMAIL
+- ADMIN_PASSWORD
+- SECRET_KEY
+- CORS_ORIGINS
+- GENAI_PROVIDER
+
+Save and rebuild: docker-compose build --no-cache
+
+================================================================================
+FILES REFERENCE
+================================================================================
+
+DOCKER-SETUP.md              - Complete setup guide
+JOTI-DOCKER-STATUS.md        - Detailed status report
+JOTI-DOCKER-START.sh         - Linux/macOS startup script
+JOTI-DOCKER-START.bat        - Windows startup script
+QUICK-DOCKER-REFERENCE.txt   - This file
+
+docker-compose.yml           - Production config
+docker-compose.dev.yml       - Development config
+
+.env                         - Environment variables
+.env.production.example      - Production template
+
+================================================================================
+ENVIRONMENT VARIABLES
+================================================================================
+
+POSTGRES_USER=joti_user
+POSTGRES_PASSWORD=joti_pass_2024
+POSTGRES_DB=joti_db
+DATABASE_URL=postgresql://joti_user:joti_pass_2024@postgres:5432/joti_db
+
+ADMIN_EMAIL=admin@joti.local
+ADMIN_PASSWORD=Joti123!@2026
+
+SECRET_KEY=joti-dev-secret-key-32chars-min-length-required
+
+ENV=dev
+DEBUG=true
+
+CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+
+GENAI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+OLLAMA_MODEL=llama3:latest
+
+ENABLE_AUTOMATION_SCHEDULER=true
+
+================================================================================
+SERVICES & PORTS
+================================================================================
+
+PostgreSQL:    127.0.0.1:5432  (Database)
+Redis:         127.0.0.1:6379  (Cache)
+Backend:       localhost:8000  (FastAPI)
+Frontend:      localhost:3000  (React)
+
+================================================================================
+HEALTH CHECKS
+================================================================================
+
+All services have automatic health checks:
+- Attempts: 5
+- Interval: 10 seconds
+- Timeout: 5 seconds
+
+View with: docker-compose ps
+
+================================================================================
+USEFUL SCRIPTS
+================================================================================
+
+View backend environment:
+  docker-compose exec backend env | grep -i admin
+
+Test API manually:
+  curl -X POST http://localhost:8000/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@joti.local","password":"Joti123!@2026"}'
+
+Check database connection:
+  docker-compose exec postgres pg_isready -U joti_user
+
+View all logs:
+  docker-compose logs | head -100
+
+Follow specific service:
+  docker-compose logs --tail=50 -f backend
+
+================================================================================
+NOTES
+================================================================================
+
+- First startup takes ~60 seconds due to database initialization
+- Containers use health checks to prevent premature starts
+- Live reload enabled in dev mode (changes reflect immediately)
+- CORS allows localhost:3000 to access backend
+- All services restart on failure automatically
+
+================================================================================
+LAST UPDATED: February 8, 2026
+VERSION: JOTI Docker v1.0
+================================================================================

@@ -78,6 +78,8 @@ services:
     build:
       context: ./frontend
       dockerfile: ../infra/Dockerfile.frontend.dev
+      args:
+        REACT_APP_API_URL: http://localhost:8000
     ports:
       - "3000:3000"
     # Live reload enabled - changes to frontend files reflect immediately
