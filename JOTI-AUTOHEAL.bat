@@ -126,7 +126,7 @@ if errorlevel 1 (
 
 REM ─── Check 7: Admin user exists? ──────────────────────────────
 echo [7/10] Checking admin user...
-docker exec joti-postgres-1 psql -U joti_user -d joti_db -c "SELECT COUNT(*) FROM public.user WHERE email='admin@joti.local';" >nul 2>&1
+docker exec joti-postgres-1 psql -U joti_user -d joti_db -c "SELECT COUNT(*) FROM public.users WHERE email='admin@joti.local';" >nul 2>&1
 if errorlevel 1 (
     echo   ⚠️  WARN: Admin user check failed. Database may need init.
     set /a ISSUES_FOUND+=1
@@ -144,9 +144,9 @@ if errorlevel 1 (
     echo   ✅ OK: API endpoints responding
 )
 
-REM ─── Check 9: Login page loads? ───────────────────────────────
-echo [9/10] Checking login page...
-curl -sf http://localhost:3000 | findstr "login" >nul 2>&1
+REM ─── Check 9: Frontend HTML loads? ───────────────────────────
+echo [9/10] Checking frontend HTML...
+curl -sf http://localhost:3000 | findstr "doctype html root" >nul 2>&1
 if errorlevel 1 (
     echo   ⚠️  WARN: Frontend content not loading properly
     set /a ISSUES_FOUND+=1

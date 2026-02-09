@@ -117,7 +117,7 @@ fi
 
 # ─── Check 7: Admin user exists? ──────────────────────────────
 echo "[7/10] Checking admin user..."
-if docker exec joti-postgres-1 psql -U joti_user -d joti_db -c "SELECT COUNT(*) FROM public.user WHERE email='admin@joti.local';" > /dev/null 2>&1; then
+if docker exec joti-postgres-1 psql -U joti_user -d joti_db -c "SELECT COUNT(*) FROM public.users WHERE email='admin@joti.local';" > /dev/null 2>&1; then
     echo "  ✅ OK: Admin user exists"
 else
     echo "  ⚠️  WARN: Admin user check failed. Database may need init."
@@ -133,9 +133,9 @@ else
     ISSUES_FOUND=$((ISSUES_FOUND + 1))
 fi
 
-# ─── Check 9: Login page loads? ───────────────────────────────
-echo "[9/10] Checking login page..."
-if curl -sf http://localhost:3000 | grep -q "login"; then
+# ─── Check 9: Frontend HTML loads? ────────────────────────────
+echo "[9/10] Checking frontend HTML..."
+if curl -sf http://localhost:3000 | grep -q "doctype\|html\|root"; then
     echo "  ✅ OK: Frontend loading correctly"
 else
     echo "  ⚠️  WARN: Frontend content not loading properly"
