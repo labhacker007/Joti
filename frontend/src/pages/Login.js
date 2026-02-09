@@ -471,6 +471,8 @@ function Login() {
         return <FloatingOrbsBackground primaryColor={'#FF9500'} secondaryColor={'#00D9FF'} />;
       case 'daylight':
         return <NeuralNetworkBackground color={'#2196F3'} />;
+      case 'kimi':
+        return <FloatingOrbsBackground primaryColor={'#FF9933'} secondaryColor={'#FF6B00'} />;
       case 'command-center':
       default:
         return <NeuralNetworkBackground color={'#00D9FF'} />;
@@ -513,6 +515,7 @@ function Login() {
           <option value="daylight">Daylight</option>
           <option value="midnight">Midnight</option>
           <option value="matrix">Matrix</option>
+          <option value="kimi">⚡ Kimi Cyber-Kinetic</option>
         </select>
       </div>
 

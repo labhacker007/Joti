@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import { ThemeProvider } from './contexts/ThemeContext';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import './index.css';
+import './styles/kimi-theme.css';
 
 // Auth
 import Login from './pages/Login';

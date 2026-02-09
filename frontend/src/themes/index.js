@@ -244,37 +244,37 @@ export const THEMES = {
       'card-foreground': '60 30% 95%',
       popover: '120 15% 8%',
       'popover-foreground': '60 30% 95%',
-      
+
       // Primary - Amber/Gold
       primary: '45 100% 50%',         // #ffbf00
       'primary-foreground': '120 20% 5%',
       'primary-light': '45 100% 50% / 0.15',
       'primary-glow': '45 100% 50% / 0.4',
-      
+
       // Secondary - Olive
       secondary: '80 60% 35%',        // #5c8a23
       'secondary-foreground': '60 30% 95%',
-      
+
       // Muted
       muted: '120 12% 12%',           // #1a241a
       'muted-foreground': '60 20% 55%', // #999980
-      
+
       // Accent
       accent: '120 12% 12%',
       'accent-foreground': '60 30% 95%',
-      
+
       // Destructive
       destructive: '0 80% 50%',       // #e61a1a
       'destructive-foreground': '60 30% 95%',
-      
+
       // Border
       border: '60 20% 20%',           // #4d4d33
       input: '60 20% 20%',
       ring: '45 100% 50%',
-      
+
       // Radius
       radius: '0.375rem',
-      
+
       // Sidebar
       'sidebar-background': '120 15% 6%',
       'sidebar-foreground': '60 30% 95%',
@@ -284,13 +284,13 @@ export const THEMES = {
       'sidebar-accent-foreground': '60 30% 95%',
       'sidebar-border': '60 20% 20%',
       'sidebar-ring': '45 100% 50%',
-      
+
       // Semantic colors - Tactical
       success: '100 80% 40%',         // #66cc14
       warning: '45 100% 50%',         // #ffbf00
       critical: '0 80% 50%',          // #e61a1a
       info: '180 60% 50%',            // #33cccc
-      
+
       // Platform colors - Tactical
       xsiam: '30 100% 45%',
       splunk: '100 80% 40%',
@@ -301,6 +301,80 @@ export const THEMES = {
       glassmorphism: true,
       glowEffects: true,
       animatedBackground: false,
+      gridPattern: true,
+    }
+  },
+
+  kimi: {
+    id: 'kimi',
+    name: 'Kimi Cyber-Kinetic',
+    description: 'Ultra-modern cyber-kinetic theme with orange/amber accents and glassmorphism',
+    author: 'Kimi Design Team',
+    colors: {
+      // Background hierarchy - Deep space black
+      background: '0 0% 2%',          // #050505
+      foreground: '0 0% 100%',        // #ffffff
+      card: '0 0% 5%',                // #0d0d0d
+      'card-foreground': '0 0% 100%',
+      popover: '0 0% 5%',
+      'popover-foreground': '0 0% 100%',
+
+      // Primary - Kimi Orange (Cyber-Kinetic)
+      primary: '17 100% 60%',         // #ff9933
+      'primary-foreground': '0 0% 100%',
+      'primary-light': '17 100% 60% / 0.1',
+      'primary-glow': '17 100% 60% / 0.4',
+
+      // Secondary - Dark secondary
+      secondary: '0 0% 11%',          // #1a1a1a
+      'secondary-foreground': '0 0% 100%',
+
+      // Muted
+      muted: '0 0% 15%',              // #262626
+      'muted-foreground': '0 0% 53%',  // #878787
+
+      // Accent - Orange accent
+      accent: '17 100% 60%',
+      'accent-foreground': '0 0% 100%',
+
+      // Destructive
+      destructive: '0 84.2% 60.2%',   // #ef4444
+      'destructive-foreground': '0 0% 98%',
+
+      // Border
+      border: '0 0% 15%',             // #262626
+      input: '0 0% 15%',
+      ring: '17 100% 60%',
+
+      // Radius
+      radius: '0.5rem',
+
+      // Sidebar
+      'sidebar-background': '0 0% 5%',
+      'sidebar-foreground': '0 0% 100%',
+      'sidebar-primary': '17 100% 60%',
+      'sidebar-primary-foreground': '0 0% 100%',
+      'sidebar-accent': '0 0% 15%',
+      'sidebar-accent-foreground': '0 0% 100%',
+      'sidebar-border': '0 0% 12%',
+      'sidebar-ring': '17 100% 60%',
+
+      // Semantic colors
+      success: '142 71% 45%',         // #22c55e
+      warning: '38 92% 50%',          // #f59e0b
+      critical: '0 84% 60%',          // #ef4444
+      info: '217 91% 60%',            // #3b82f6
+
+      // Platform colors
+      xsiam: '17 100% 60%',           // Orange
+      splunk: '142 71% 45%',          // Green
+      defender: '217 91% 60%',        // Blue
+      wiz: '263 70% 50%',             // Purple
+    },
+    features: {
+      glassmorphism: true,
+      glowEffects: true,
+      animatedBackground: true,
       gridPattern: true,
     }
   }
@@ -319,7 +393,7 @@ export function applyTheme(themeId) {
   });
   
   // Apply theme class
-  root.classList.remove('theme-midnight', 'theme-corporate', 'theme-cyberpunk', 'theme-tactical');
+  root.classList.remove('theme-midnight', 'theme-corporate', 'theme-cyberpunk', 'theme-tactical', 'theme-kimi');
   root.classList.add(`theme-${themeId}`);
   
   // Store preference

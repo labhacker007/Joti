@@ -373,6 +373,19 @@ function NavBar() {
       ),
       onClick: () => setTheme('matrix'),
     },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'kimi',
+      label: (
+        <Space>
+          <span>⚡ Kimi Cyber-Kinetic</span>
+          {theme === 'kimi' && <CheckCircleOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
+        </Space>
+      ),
+      onClick: () => setTheme('kimi'),
+    },
   ];
 
   // Timezone options for profile menu
