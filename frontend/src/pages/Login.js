@@ -348,11 +348,11 @@ function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { setTokens, setUser } = useAuthStore();
-  const { currentTheme, setTheme } = useTheme();
+  const { theme, themeEmoji } = useTheme();
 
-  // Get accent color from theme
-  const accentColor = currentTheme.colors.loginAccentColor || currentTheme.colors.primary;
-  const secondaryColor = currentTheme.colors.secondary;
+  // Basic colors - no complex theme styling needed
+  const bgColor = '#000';
+  const textColor = '#fff';
 
   // Check SAML on mount
   useEffect(() => {
@@ -460,27 +460,25 @@ function Login() {
 
   // Select background based on theme
   const renderBackground = () => {
-    const themeId = currentTheme.id?.replace('-terminal', '').replace('-neon', '');
-    
-    switch (themeId) {
+    switch (theme) {
       case 'matrix':
-        return <MatrixRainBackground color={accentColor} />;
+        return <MatrixRainBackground color={'#00ff00'} />;
       case 'aurora':
-        return <FloatingOrbsBackground primaryColor={accentColor} secondaryColor={secondaryColor} />;
+        return <FloatingOrbsBackground primaryColor={'#9D4EDD'} secondaryColor={'#3A86FF'} />;
       case 'red-alert':
-        return <ConstellationBackground color={accentColor} />;
+        return <ConstellationBackground color={'#FF6B6B'} />;
       case 'midnight':
-        return <FloatingOrbsBackground primaryColor={accentColor} secondaryColor={secondaryColor} />;
+        return <FloatingOrbsBackground primaryColor={'#FF9500'} secondaryColor={'#00D9FF'} />;
       case 'daylight':
-        return <NeuralNetworkBackground color={accentColor} />;
+        return <NeuralNetworkBackground color={'#2196F3'} />;
       case 'command-center':
       default:
-        return <NeuralNetworkBackground color={accentColor} />;
+        return <NeuralNetworkBackground color={'#00D9FF'} />;
     }
   };
 
   return (
-    <div className="joti-login" style={{ background: currentTheme.colors.loginBgGradient }}>
+    <div className="joti-login" style={{ background: '#000', minHeight: '100vh' }}>
       {/* Animated Background */}
       {renderBackground()}
 
@@ -494,12 +492,14 @@ function Login() {
         gap: 8,
       }}>
         <select
-          value={currentTheme.id}
-          onChange={(e) => setTheme(e.target.value)}
+          value={theme}
+          onChange={(e) => {
+            // TODO: implement theme switching
+          }}
           style={{
-            background: currentTheme.colors.bgElevated,
-            color: currentTheme.colors.textPrimary,
-            border: `1px solid ${currentTheme.colors.borderDefault}`,
+            background: '#1a1a1a',
+            color: '#fff',
+            border: '1px solid #444',
             borderRadius: 6,
             padding: '6px 12px',
             fontSize: 12,
@@ -521,32 +521,35 @@ function Login() {
         {/* Brand */}
         <div className="login-brand">
           <Title level={2} className="brand-title" style={{
-            color: currentTheme.colors.textPrimary,
+            color: '#fff',
             fontWeight: 700,
             letterSpacing: '-0.02em',
             marginBottom: 4,
           }}>
             Joti
           </Title>
-          <Text className="brand-subtitle" style={{ color: currentTheme.colors.textSecondary }}>
+          <Text className="brand-subtitle" style={{ color: '#aaa' }}>
             News Feed Aggregator
           </Text>
         </div>
 
         {/* Login Card */}
-        <div 
+        <div
           className="login-card"
           style={{
-            background: currentTheme.colors.glassBg,
-            borderColor: currentTheme.colors.glassBorder,
+            background: 'rgba(0,0,0,0.6)',
+            borderColor: '#444',
+            border: '1px solid #444',
+            borderRadius: 8,
+            padding: 32,
           }}
         >
           {/* Welcome Text */}
           <div className="login-header">
-            <Title level={4} style={{ color: currentTheme.colors.textPrimary, margin: 0 }}>
+            <Title level={4} style={{ color: '#fff', margin: 0 }}>
               Welcome back
             </Title>
-            <Text style={{ color: currentTheme.colors.textMuted }}>
+            <Text style={{ color: '#999' }}>
               Sign in to your account
             </Text>
           </div>
@@ -559,9 +562,10 @@ function Login() {
               showIcon
               className="login-error"
               style={{
-                background: currentTheme.colors.criticalBg,
-                borderColor: currentTheme.colors.critical + '40',
-                color: currentTheme.colors.critical,
+                background: '#ff6b6b22',
+                borderColor: '#ff6b6b44',
+                color: '#ff6b6b',
+                marginBottom: 16,
               }}
             />
           )}
@@ -584,9 +588,9 @@ function Login() {
                   window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/auth/google/login`;
                 }}
                 style={{
-                  background: currentTheme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : '#ffffff',
-                  borderColor: currentTheme.colors.borderDefault,
-                  color: currentTheme.colors.textPrimary,
+                  background: 'rgba(255,255,255,0.08)',
+                  borderColor: '#444',
+                  color: '#fff',
                   height: 44,
                 }}
               >
@@ -603,9 +607,9 @@ function Login() {
                   window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/auth/microsoft/login`;
                 }}
                 style={{
-                  background: currentTheme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : '#ffffff',
-                  borderColor: currentTheme.colors.borderDefault,
-                  color: currentTheme.colors.textPrimary,
+                  background: 'rgba(255,255,255,0.08)',
+                  borderColor: '#444',
+                  color: '#fff',
                   height: 44,
                 }}
               >
@@ -624,13 +628,13 @@ function Login() {
                 left: 0,
                 right: 0,
                 top: '50%',
-                borderTop: `1px solid ${currentTheme.colors.borderDefault}`,
+                borderTop: `1px solid ${'#444'}`,
               }} />
               <span style={{
                 position: 'relative',
-                background: currentTheme.colors.backgroundPrimary,
+                background: '#000',
                 padding: '0 16px',
-                color: currentTheme.colors.textMuted,
+                color: '#666',
                 fontSize: '14px',
               }}>
                 OR
@@ -642,13 +646,13 @@ function Login() {
               rules={[{ required: true, message: 'Please enter your username' }]}
             >
               <Input
-                prefix={<LoginOutlined style={{ color: currentTheme.colors.textMuted }} />}
+                prefix={<LoginOutlined style={{ color: '#666' }} />}
                 placeholder="Username or email"
                 size="large"
                 style={{
                   background: 'transparent',
-                  borderColor: currentTheme.colors.borderDefault,
-                  color: currentTheme.colors.textPrimary,
+                  borderColor: '#444',
+                  color: '#fff',
                 }}
               />
             </Form.Item>
@@ -658,7 +662,7 @@ function Login() {
               rules={[{ required: true, message: 'Please enter your password' }]}
             >
               <Input.Password
-                prefix={<LockOutlined style={{ color: currentTheme.colors.textMuted }} />}
+                prefix={<LockOutlined style={{ color: '#666' }} />}
                 placeholder="Password"
                 size="large"
                 visibilityToggle={{
@@ -667,15 +671,15 @@ function Login() {
                 }}
                 iconRender={(visible) =>
                   visible ? (
-                    <EyeOutlined style={{ color: currentTheme.colors.textMuted }} />
+                    <EyeOutlined style={{ color: '#666' }} />
                   ) : (
-                    <EyeInvisibleOutlined style={{ color: currentTheme.colors.textMuted }} />
+                    <EyeInvisibleOutlined style={{ color: '#666' }} />
                   )
                 }
                 style={{
                   background: 'transparent',
-                  borderColor: currentTheme.colors.borderDefault,
-                  color: currentTheme.colors.textPrimary,
+                  borderColor: '#444',
+                  color: '#fff',
                 }}
               />
             </Form.Item>
@@ -688,9 +692,9 @@ function Login() {
                 block
                 loading={loading}
                 style={{
-                  background: currentTheme.colors.gradientPrimary,
+                  background: 'linear-gradient(135deg, #FF9500, #FF6B6B)',
                   borderColor: 'transparent',
-                  boxShadow: `0 4px 16px ${currentTheme.colors.primaryGlow}`,
+                  boxShadow: `0 4px 16px ${'#FF9500'}`,
                 }}
               >
                 Sign In
@@ -705,8 +709,8 @@ function Login() {
                   block
                   onClick={handleSamlLogin}
                   style={{
-                    borderColor: currentTheme.colors.borderDefault,
-                    color: currentTheme.colors.textSecondary,
+                    borderColor: '#444',
+                    color: '#aaa',
                   }}
                 >
                   Sign in with SSO
