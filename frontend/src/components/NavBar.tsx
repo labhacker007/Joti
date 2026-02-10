@@ -143,14 +143,19 @@ function NavBar() {
               </Badge>
             )}
 
-            {/* Theme Toggle */}
-            <button
-              onClick={() => setTheme(isDark ? 'daylight' : 'midnight')}
-              className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+            {/* Theme Selector */}
+            <select
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as ThemeName)}
+              className="px-2 py-1 rounded-md border border-border bg-background text-foreground text-sm hover:bg-accent transition-colors cursor-pointer"
+              title="Select theme"
             >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
+              {Object.entries(themeOptions).map(([key, { emoji, label }]) => (
+                <option key={key} value={key}>
+                  {emoji} {label}
+                </option>
+              ))}
+            </select>
 
             {/* User Menu */}
             <div className="flex items-center gap-2 text-sm">
