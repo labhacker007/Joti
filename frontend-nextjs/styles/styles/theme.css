@@ -1,0 +1,1728 @@
+/* ============================================
+   PARSHU - UNIFIED THEME SYSTEM
+   Dynamic CSS Variables + Consistent Sizing
+   ============================================ */
+
+:root {
+  /* Default to Arctic Blue - overridden by JS */
+  --primary: #2563EB;
+  --primary-rgb: 37, 99, 235;
+  --primary-hover: #1D4ED8;
+  --primary-light: #EFF6FF;
+  --primary-dark: #1E40AF;
+  --bg-body: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-navbar: #1E3A5F;
+  --bg-elevated: #FFFFFF;
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #6B7280;
+  --text-inverse: #FFFFFF;
+  --success: #16A34A;
+  --success-bg: #DCFCE7;
+  --warning: #EA580C;
+  --warning-bg: #FED7AA;
+  --danger: #DC2626;
+  --danger-bg: #FEE2E2;
+  --info: #2563EB;
+  --info-bg: #DBEAFE;
+  --border-color: #E5E7EB;
+
+  /* Consistent Sizing System */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  /* Consistent Tag Sizing */
+  --tag-height: 24px;
+  --tag-font-size: 12px;
+  --tag-padding: 0 10px;
+  --tag-radius: 4px;
+  
+  /* Consistent Card Sizing */
+  --card-padding: 20px;
+  --card-header-padding: 14px 20px;
+  --card-radius: 12px;
+  
+  /* Consistent Button Sizing */
+  --btn-height-sm: 28px;
+  --btn-height-md: 36px;
+  --btn-height-lg: 44px;
+  
+  /* Typography - Comfortable reading sizes */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-md: 15px;
+  --font-size-lg: 17px;
+  --font-size-xl: 22px;
+  --font-size-2xl: 28px;
+  --font-scale: 1;
+  
+  --transition-fast: 100ms ease;
+  --transition: 150ms ease;
+  --transition-slow: 200ms ease;
+}
+
+/* ============================================
+   GLOBAL STYLES
+   ============================================ */
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  background-color: var(--bg-body);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition), color var(--transition);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ============================================
+   CONSISTENT FONT ACROSS ALL COMPONENTS
+   ============================================ */
+
+* {
+  font-family: var(--font-family);
+}
+
+/* Ant Design component fonts */
+.ant-typography,
+.ant-btn,
+.ant-input,
+.ant-select,
+.ant-table,
+.ant-card,
+.ant-tag,
+.ant-tabs,
+.ant-menu,
+.ant-modal,
+.ant-drawer,
+.ant-dropdown,
+.ant-form,
+.ant-checkbox,
+.ant-radio,
+.ant-statistic,
+.ant-alert,
+.ant-badge,
+.ant-collapse {
+  font-family: var(--font-family) !important;
+}
+
+/* Table cells - comfortable reading size */
+.ant-table-thead > tr > th,
+.ant-table-tbody > tr > td {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+}
+
+/* Card headers */
+.ant-card-head-title {
+  font-family: var(--font-family);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+/* Tabs */
+.ant-tabs-tab {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+}
+
+/* Buttons */
+.ant-btn {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+}
+
+/* Tags */
+.ant-tag {
+  font-family: var(--font-family);
+  font-size: var(--tag-font-size);
+}
+
+/* Modal titles */
+.ant-modal-title {
+  font-family: var(--font-family);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+/* Drawer titles */
+.ant-drawer-title {
+  font-family: var(--font-family);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+/* Statistic values - Consistent across all pages */
+.ant-statistic-content-value {
+  font-family: var(--font-family) !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-statistic-title {
+  font-family: var(--font-family) !important;
+  font-size: var(--font-size-sm) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.ant-statistic-content-prefix {
+  font-family: var(--font-family) !important;
+  font-size: 18px !important;
+  margin-right: 8px;
+}
+
+/* Smaller statistic variant for compact cards */
+.stat-compact .ant-statistic-content-value {
+  font-size: 20px !important;
+}
+
+.stat-compact .ant-statistic-content-prefix {
+  font-size: 16px !important;
+}
+
+/* Extra small statistic for inline metrics */
+.stat-xs .ant-statistic-content-value {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+.stat-xs .ant-statistic-content-prefix {
+  font-size: 14px !important;
+}
+
+/* Dark theme text adjustments for readability */
+.theme-dark {
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+}
+
+.theme-dark .ant-typography {
+  color: var(--text-primary);
+}
+
+.theme-dark .ant-typography.ant-typography-secondary {
+  color: var(--text-secondary) !important;
+}
+
+/* ============================================
+   NAVBAR - CONSISTENT ACROSS THEMES
+   ============================================ */
+
+.jyoti-navbar {
+  background: var(--bg-navbar) !important;
+  height: 56px;
+  padding: 0 var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.jyoti-navbar .logo {
+  color: var(--nav-text);
+  font-weight: 600;
+  font-size: var(--font-size-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.jyoti-navbar .logo-icon {
+  color: var(--primary);
+  font-size: 20px;
+}
+
+.theme-dark .jyoti-navbar .logo-icon {
+  filter: drop-shadow(0 0 8px var(--primary));
+}
+
+/* Dark theme navbar menu - ensure icons and text are visible */
+.theme-dark .jyoti-navbar,
+.theme-dark .ant-layout-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.theme-dark .ant-menu-dark,
+.theme-dark .ant-menu-dark .ant-menu-sub {
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+.theme-dark .ant-menu-dark .ant-menu-item,
+.theme-dark .ant-menu-dark .ant-menu-item a {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-weight: 500;
+  padding: 0 12px !important;
+  height: 56px;
+  line-height: 56px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.theme-dark .ant-menu-dark .ant-menu-item .anticon {
+  color: var(--primary) !important;
+  margin-right: 8px;
+}
+
+.theme-dark .ant-menu-dark .ant-menu-item-selected,
+.theme-dark .ant-menu-dark .ant-menu-item-selected a {
+  color: #fff !important;
+  background: transparent !important;
+  border-bottom-color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.theme-dark .ant-menu-dark .ant-menu-item-selected .anticon {
+  color: var(--primary) !important;
+  filter: drop-shadow(0 0 4px var(--primary));
+}
+
+.theme-dark .ant-menu-dark .ant-menu-item:hover,
+.theme-dark .ant-menu-dark .ant-menu-item:hover a {
+  color: #fff !important;
+  background: transparent !important;
+}
+
+.theme-dark .ant-menu-dark .ant-menu-item:hover .anticon {
+  color: var(--primary) !important;
+}
+
+/* Ensure navbar buttons are visible in dark mode */
+.theme-dark .jyoti-navbar .ant-btn-text {
+  color: rgba(255, 255, 255, 0.85) !important;
+  border-radius: 4px;
+  padding: 6px 12px;
+  height: auto;
+  font-weight: 500;
+}
+
+.theme-dark .jyoti-navbar .ant-btn-text:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.theme-dark .jyoti-navbar .ant-btn-text .anticon {
+  color: inherit !important;
+}
+
+/* ============================================
+   LIGHT THEME (DAYLIGHT) - CRITICAL OVERRIDES
+   ============================================ */
+
+/* Light theme navbar menu - ensure icons and text are visible */
+.theme-light .jyoti-navbar,
+.theme-light .ant-layout-header {
+  border-bottom: 1px solid #E2E8F0 !important;
+}
+
+/* CRITICAL: Fix button visibility in light theme */
+.theme-light .ant-btn-text {
+  color: #0F172A !important;
+  background: transparent !important;
+}
+
+.theme-light .ant-btn-text:hover,
+.theme-light .ant-btn-text:focus {
+  color: #0369A1 !important;
+  background: rgba(3, 105, 161, 0.08) !important;
+}
+
+.theme-light .ant-btn-text:active {
+  color: #075985 !important;
+  background: rgba(3, 105, 161, 0.12) !important;
+}
+
+/* Fix theme toggle button visibility */
+.theme-light .jyoti-navbar .ant-btn {
+  color: #0F172A !important;
+}
+
+.theme-light .jyoti-navbar .ant-btn:hover {
+  color: #0369A1 !important;
+}
+
+.theme-light .ant-menu,
+.theme-light .ant-menu-light,
+.theme-light .ant-menu-light .ant-menu-sub {
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+.theme-light .ant-menu-item,
+.theme-light .ant-menu-light .ant-menu-item,
+.theme-light .ant-menu-light .ant-menu-item a {
+  color: #0F172A !important;
+  font-weight: 500;
+  padding: 0 12px !important;
+  height: 56px;
+  line-height: 56px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.theme-light .ant-menu-item .anticon,
+.theme-light .ant-menu-light .ant-menu-item .anticon {
+  color: #0369A1 !important;
+  margin-right: 8px;
+}
+
+.theme-light .ant-menu-item-selected,
+.theme-light .ant-menu-light .ant-menu-item-selected,
+.theme-light .ant-menu-light .ant-menu-item-selected a {
+  color: var(--primary) !important;
+  background: transparent !important;
+  border-bottom-color: var(--primary) !important;
+  font-weight: 600;
+}
+
+.theme-light .ant-menu-item-selected .anticon,
+.theme-light .ant-menu-light .ant-menu-item-selected .anticon {
+  color: var(--primary) !important;
+}
+
+.theme-light .ant-menu-item:hover,
+.theme-light .ant-menu-light .ant-menu-item:hover,
+.theme-light .ant-menu-light .ant-menu-item:hover a {
+  color: var(--primary) !important;
+  background: transparent !important;
+}
+
+.theme-light .ant-menu-item:hover .anticon,
+.theme-light .ant-menu-light .ant-menu-item:hover .anticon {
+  color: var(--primary) !important;
+}
+
+/* Light theme button styles - secondary rules */
+.theme-light .jyoti-navbar .ant-btn-text {
+  border-radius: 4px;
+  padding: 6px 12px;
+  height: auto;
+  font-weight: 500;
+}
+
+/* ============================================
+   CARDS - UNIFIED SIZING
+   ============================================ */
+
+.ant-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  border-radius: var(--card-radius);
+  transition: var(--transition);
+}
+
+.ant-card-head {
+  padding: var(--card-header-padding);
+  border-bottom: 1px solid var(--border-color);
+  min-height: auto;
+}
+
+.ant-card-head-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ant-card-body {
+  padding: var(--card-padding);
+}
+
+.theme-dark .ant-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.theme-dark .ant-card-head {
+  background: transparent;
+  border-color: var(--border-color);
+}
+
+.theme-dark .ant-card-head-title {
+  color: var(--text-primary);
+}
+
+/* ============================================
+   TAGS - CONSISTENT SIZING ACROSS ALL PAGES
+   ============================================ */
+
+.ant-tag {
+  height: var(--tag-height);
+  line-height: calc(var(--tag-height) - 2px);
+  padding: var(--tag-padding);
+  font-size: var(--tag-font-size);
+  font-weight: 500;
+  border-radius: var(--tag-radius);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ant-tag-blue, .ant-tag-cyan {
+  background: var(--info-bg);
+  color: var(--info);
+  border-color: var(--info);
+}
+
+.ant-tag-green, .ant-tag-success {
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.ant-tag-orange, .ant-tag-gold, .ant-tag-warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.ant-tag-red, .ant-tag-magenta, .ant-tag-error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.ant-tag-purple {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8B5CF6;
+  border-color: #8B5CF6;
+}
+
+.theme-dark .ant-tag {
+  border: none;
+}
+
+/* ============================================
+   BUTTONS - CONSISTENT SIZING
+   ============================================ */
+
+.ant-btn {
+  height: var(--btn-height-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  padding: 0 var(--spacing-md);
+  transition: var(--transition);
+}
+
+.ant-btn-sm {
+  height: var(--btn-height-sm);
+  padding: 0 var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.ant-btn-lg {
+  height: var(--btn-height-lg);
+  padding: 0 var(--spacing-lg);
+  font-size: var(--font-size-md);
+}
+
+.ant-btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.ant-btn-primary:hover {
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+.theme-dark .ant-btn-primary {
+  box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.3);
+}
+
+.theme-dark .ant-btn-default {
+  background: var(--bg-elevated);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.theme-dark .ant-btn-default:hover {
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+/* ============================================
+   TABLES - CONSISTENT STYLING
+   ============================================ */
+
+.ant-table {
+  background: var(--bg-card);
+  font-size: var(--font-size-base);
+}
+
+.ant-table-thead > tr > th {
+  background: var(--bg-body) !important;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 10px var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ant-table-tbody > tr > td {
+  padding: 12px var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: var(--primary-light) !important;
+}
+
+.theme-dark .ant-table-thead > tr > th {
+  background: var(--bg-elevated) !important;
+  color: var(--text-secondary);
+  border-color: var(--border-color) !important;
+}
+
+.theme-dark .ant-table-tbody > tr > td {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-color) !important;
+}
+
+.theme-dark .ant-table-tbody > tr:hover > td {
+  background: var(--primary-light) !important;
+}
+
+/* ============================================
+   FORMS - CONSISTENT STYLING
+   ============================================ */
+
+.ant-input,
+.ant-select-selector,
+.ant-picker,
+.ant-input-affix-wrapper {
+  border-radius: var(--radius-sm) !important;
+  border-color: var(--border-color) !important;
+  font-size: var(--font-size-base);
+  transition: var(--transition);
+}
+
+.ant-input:hover,
+.ant-select-selector:hover,
+.ant-picker:hover {
+  border-color: var(--primary) !important;
+}
+
+.ant-input:focus,
+.ant-select-focused .ant-select-selector,
+.ant-input-affix-wrapper-focused {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.15) !important;
+}
+
+.theme-dark .ant-input,
+.theme-dark .ant-select-selector,
+.theme-dark .ant-picker,
+.theme-dark .ant-input-affix-wrapper {
+  background: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.theme-dark .ant-input::placeholder,
+.theme-dark .ant-select-selection-placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* ============================================
+   STAT CARDS - GRADIENT STYLING
+   ============================================ */
+
+.stat-card {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  border-radius: var(--card-radius);
+  padding: var(--card-padding);
+  color: var(--text-inverse);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: var(--transition);
+  cursor: pointer;
+  border: none;
+  height: 100%;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.theme-dark .stat-card:hover {
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3), 0 0 20px rgba(var(--primary-rgb), 0.2);
+}
+
+.stat-card .ant-statistic-title {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-sm);
+}
+
+.stat-card .ant-statistic-content {
+  color: var(--text-inverse) !important;
+}
+
+.stat-card .ant-statistic-content-value {
+  font-weight: 700;
+  font-size: 28px;
+  color: var(--text-inverse) !important;
+}
+
+.stat-card.stat-success {
+  background: linear-gradient(135deg, var(--success) 0%, #15803D 100%);
+}
+
+.stat-card.stat-warning {
+  background: linear-gradient(135deg, var(--warning) 0%, #C2410C 100%);
+}
+
+.stat-card.stat-danger {
+  background: linear-gradient(135deg, var(--danger) 0%, #B91C1C 100%);
+}
+
+.stat-card.stat-info {
+  background: linear-gradient(135deg, var(--info) 0%, #0284C7 100%);
+}
+
+.stat-card.stat-purple {
+  background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+}
+
+/* ============================================
+   UNIFIED STAT TILES - CONSISTENT ACROSS ALL PAGES
+   Use .jyoti-stat-tile for flat style tiles
+   ============================================ */
+
+.jyoti-stat-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--card-radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 100%;
+  min-height: 90px;
+}
+
+.jyoti-stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--primary);
+}
+
+.jyoti-stat-tile.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15);
+}
+
+.jyoti-stat-tile .ant-statistic-title {
+  color: var(--text-secondary) !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.jyoti-stat-tile .ant-statistic-content-value {
+  color: var(--text-primary) !important;
+  font-weight: 700;
+  font-size: 24px !important;
+}
+
+.jyoti-stat-tile .ant-statistic-content-prefix {
+  color: var(--text-primary) !important;
+  font-size: 18px !important;
+  margin-right: 8px;
+}
+
+/* Tile variants with colored icons */
+.jyoti-stat-tile.tile-primary .ant-statistic-content-prefix { color: var(--primary) !important; }
+.jyoti-stat-tile.tile-success .ant-statistic-content-prefix { color: var(--success) !important; }
+.jyoti-stat-tile.tile-warning .ant-statistic-content-prefix { color: var(--warning) !important; }
+.jyoti-stat-tile.tile-danger .ant-statistic-content-prefix { color: var(--danger) !important; }
+.jyoti-stat-tile.tile-info .ant-statistic-content-prefix { color: var(--info) !important; }
+.jyoti-stat-tile.tile-purple .ant-statistic-content-prefix { color: #8B5CF6 !important; }
+
+/* Active states for each variant */
+.jyoti-stat-tile.tile-success.active { border-color: var(--success); box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15); }
+.jyoti-stat-tile.tile-warning.active { border-color: var(--warning); box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15); }
+.jyoti-stat-tile.tile-danger.active { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15); }
+.jyoti-stat-tile.tile-purple.active { border-color: #8B5CF6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15); }
+
+/* Dark theme stat tiles */
+.theme-dark .jyoti-stat-tile {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.theme-dark .jyoti-stat-tile:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Hacker mode stat tiles */
+body.hacker-mode .jyoti-stat-tile {
+  background: #0a0a0a;
+  border-color: #1a1a1a;
+}
+
+body.hacker-mode .jyoti-stat-tile:hover {
+  border-color: rgba(0, 255, 65, 0.4);
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.15);
+}
+
+body.hacker-mode .jyoti-stat-tile.active {
+  border-color: #00FF41;
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+}
+
+body.hacker-mode .jyoti-stat-tile .ant-statistic-title {
+  color: #88C070 !important;
+}
+
+body.hacker-mode .jyoti-stat-tile .ant-statistic-content-value {
+  color: #00FF41 !important;
+}
+
+/* Cyber mode stat tiles */
+body.cyber-mode .jyoti-stat-tile {
+  background: #0a0a1a;
+  border-color: #1a1a3a;
+}
+
+body.cyber-mode .jyoti-stat-tile:hover {
+  border-color: rgba(0, 240, 255, 0.4);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+}
+
+body.cyber-mode .jyoti-stat-tile.active {
+  border-color: #00F0FF;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+}
+
+body.cyber-mode .jyoti-stat-tile .ant-statistic-title {
+  color: #7AC7D4 !important;
+}
+
+body.cyber-mode .jyoti-stat-tile .ant-statistic-content-value {
+  color: #00F0FF !important;
+}
+
+/* ============================================
+   PAGE LAYOUTS - CONSISTENT SPACING
+   ============================================ */
+
+.page-container {
+  padding: var(--spacing-lg);
+  min-height: calc(100vh - 56px);
+  background: var(--bg-body);
+}
+
+.page-header {
+  margin-bottom: var(--spacing-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
+.page-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.page-title .anticon {
+  color: var(--primary);
+}
+
+.theme-dark .page-title .anticon {
+  filter: drop-shadow(0 0 8px var(--primary));
+}
+
+/* ============================================
+   MODALS & DRAWERS - DARK MODE SUPPORT
+   ============================================ */
+
+.theme-dark .ant-modal-content,
+.theme-dark .ant-drawer-content {
+  background: var(--bg-card);
+}
+
+.theme-dark .ant-modal-header,
+.theme-dark .ant-drawer-header {
+  background: var(--bg-elevated);
+  border-color: var(--border-color);
+}
+
+.theme-dark .ant-modal-title,
+.theme-dark .ant-drawer-title {
+  color: var(--text-primary);
+}
+
+.theme-dark .ant-modal-close-x {
+  color: var(--text-secondary);
+}
+
+/* ============================================
+   TABS - CONSISTENT STYLING
+   ============================================ */
+
+.ant-tabs-tab {
+  font-size: var(--font-size-base);
+  color: var(--text-muted) !important;
+}
+
+.ant-tabs-tab-active {
+  color: var(--primary) !important;
+}
+
+.ant-tabs-tab:hover {
+  color: var(--primary) !important;
+}
+
+.ant-tabs-ink-bar {
+  background: var(--primary) !important;
+}
+
+.theme-dark .ant-tabs-tab {
+  color: var(--text-muted) !important;
+}
+
+.theme-dark .ant-tabs-tab-active {
+  color: var(--primary) !important;
+}
+
+/* ============================================
+   DROPDOWN & POPOVER - DARK MODE
+   ============================================ */
+
+.theme-dark .ant-dropdown-menu,
+.theme-dark .ant-select-dropdown,
+.theme-dark .ant-popover-inner {
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border-color);
+}
+
+.theme-dark .ant-dropdown-menu-item,
+.theme-dark .ant-select-item {
+  color: var(--text-primary) !important;
+}
+
+.theme-dark .ant-dropdown-menu-item:hover,
+.theme-dark .ant-select-item-option-active {
+  background: var(--primary-light) !important;
+}
+
+/* ============================================
+   SCROLLBAR - THEME AWARE
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-body);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* ============================================
+   ICON VISIBILITY - ALL THEMES
+   ============================================ */
+
+.anticon {
+  color: var(--icon-primary, var(--primary));
+}
+
+.ant-menu-item .anticon,
+.ant-menu-submenu-title .anticon {
+  color: inherit;
+}
+
+/* Ensure icons are visible in dark mode */
+.theme-dark .anticon {
+  color: var(--icon-primary, var(--primary));
+}
+
+.theme-dark .ant-menu-item .anticon,
+.theme-dark .ant-menu-submenu-title .anticon {
+  color: var(--text-inverse);
+}
+
+/* Icon in navbar should always be visible */
+.jyoti-navbar .anticon {
+  color: var(--text-inverse);
+}
+
+.jyoti-navbar .logo-icon {
+  color: var(--primary) !important;
+  filter: brightness(1.2);
+}
+
+/* Tags with icons */
+.ant-tag .anticon {
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+/* Button icons */
+.ant-btn .anticon {
+  color: inherit;
+}
+
+/* ============================================
+   HACKER MODE STYLES
+   ============================================ */
+
+body.hacker-mode {
+  --hacker-green: #00FF41;
+  --hacker-green-rgb: 0, 255, 65;
+  background: #0D0D0D;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* Scanline effect overlay */
+body.hacker-mode::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.03),
+    rgba(0, 0, 0, 0.03) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Hacker mode colors */
+body.hacker-mode {
+  --primary: #00FF41;
+  --primary-rgb: 0, 255, 65;
+  --primary-hover: #00CC33;
+  --primary-light: rgba(0, 255, 65, 0.1);
+  --primary-dark: #00AA2A;
+  --bg-body: #0D0D0D;
+  --bg-card: #1A1A1A;
+  --bg-navbar: #000000;
+  --bg-elevated: #262626;
+  --text-primary: #00FF41;
+  --text-secondary: #33FF66;
+  --text-muted: #00AA2A;
+  --text-inverse: #0D0D0D;
+  --success: #00FF41;
+  --success-bg: rgba(0, 255, 65, 0.15);
+  --warning: #FFD700;
+  --warning-bg: rgba(255, 215, 0, 0.15);
+  --danger: #FF3333;
+  --danger-bg: rgba(255, 51, 51, 0.15);
+  --info: #00BFFF;
+  --info-bg: rgba(0, 191, 255, 0.15);
+  --border-color: #333333;
+  --icon-primary: #00FF41;
+  --icon-muted: #00CC33;
+}
+
+/* Hacker text glow */
+body.hacker-mode .ant-typography,
+body.hacker-mode .page-title,
+body.hacker-mode .ant-card-head-title,
+body.hacker-mode .ant-statistic-content-value,
+body.hacker-mode .ant-menu-item,
+body.hacker-mode h1, body.hacker-mode h2, 
+body.hacker-mode h3, body.hacker-mode h4 {
+  text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+}
+
+/* Hacker icons always green and visible */
+body.hacker-mode .anticon {
+  color: #00FF41 !important;
+  filter: drop-shadow(0 0 3px rgba(0, 255, 65, 0.5));
+}
+
+body.hacker-mode .ant-menu-item .anticon {
+  color: #00FF41 !important;
+}
+
+body.hacker-mode .ant-btn .anticon {
+  color: inherit !important;
+}
+
+body.hacker-mode .ant-btn-primary .anticon {
+  color: #0D0D0D !important;
+}
+
+/* Hacker card styling */
+body.hacker-mode .ant-card {
+  background: #1A1A1A;
+  border: 1px solid #333;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.1);
+}
+
+body.hacker-mode .ant-card:hover {
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+}
+
+/* Hacker buttons */
+body.hacker-mode .ant-btn-primary {
+  background: #00FF41;
+  border-color: #00FF41;
+  color: #0D0D0D;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
+}
+
+body.hacker-mode .ant-btn-primary:hover {
+  background: #00CC33 !important;
+  border-color: #00CC33 !important;
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.6);
+}
+
+body.hacker-mode .ant-btn-default {
+  background: #1A1A1A;
+  border-color: #00FF41;
+  color: #00FF41;
+}
+
+body.hacker-mode .ant-btn-default:hover {
+  background: rgba(0, 255, 65, 0.1) !important;
+  border-color: #00FF41 !important;
+  color: #00FF41 !important;
+}
+
+/* Hacker tags */
+body.hacker-mode .ant-tag {
+  background: rgba(0, 255, 65, 0.15) !important;
+  border-color: #00FF41 !important;
+  color: #00FF41 !important;
+  text-shadow: 0 0 3px rgba(0, 255, 65, 0.5);
+}
+
+body.hacker-mode .ant-tag-success,
+body.hacker-mode .ant-tag-green {
+  background: rgba(0, 255, 65, 0.2) !important;
+}
+
+body.hacker-mode .ant-tag-warning,
+body.hacker-mode .ant-tag-orange,
+body.hacker-mode .ant-tag-gold {
+  background: rgba(255, 215, 0, 0.15) !important;
+  border-color: #FFD700 !important;
+  color: #FFD700 !important;
+}
+
+body.hacker-mode .ant-tag-error,
+body.hacker-mode .ant-tag-red {
+  background: rgba(255, 51, 51, 0.15) !important;
+  border-color: #FF3333 !important;
+  color: #FF3333 !important;
+}
+
+/* Hacker tables */
+body.hacker-mode .ant-table-thead > tr > th {
+  background: #1A1A1A !important;
+  color: #00FF41 !important;
+  border-color: #333 !important;
+  text-shadow: 0 0 3px rgba(0, 255, 65, 0.5);
+}
+
+body.hacker-mode .ant-table-tbody > tr > td {
+  background: #0D0D0D !important;
+  color: #00FF41 !important;
+  border-color: #333 !important;
+}
+
+body.hacker-mode .ant-table-tbody > tr:hover > td {
+  background: rgba(0, 255, 65, 0.1) !important;
+}
+
+/* Hacker inputs */
+body.hacker-mode .ant-input,
+body.hacker-mode .ant-select-selector,
+body.hacker-mode .ant-picker {
+  background: #1A1A1A !important;
+  border-color: #333 !important;
+  color: #00FF41 !important;
+}
+
+body.hacker-mode .ant-input:focus,
+body.hacker-mode .ant-select-focused .ant-select-selector {
+  border-color: #00FF41 !important;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3) !important;
+}
+
+body.hacker-mode .ant-input::placeholder {
+  color: #00AA2A !important;
+}
+
+/* Hacker stat cards */
+body.hacker-mode .stat-card {
+  background: linear-gradient(135deg, #00AA2A 0%, #006600 100%);
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+}
+
+body.hacker-mode .stat-card:hover {
+  box-shadow: 0 0 25px rgba(0, 255, 65, 0.5);
+}
+
+/* Hacker navbar */
+body.hacker-mode .jyoti-navbar {
+  background: #000000 !important;
+  border-bottom: 1px solid #00FF41;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
+body.hacker-mode .jyoti-navbar .logo {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.8);
+}
+
+body.hacker-mode .jyoti-navbar .logo-icon {
+  color: #00FF41 !important;
+  filter: drop-shadow(0 0 10px rgba(0, 255, 65, 0.8));
+}
+
+/* Hacker menu */
+body.hacker-mode .ant-menu-dark,
+body.hacker-mode .ant-menu-dark .ant-menu-sub {
+  background: #000000 !important;
+}
+
+body.hacker-mode .ant-menu-dark .ant-menu-item-selected {
+  background: rgba(0, 255, 65, 0.2) !important;
+}
+
+/* Hacker scrollbar */
+body.hacker-mode ::-webkit-scrollbar-thumb {
+  background: #00FF41;
+}
+
+body.hacker-mode ::-webkit-scrollbar-track {
+  background: #0D0D0D;
+}
+
+/* Hacker dropdown */
+body.hacker-mode .ant-dropdown-menu,
+body.hacker-mode .ant-select-dropdown {
+  background: #1A1A1A !important;
+  border: 1px solid #00FF41;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
+body.hacker-mode .ant-dropdown-menu-item,
+body.hacker-mode .ant-select-item {
+  color: #00FF41 !important;
+}
+
+body.hacker-mode .ant-dropdown-menu-item:hover,
+body.hacker-mode .ant-select-item-option-active {
+  background: rgba(0, 255, 65, 0.15) !important;
+}
+
+/* ============================================
+   CYBER MODE - Futuristic Neon Aesthetic
+   ============================================ */
+
+body.cyber-mode {
+  --bg-body: #050510;
+  --bg-card: #0A0A1F;
+  --bg-navbar: #000005;
+  --bg-elevated: #15152A;
+  --text-primary: #FFFFFF;
+  --text-secondary: #00F0FF;
+  --text-muted: #00A8B5;
+  --text-inverse: #050510;
+  --success: #39FF14;
+  --success-bg: rgba(57, 255, 20, 0.15);
+  --warning: #FF6B00;
+  --warning-bg: rgba(255, 107, 0, 0.15);
+  --danger: #FF0080;
+  --danger-bg: rgba(255, 0, 128, 0.15);
+  --info: #00F0FF;
+  --info-bg: rgba(0, 240, 255, 0.15);
+  --border-color: #1A1A3F;
+  --icon-primary: #00F0FF;
+  --icon-muted: #00A8B5;
+}
+
+/* Cyber text glow */
+body.cyber-mode .ant-typography,
+body.cyber-mode .page-title,
+body.cyber-mode .ant-card-head-title,
+body.cyber-mode .ant-statistic-content-value,
+body.cyber-mode .ant-menu-item,
+body.cyber-mode h1, body.cyber-mode h2, 
+body.cyber-mode h3, body.cyber-mode h4 {
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+}
+
+/* Cyber icons always cyan and visible */
+body.cyber-mode .anticon {
+  color: #00F0FF !important;
+  filter: drop-shadow(0 0 3px rgba(0, 240, 255, 0.5));
+}
+
+body.cyber-mode .ant-menu-item .anticon {
+  color: #00F0FF !important;
+}
+
+body.cyber-mode .ant-btn .anticon {
+  color: inherit !important;
+}
+
+body.cyber-mode .ant-btn-primary .anticon {
+  color: #050510 !important;
+}
+
+/* Cyber card styling */
+body.cyber-mode .ant-card {
+  background: #0A0A1F;
+  border: 1px solid #1A1A3F;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+}
+
+body.cyber-mode .ant-card:hover {
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.25);
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+/* Cyber buttons */
+body.cyber-mode .ant-btn-primary {
+  background: linear-gradient(135deg, #00F0FF 0%, #00A8B5 100%);
+  border-color: #00F0FF;
+  color: #050510;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+  font-weight: 600;
+}
+
+body.cyber-mode .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #00D4E6 0%, #008B99 100%) !important;
+  border-color: #00F0FF !important;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.7);
+}
+
+body.cyber-mode .ant-btn-default {
+  background: #0A0A1F;
+  border-color: #00F0FF;
+  color: #00F0FF;
+}
+
+body.cyber-mode .ant-btn-default:hover {
+  background: rgba(0, 240, 255, 0.15) !important;
+  border-color: #00F0FF !important;
+  color: #00F0FF !important;
+}
+
+/* Cyber tags */
+body.cyber-mode .ant-tag {
+  background: rgba(0, 240, 255, 0.15) !important;
+  border-color: #00F0FF !important;
+  color: #00F0FF !important;
+  text-shadow: 0 0 4px rgba(0, 240, 255, 0.5);
+}
+
+body.cyber-mode .ant-tag-success,
+body.cyber-mode .ant-tag-green {
+  background: rgba(57, 255, 20, 0.2) !important;
+  border-color: #39FF14 !important;
+  color: #39FF14 !important;
+}
+
+body.cyber-mode .ant-tag-warning,
+body.cyber-mode .ant-tag-orange,
+body.cyber-mode .ant-tag-gold {
+  background: rgba(255, 107, 0, 0.15) !important;
+  border-color: #FF6B00 !important;
+  color: #FF6B00 !important;
+}
+
+body.cyber-mode .ant-tag-error,
+body.cyber-mode .ant-tag-red {
+  background: rgba(255, 0, 128, 0.15) !important;
+  border-color: #FF0080 !important;
+  color: #FF0080 !important;
+}
+
+/* Cyber tables */
+body.cyber-mode .ant-table-thead > tr > th {
+  background: #0A0A1F !important;
+  color: #00F0FF !important;
+  border-color: #1A1A3F !important;
+  text-shadow: 0 0 4px rgba(0, 240, 255, 0.5);
+}
+
+body.cyber-mode .ant-table-tbody > tr > td {
+  background: #050510 !important;
+  color: #FFFFFF !important;
+  border-color: #1A1A3F !important;
+}
+
+body.cyber-mode .ant-table-tbody > tr:hover > td {
+  background: rgba(0, 240, 255, 0.1) !important;
+}
+
+/* Cyber inputs */
+body.cyber-mode .ant-input,
+body.cyber-mode .ant-select-selector,
+body.cyber-mode .ant-picker {
+  background: #0A0A1F !important;
+  border-color: #1A1A3F !important;
+  color: #FFFFFF !important;
+}
+
+body.cyber-mode .ant-input:focus,
+body.cyber-mode .ant-select-focused .ant-select-selector {
+  border-color: #00F0FF !important;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.35) !important;
+}
+
+body.cyber-mode .ant-input::placeholder {
+  color: #00A8B5 !important;
+}
+
+/* Cyber stat cards */
+body.cyber-mode .stat-card {
+  background: linear-gradient(135deg, #00A8B5 0%, #005F6B 100%);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+}
+
+body.cyber-mode .stat-card:hover {
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.5);
+}
+
+/* Cyber navbar */
+body.cyber-mode .jyoti-navbar {
+  background: linear-gradient(90deg, #000005 0%, #0A0A1F 50%, #000005 100%) !important;
+  border-bottom: 2px solid #00F0FF;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+}
+
+body.cyber-mode .jyoti-navbar .logo {
+  text-shadow: 0 0 12px rgba(0, 240, 255, 0.9);
+  color: #00F0FF;
+}
+
+body.cyber-mode .jyoti-navbar .logo-icon {
+  color: #00F0FF !important;
+  filter: drop-shadow(0 0 12px rgba(0, 240, 255, 0.9));
+}
+
+/* Cyber menu */
+body.cyber-mode .ant-menu-dark,
+body.cyber-mode .ant-menu-dark .ant-menu-sub {
+  background: transparent !important;
+}
+
+body.cyber-mode .ant-menu-dark .ant-menu-item-selected {
+  background: rgba(0, 240, 255, 0.25) !important;
+  box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+body.cyber-mode .ant-menu-dark .ant-menu-item {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+body.cyber-mode .ant-menu-dark .ant-menu-item-selected,
+body.cyber-mode .ant-menu-dark .ant-menu-item-selected a {
+  color: #00F0FF !important;
+}
+
+/* Cyber scrollbar */
+body.cyber-mode ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #00F0FF 0%, #00A8B5 100%);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+}
+
+body.cyber-mode ::-webkit-scrollbar-track {
+  background: #050510;
+}
+
+/* Cyber dropdown */
+body.cyber-mode .ant-dropdown-menu,
+body.cyber-mode .ant-select-dropdown {
+  background: #0A0A1F !important;
+  border: 1px solid #00F0FF;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+}
+
+body.cyber-mode .ant-dropdown-menu-item,
+body.cyber-mode .ant-select-item {
+  color: #FFFFFF !important;
+}
+
+body.cyber-mode .ant-dropdown-menu-item:hover,
+body.cyber-mode .ant-select-item-option-active {
+  background: rgba(0, 240, 255, 0.2) !important;
+}
+
+/* ============================================
+   UNIFIED STAT CARDS - Equal Height Grid
+   ============================================ */
+
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.stats-row .ant-col {
+  display: flex;
+}
+
+.stats-row .ant-card {
+  width: 100%;
+  height: 100%;
+  min-height: 100px;
+}
+
+.stats-row .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Unified List Items */
+.unified-list .ant-list-item {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color) !important;
+  transition: background var(--transition-fast);
+}
+
+.unified-list .ant-list-item:hover {
+  background: var(--primary-light);
+}
+
+.unified-list .ant-list-item-meta-title {
+  margin-bottom: var(--spacing-xs);
+  font-weight: 500;
+}
+
+/* Unified Function/Item Selector */
+.item-selector {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: var(--spacing-xs);
+}
+
+.item-selector-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.item-selector-item:hover {
+  background: var(--primary-light);
+}
+
+.item-selector-item.selected {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.item-selector-item .item-icon {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+}
+
+.item-selector-item .item-label {
+  flex: 1;
+  font-size: var(--font-size-sm);
+}
+
+.item-selector-item.selected .item-label {
+  font-weight: 600;
+}
+
+/* Unified Tag Container - Prevents overflow */
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.tag-container .ant-tag {
+  margin: 0;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Small tags for dense layouts */
+.ant-tag.tag-sm {
+  height: 18px;
+  line-height: 16px;
+  font-size: 10px;
+  padding: 0 6px;
+}
+
+/* Info Boxes - Unified styling */
+.info-box {
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.info-box-title {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.info-box-content {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.theme-dark .info-box {
+  background: var(--bg-elevated);
+}
+
+/* Equal Height Card Grid */
+.card-grid {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.card-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.card-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.card-grid-4 { grid-template-columns: repeat(4, 1fr); }
+.card-grid-5 { grid-template-columns: repeat(5, 1fr); }
+
+.card-grid .ant-card {
+  height: 100%;
+}
+
+@media (max-width: 1200px) {
+  .card-grid-5 { grid-template-columns: repeat(3, 1fr); }
+  .card-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 992px) {
+  .card-grid-5, .card-grid-4, .card-grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 576px) {
+  .card-grid-5, .card-grid-4, .card-grid-3, .card-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* Action Buttons Group - Consistent spacing */
+.action-buttons {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.action-buttons .ant-btn {
+  margin: 0;
+}
+
+/* Tile Cards - Clickable stat tiles */
+.tile-card {
+  cursor: pointer;
+  transition: all var(--transition);
+  height: 100%;
+}
+
+.tile-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.tile-card.tile-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
+}
+
+.theme-dark .tile-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .page-container {
+    padding: var(--spacing-md);
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .stat-card {
+    padding: var(--spacing-md);
+  }
+  
+  .stat-card .ant-statistic-content-value {
+    font-size: 22px;
+  }
+}

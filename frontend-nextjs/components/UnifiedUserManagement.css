@@ -1,0 +1,380 @@
+/* Unified User Management - Enhanced RBAC UI */
+
+.unified-user-management {
+  padding: 0;
+}
+
+/* Stats Overview Card - Single card with inline stats */
+.stats-overview-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.stats-overview-card .ant-card-body {
+  padding: 12px 16px !important;
+}
+
+.stats-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.stat-inline-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.stat-inline-item:hover {
+  background: var(--primary-light);
+}
+
+.stat-inline-item.active {
+  background: var(--primary-light);
+}
+
+.stat-inline-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.stat-inline-item.stat-users .stat-inline-icon {
+  color: #1890ff;
+}
+
+.stat-inline-item.stat-active .stat-inline-icon {
+  color: #52c41a;
+}
+
+.stat-inline-item.stat-roles .stat-inline-icon {
+  color: #722ed1;
+}
+
+.stat-inline-item.stat-permissions .stat-inline-icon {
+  color: #fa8c16;
+}
+
+.stat-inline-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.stat-inline-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border-color);
+  margin: 0 4px;
+}
+
+/* Responsive - stack on small screens */
+@media (max-width: 576px) {
+  .stats-inline-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .stat-divider {
+    display: none;
+  }
+  
+  .stat-inline-item {
+    justify-content: flex-start;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .stat-inline-item:last-child {
+    border-bottom: none;
+  }
+}
+
+.stat-card-mini .stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stat-card-mini .stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.stat-card-mini .stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Management Card */
+.management-card {
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-color);
+}
+
+.management-card .ant-card-body {
+  padding: 0;
+}
+
+/* Tabs */
+.management-tabs .ant-tabs-nav {
+  padding: 0 16px;
+  margin-bottom: 0;
+  background: var(--bg-body);
+  border-radius: var(--card-radius) var(--card-radius) 0 0;
+}
+
+.management-tabs .ant-tabs-tab {
+  padding: 14px 8px;
+}
+
+.management-tabs .tab-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.management-tabs .tab-label .ant-badge {
+  margin-left: 4px;
+}
+
+.management-tabs .ant-tabs-content-holder {
+  padding: 20px;
+}
+
+/* Tab Content */
+.tab-content .tab-intro {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tab-content .tab-intro h5 {
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.tab-content .tab-intro .ant-typography-secondary {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* Quick Tips */
+.quick-tips-alert {
+  margin-bottom: 16px;
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
+}
+
+.quick-tips-alert .ant-alert-message {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Role Reference */
+.role-reference .role-card {
+  height: 100%;
+  transition: var(--transition);
+}
+
+.role-reference .role-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.role-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.role-header .ant-avatar {
+  flex-shrink: 0;
+}
+
+.role-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.role-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.role-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  display: block;
+}
+
+.role-permissions {
+  margin-bottom: 12px;
+}
+
+.perm-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.perm-item.denied {
+  color: var(--text-muted);
+}
+
+.role-users {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Categories Card */
+.categories-card {
+  margin-top: 16px;
+}
+
+.category-box {
+  background: var(--bg-body);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  height: 100%;
+}
+
+.category-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.category-list li {
+  padding: 2px 0;
+}
+
+/* Dark Theme */
+/* Dark Theme - Stats Overview */
+.theme-dark .stats-overview-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.theme-dark .stat-inline-item:hover,
+.theme-dark .stat-inline-item.active {
+  background: rgba(var(--primary-rgb), 0.15);
+}
+
+.theme-dark .stat-inline-value {
+  color: var(--text-primary);
+}
+
+/* Hacker Mode - Stats Overview */
+body.hacker-mode .stats-overview-card {
+  background: #0a0a0a;
+  border-color: #1a1a1a;
+}
+
+body.hacker-mode .stat-inline-item:hover,
+body.hacker-mode .stat-inline-item.active {
+  background: rgba(0, 255, 65, 0.1);
+}
+
+body.hacker-mode .stat-inline-value {
+  color: #00FF41;
+}
+
+body.hacker-mode .stat-divider {
+  background: #333;
+}
+
+/* Cyber Mode - Stats Overview */
+body.cyber-mode .stats-overview-card {
+  background: #0a0a1a;
+  border-color: #1a1a3a;
+}
+
+body.cyber-mode .stat-inline-item:hover,
+body.cyber-mode .stat-inline-item.active {
+  background: rgba(0, 240, 255, 0.1);
+}
+
+body.cyber-mode .stat-inline-value {
+  color: #00F0FF;
+}
+
+body.cyber-mode .stat-divider {
+  background: #2a2a4a;
+}
+
+.theme-dark .management-tabs .ant-tabs-nav {
+  background: var(--bg-elevated);
+}
+
+.theme-dark .quick-tips-alert {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.theme-dark .category-box {
+  background: var(--bg-elevated);
+}
+
+.theme-dark .role-reference .role-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stats-row .ant-col {
+    margin-bottom: 8px;
+  }
+  
+  .stat-card-mini {
+    padding: 12px;
+  }
+  
+  .stat-card-mini .stat-value {
+    font-size: 18px;
+  }
+  
+  .management-tabs .ant-tabs-content-holder {
+    padding: 12px;
+  }
+  
+  .tab-label span:not(.anticon) {
+    display: none;
+  }
+}
