@@ -9,6 +9,7 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Spinner } from '../components/ui/spinner';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import AdminNav from '../components/AdminNav';
 
 // ============================================
 // CONSTANTS
@@ -117,6 +118,8 @@ export default function AuditLogs() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <AdminNav />
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>

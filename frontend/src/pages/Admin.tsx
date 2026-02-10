@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Users, Settings, Shield, FileText, Plug, Brain, Activity } from 'lucide-react';
+import AdminNav from '../components/AdminNav';
 
 export default function Admin() {
   const navigate = useNavigate();
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <AdminNav />
+
       <div>
         <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
         <p className="text-muted-foreground">System administration and management</p>

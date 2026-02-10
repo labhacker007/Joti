@@ -9,6 +9,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Spinner } from '../components/ui/spinner';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import AdminNav from '../components/AdminNav';
 
 // ============================================
 // CONSTANTS
@@ -123,6 +124,7 @@ export default function ConnectorManagement() {
   if (loading) {
     return (
       <div className="container mx-auto p-6">
+        <AdminNav />
         <div className="flex justify-center items-center py-20">
           <div className="text-center">
             <Spinner className="mx-auto mb-4" />
@@ -137,6 +139,8 @@ export default function ConnectorManagement() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <AdminNav />
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
