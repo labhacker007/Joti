@@ -37,6 +37,10 @@ function NavBar() {
   const location = useLocation();
   const [accessiblePages, setAccessiblePages] = useState<AccessiblePage[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [showDashboard, setShowDashboard] = useState(() => {
+    const saved = localStorage.getItem('showDashboard');
+    return saved === 'true';
+  });
 
   // Fetch user's accessible pages
   const fetchMyPermissions = useCallback(async () => {
