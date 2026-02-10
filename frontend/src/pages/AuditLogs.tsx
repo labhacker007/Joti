@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auditAPI } from '../api/client';
+import { auditAPI } from '../api/client.ts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Spinner } from '../components/ui/spinner';

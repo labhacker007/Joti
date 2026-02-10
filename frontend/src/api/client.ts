@@ -189,6 +189,39 @@ export const authAPI = {
 };
 
 // ============================================
+// USERS API
+// ============================================
+
+export const usersAPI = {
+  getUsers: (params?: { page?: number; page_size?: number; search?: string }) =>
+    client.get<User[]>('/users', { params }),
+
+  getUser: (id: number) =>
+    client.get<UserResponse>(`/users/${id}`),
+
+  createUser: (data: UserCreateRequest) =>
+    client.post<UserResponse>('/users', data),
+
+  updateUser: (id: number, data: UserUpdateRequest) =>
+    client.patch<UserResponse>(`/users/${id}`, data),
+
+  deleteUser: (id: number) =>
+    client.delete(`/users/${id}`),
+
+  switchRole: (role: UserRole) =>
+    client.post('/users/switch-role', { role }),
+
+  restoreRole: () =>
+    client.post('/users/restore-role'),
+
+  getMyPermissions: () =>
+    client.get('/users/my-permissions'),
+
+  getAvailableRoles: () =>
+    client.get<UserRole[]>('/users/available-roles'),
+};
+
+// ============================================
 // ARTICLES API
 // ============================================
 
@@ -559,58 +592,6 @@ export const adminAPI = {
     client.delete(`/admin/prompts/${promptId}/guardrails/${guardrailId}`),
 };
 
-// ============================================
-// USERS API (Admin)
-// ============================================
-
-export const usersAPI = {
-  list: () =>
-    client.get<User[]>('/users/'),
-
-  listUsers: () =>
-    client.get<User[]>('/users/'),
-
-  get: (id: string) =>
-    client.get<User>(`/users/${id}`),
-
-  create: (data: Partial<User> & { password: string }) =>
-    client.post<User>('/users/', data),
-
-  createUser: (data: Partial<User> & { password: string }) =>
-    client.post<User>('/users/', data),
-
-  update: (id: string, data: Partial<User>) =>
-    client.patch<User>(`/users/${id}`, data),
-
-  updateUser: (id: string, data: Partial<User>) =>
-    client.patch<User>(`/users/${id}`, data),
-
-  delete: (id: string) =>
-    client.delete(`/users/${id}`),
-
-  deleteUser: (id: string) =>
-    client.delete(`/users/${id}`),
-
-  resetPassword: (id: string) =>
-    client.post(`/users/${id}/reset-password`),
-
-  toggleActive: (id: string, isActive: boolean) =>
-    client.patch<User>(`/users/${id}`, { is_active: isActive }),
-
-  // Role switching (admin only)
-  getAvailableRoles: () =>
-    client.get<string[]>('/users/available-roles'),
-
-  switchRole: (targetRole: string) =>
-    client.post<{ access_token: string }>('/users/switch-role', { target_role: targetRole }),
-
-  restoreRole: () =>
-    client.post<{ access_token: string }>('/users/restore-role'),
-
-  // Permissions
-  getMyPermissions: () =>
-    client.get<UserPermissions>('/users/my-permissions'),
-};
 
 // ============================================
 // RBAC API (Admin)

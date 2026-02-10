@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/index';
-import { usersAPI } from '../api/client';
+import { usersAPI } from '../api/client.ts';
 import { Spinner } from './ui/spinner';
 
 // Map route paths to page keys - defined outside component to avoid re-creation

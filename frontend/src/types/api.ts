@@ -7,17 +7,55 @@
 // USER & AUTHENTICATION TYPES
 // ============================================
 
+export type UserRole = 'ADMIN' | 'ANALYST' | 'VIEWER' | 'CONTRIBUTOR';
+
 export interface User {
-  id: string;
+  id: number;
   email: string;
   username: string;
-  role: 'ADMIN' | 'USER' | 'ANALYST' | 'VIEWER';
+  full_name: string;
+  role: UserRole;
+  additional_roles: UserRole[];
+  custom_permissions?: {
+    grant: string[];
+    deny: string[];
+  };
   is_active: boolean;
+  is_saml_user?: boolean;
+  oauth_provider?: 'google' | 'microsoft' | null;
+  oauth_email?: string;
+  otp_enabled?: boolean;
+  last_login?: string;
   created_at: string;
   updated_at?: string;
-  last_login?: string;
-  oauth_provider?: 'google' | 'microsoft' | null;
-  otp_enabled?: boolean;
+}
+
+export interface UserCreateRequest {
+  email: string;
+  username: string;
+  password: string;
+  full_name: string;
+  role: UserRole;
+  is_active?: boolean;
+}
+
+export interface UserUpdateRequest {
+  email?: string;
+  username?: string;
+  full_name?: string;
+  role?: UserRole;
+  additional_roles?: UserRole[];
+  is_active?: boolean;
+  password?: string; // Optional password reset
+}
+
+export interface UserResponse extends User {}
+
+export interface PaginatedUsers {
+  users: User[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 export interface AuthTokens {

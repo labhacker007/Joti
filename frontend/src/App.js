@@ -18,6 +18,7 @@ import Admin from './pages/Admin';
 import AuditLogs from './pages/AuditLogs';
 import UserProfile from './pages/UserProfile';
 import Unauthorized from './pages/Unauthorized';
+import UserManagement from './pages/UserManagement';
 
 // Layout
 import NavBar from './components/NavBar';
@@ -58,6 +59,7 @@ function App() {
             <Route path="/profile" element={<UserProfile />} />
             <Route path="/audit" element={<AuditLogs />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/users" element={<UserManagement />} />
           </Route>
 
           {/* Catch-all */}

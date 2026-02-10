@@ -5,6 +5,7 @@ import {
   FileText,
   Settings,
   User,
+  Users,
   LogOut,
   ChevronDown,
   Shield,
@@ -13,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store';
 import { useTheme, themeOptions, ThemeName } from '../contexts/ThemeContext';
-import { usersAPI } from '../api/client';
+import { usersAPI } from '../api/client.ts';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 
@@ -91,6 +92,7 @@ function NavBar() {
     { key: 'profile', label: 'Profile', path: '/profile', icon: User },
     { key: 'audit', label: 'Audit', path: '/audit', icon: Shield },
     { key: 'admin', label: 'Admin', path: '/admin', icon: Settings },
+    { key: 'users', label: 'Users', path: '/admin/users', icon: Users },
   ];
 
   return (

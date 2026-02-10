@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { articlesAPI, sourcesAPI } from '../api/client';
+import { articlesAPI, sourcesAPI } from '../api/client.ts';
 import { useAuthStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';

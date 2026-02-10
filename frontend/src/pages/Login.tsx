@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Eye, EyeOff, Mail, Lock, Chrome, Monitor } from 'lucide-react';
 
-import { authAPI } from '../api/client';
+import { authAPI } from '../api/client.ts';
 import { useAuthStore } from '../store/index';
 import { useTheme, ThemeName, themeOptions } from '../contexts/ThemeContext';
 import {

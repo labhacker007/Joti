@@ -37,7 +37,10 @@
       "Bash(c:/project/Joti/frontend/src/contexts/TimezoneContext.js << 'EOF'\nexport * from './TimezoneContext.tsx';\nexport { default as TimezoneProvider, useTimezone } from './TimezoneContext.tsx';\nEOF)",
       "Bash(c:/project/Joti/frontend/src/components/AnimatedBackgrounds.js << 'EOF'\nexport * from './AnimatedBackgrounds.tsx';\nEOF)",
       "Bash(docker restart:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(grep:*)"
     ]
   }
 }
