@@ -22,6 +22,9 @@ import UserManagement from './pages/UserManagement';
 import SystemSettings from './pages/SystemSettings';
 import RBACManager from './pages/RBACManager';
 import GuardrailsManager from './pages/GuardrailsManager';
+import ConnectorManagement from './pages/ConnectorManagement';
+import GenAIManagement from './pages/GenAIManagement';
+import SystemMonitoring from './pages/SystemMonitoring';
 
 // Layout
 import NavBar from './components/NavBar';
@@ -65,6 +68,9 @@ function App() {
             <Route path="/admin/settings" element={<SystemSettings />} />
             <Route path="/admin/rbac" element={<RBACManager />} />
             <Route path="/admin/guardrails" element={<GuardrailsManager />} />
+            <Route path="/admin/connectors" element={<ConnectorManagement />} />
+            <Route path="/admin/genai" element={<GenAIManagement />} />
+            <Route path="/admin/monitoring" element={<SystemMonitoring />} />
             <Route path="/admin/audit" element={<AuditLogs />} />
           </Route>
 

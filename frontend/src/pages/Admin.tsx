@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Users, Settings, Shield, FileText } from 'lucide-react';
+import { Users, Settings, Shield, FileText, Plug, Brain, Activity } from 'lucide-react';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -86,6 +86,51 @@ export default function Admin() {
           <CardContent>
             <Button variant="outline" className="w-full" onClick={() => navigate('/admin/audit')}>
               View Audit Logs
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plug className="h-5 w-5" />
+              Connectors
+            </CardTitle>
+            <CardDescription>Manage external integrations (XSIAM, Defender, Wiz, Splunk, etc.)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/admin/connectors')}>
+              Manage Connectors
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5" />
+              GenAI Management
+            </CardTitle>
+            <CardDescription>Manage AI models, test prompts, and configure Ollama</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/admin/genai')}>
+              Manage GenAI
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              System Monitoring
+            </CardTitle>
+            <CardDescription>Monitor system health, stats, and recent activity</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/admin/monitoring')}>
+              View Monitoring
             </Button>
           </CardContent>
         </Card>

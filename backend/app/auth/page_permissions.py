@@ -75,7 +75,8 @@ class PagePermission(str, Enum):
     MANAGE_GENAI = "page:admin:manage_genai"
     MANAGE_KNOWLEDGE = "page:admin:manage_knowledge"
     MANAGE_RBAC = "page:admin:manage_rbac"
-    
+    VIEW_MONITORING = "page:admin:view_monitoring"
+
     # Chatbot
     USE_CHATBOT = "page:chatbot:use"
     VIEW_CHATBOT_HISTORY = "page:chatbot:view_history"
@@ -196,9 +197,9 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
     "connectors": PageDefinition(
         page_key="connectors",
         page_name="Connectors",
-        page_path="/connectors",
+        page_path="/admin/connectors",
         description="Integration connectors management",
-        category="Configuration",
+        category="Administration",
         permissions=[
             PagePermission.VIEW_CONNECTORS.value,
             PagePermission.MANAGE_CONNECTORS.value,
@@ -311,6 +312,28 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
         category="Administration",
         permissions=[
             PagePermission.MANAGE_GENAI.value
+        ],
+        default_roles=["ADMIN"]
+    ),
+    "genai": PageDefinition(
+        page_key="genai",
+        page_name="GenAI Management",
+        page_path="/admin/genai",
+        description="AI model management and configuration",
+        category="Administration",
+        permissions=[
+            PagePermission.MANAGE_GENAI.value
+        ],
+        default_roles=["ADMIN"]
+    ),
+    "monitoring": PageDefinition(
+        page_key="monitoring",
+        page_name="System Monitoring",
+        page_path="/admin/monitoring",
+        description="System health and activity monitoring",
+        category="Administration",
+        permissions=[
+            PagePermission.VIEW_MONITORING.value
         ],
         default_roles=["ADMIN"]
     )

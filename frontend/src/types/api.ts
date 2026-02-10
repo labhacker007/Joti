@@ -527,3 +527,28 @@ export interface GuardrailTestResponse {
   message?: string;
   details?: any;
 }
+
+// ============================================
+// CONNECTOR TYPES
+// ============================================
+
+export type ConnectorType = 'xsiam' | 'defender' | 'wiz' | 'splunk' | 'slack' | 'email';
+export type ConnectorStatus = 'connected' | 'disconnected' | 'error' | 'testing';
+
+export interface Connector {
+  id: string;
+  name: string;
+  type: ConnectorType;
+  enabled: boolean;
+  status: ConnectorStatus;
+  config: Record<string, any>;
+  last_sync?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ConnectorTestResult {
+  success: boolean;
+  message: string;
+  details?: any;
+}
