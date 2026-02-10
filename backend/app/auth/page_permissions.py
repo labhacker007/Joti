@@ -269,6 +269,17 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.VIEW_CHATBOT_HISTORY.value
         ],
         default_roles=["ADMIN", "TI", "TH", "IR", "VIEWER"]
+    ),
+    "users": PageDefinition(
+        page_key="users",
+        page_name="User Management",
+        page_path="/admin/users",
+        description="User account management",
+        category="Administration",
+        permissions=[
+            PagePermission.MANAGE_USERS.value
+        ],
+        default_roles=["ADMIN"]
     )
 }
 

@@ -5,7 +5,6 @@ import {
   FileText,
   Settings,
   User,
-  Users,
   LogOut,
   ChevronDown,
   Shield,
@@ -92,7 +91,6 @@ function NavBar() {
     { key: 'profile', label: 'Profile', path: '/profile', icon: User },
     { key: 'audit', label: 'Audit', path: '/audit', icon: Shield },
     { key: 'admin', label: 'Admin', path: '/admin', icon: Settings },
-    { key: 'users', label: 'Users', path: '/admin/users', icon: Users },
   ];
 
   return (

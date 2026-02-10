@@ -1,9 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Users, Settings, Shield, FileText } from 'lucide-react';
 
 export default function Admin() {
+  const navigate = useNavigate();
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div>
@@ -21,7 +24,9 @@ export default function Admin() {
             <CardDescription>Manage users, roles, and permissions</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full">Manage Users</Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/admin/users')}>
+              Manage Users
+            </Button>
           </CardContent>
         </Card>
 
