@@ -460,3 +460,70 @@ export interface SystemStats {
   total_users: number;
   recent_activity?: any[];
 }
+
+// ============================================
+// RBAC TYPES
+// ============================================
+
+export interface Permission {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  permissions: string[];
+}
+
+export interface RBACMatrix {
+  roles: Role[];
+  permissions: Permission[];
+}
+
+export interface UserPermissions {
+  user_id: number;
+  role: UserRole;
+  permissions: string[];
+  custom_permissions?: {
+    grant: string[];
+    deny: string[];
+  };
+}
+
+export interface FunctionalArea {
+  id: string;
+  name: string;
+  description?: string;
+  permissions: Permission[];
+}
+
+// ============================================
+// GUARDRAILS TYPES
+// ============================================
+
+export type GuardrailType = 'input_validation' | 'output_filtering' | 'content_moderation' | 'rate_limiting' | 'custom';
+
+export interface Guardrail {
+  id: string;
+  name: string;
+  description?: string;
+  type: GuardrailType;
+  enabled: boolean;
+  config: Record<string, any>;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface GuardrailTestRequest {
+  input_text: string;
+}
+
+export interface GuardrailTestResponse {
+  passed: boolean;
+  message?: string;
+  details?: any;
+}

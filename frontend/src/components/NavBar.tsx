@@ -89,7 +89,6 @@ function NavBar() {
     { key: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { key: 'feed', label: 'News', path: '/news', icon: FileText },
     { key: 'profile', label: 'Profile', path: '/profile', icon: User },
-    { key: 'audit', label: 'Audit', path: '/audit', icon: Shield },
     { key: 'admin', label: 'Admin', path: '/admin', icon: Settings },
   ];
 

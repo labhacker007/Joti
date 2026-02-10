@@ -233,8 +233,8 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
     "audit": PageDefinition(
         page_key="audit",
         page_name="Audit Logs",
-        page_path="/audit",
-        description="System audit trail",
+        page_path="/admin/audit",
+        description="System audit trail - settings changes, login history",
         category="Administration",
         permissions=[
             PagePermission.VIEW_AUDIT.value,
@@ -289,6 +289,28 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
         category="Administration",
         permissions=[
             PagePermission.MANAGE_SYSTEM.value
+        ],
+        default_roles=["ADMIN"]
+    ),
+    "rbac": PageDefinition(
+        page_key="rbac",
+        page_name="RBAC Management",
+        page_path="/admin/rbac",
+        description="Role-based access control and permissions",
+        category="Administration",
+        permissions=[
+            PagePermission.MANAGE_RBAC.value
+        ],
+        default_roles=["ADMIN"]
+    ),
+    "guardrails": PageDefinition(
+        page_key="guardrails",
+        page_name="Guardrails",
+        page_path="/admin/guardrails",
+        description="GenAI safety guardrails management",
+        category="Administration",
+        permissions=[
+            PagePermission.MANAGE_GENAI.value
         ],
         default_roles=["ADMIN"]
     )

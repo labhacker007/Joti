@@ -49,12 +49,29 @@ export default function Admin() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              Security Settings
+              RBAC Management
             </CardTitle>
-            <CardDescription>Manage security and RBAC</CardDescription>
+            <CardDescription>Manage roles, permissions, and access control</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full">Security Settings</Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/admin/rbac')}>
+              Manage RBAC
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Guardrails
+            </CardTitle>
+            <CardDescription>Manage GenAI safety guardrails</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/admin/guardrails')}>
+              Manage Guardrails
+            </Button>
           </CardContent>
         </Card>
 
@@ -64,10 +81,12 @@ export default function Admin() {
               <FileText className="h-5 w-5" />
               Audit Logs
             </CardTitle>
-            <CardDescription>View system activity logs</CardDescription>
+            <CardDescription>View system activity, settings changes, and login history</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full">View Logs</Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/admin/audit')}>
+              View Audit Logs
+            </Button>
           </CardContent>
         </Card>
       </div>

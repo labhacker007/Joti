@@ -20,6 +20,8 @@ import UserProfile from './pages/UserProfile';
 import Unauthorized from './pages/Unauthorized';
 import UserManagement from './pages/UserManagement';
 import SystemSettings from './pages/SystemSettings';
+import RBACManager from './pages/RBACManager';
+import GuardrailsManager from './pages/GuardrailsManager';
 
 // Layout
 import NavBar from './components/NavBar';
@@ -58,10 +60,12 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/news" element={<NewsFeeds />} />
             <Route path="/profile" element={<UserProfile />} />
-            <Route path="/audit" element={<AuditLogs />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/settings" element={<SystemSettings />} />
+            <Route path="/admin/rbac" element={<RBACManager />} />
+            <Route path="/admin/guardrails" element={<GuardrailsManager />} />
+            <Route path="/admin/audit" element={<AuditLogs />} />
           </Route>
 
           {/* Catch-all */}
