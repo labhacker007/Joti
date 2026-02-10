@@ -19,6 +19,7 @@ import AuditLogs from './pages/AuditLogs';
 import UserProfile from './pages/UserProfile';
 import Unauthorized from './pages/Unauthorized';
 import UserManagement from './pages/UserManagement';
+import SystemSettings from './pages/SystemSettings';
 
 // Layout
 import NavBar from './components/NavBar';
@@ -60,6 +61,7 @@ function App() {
             <Route path="/audit" element={<AuditLogs />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/users" element={<UserManagement />} />
+            <Route path="/admin/settings" element={<SystemSettings />} />
           </Route>
 
           {/* Catch-all */}

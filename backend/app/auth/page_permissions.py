@@ -280,6 +280,17 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.MANAGE_USERS.value
         ],
         default_roles=["ADMIN"]
+    ),
+    "settings": PageDefinition(
+        page_key="settings",
+        page_name="System Settings",
+        page_path="/admin/settings",
+        description="System configuration and API settings",
+        category="Administration",
+        permissions=[
+            PagePermission.MANAGE_SYSTEM.value
+        ],
+        default_roles=["ADMIN"]
     )
 }
 

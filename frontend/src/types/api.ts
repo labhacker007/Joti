@@ -405,3 +405,58 @@ export interface TimeRangeParams {
   start_date?: string;
   end_date?: string;
 }
+
+// ============================================
+// ADMIN & CONFIGURATION TYPES
+// ============================================
+
+export type ConfigValueType = 'str' | 'int' | 'bool' | 'secret';
+export type ConfigCategory = 'genai' | 'hunt_connectors' | 'notifications' | 'authentication' | 'automation' | 'data_retention';
+
+export interface ConfigurationItem {
+  key: string;
+  value: string;
+  value_type: ConfigValueType;
+  category: ConfigCategory;
+  is_sensitive: boolean;
+  description?: string;
+  is_configured: boolean;
+}
+
+export interface ConfigurationsByCategory {
+  [category: string]: ConfigurationItem[];
+}
+
+export interface ConfigurationSaveRequest {
+  configurations: Array<{
+    category: string;
+    key: string;
+    value: string;
+    value_type: ConfigValueType;
+    is_sensitive: boolean;
+  }>;
+}
+
+export interface ConfigurationSaveResponse {
+  saved_count: number;
+  message: string;
+}
+
+export interface ConfigTestResult {
+  name: string;
+  status: 'success' | 'failed';
+  error?: string;
+  details?: string;
+}
+
+export interface ConfigTestResponse {
+  category: string;
+  tests: ConfigTestResult[];
+}
+
+export interface SystemStats {
+  total_articles: number;
+  active_sources: number;
+  total_users: number;
+  recent_activity?: any[];
+}

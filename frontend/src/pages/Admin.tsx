@@ -36,10 +36,12 @@ export default function Admin() {
               <Settings className="h-5 w-5" />
               System Configuration
             </CardTitle>
-            <CardDescription>Configure system settings</CardDescription>
+            <CardDescription>Configure API keys, connectors, and system settings</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full">Configure System</Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/admin/settings')}>
+              Configure System
+            </Button>
           </CardContent>
         </Card>
 

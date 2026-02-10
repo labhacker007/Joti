@@ -25,6 +25,10 @@ import type {
   RBACMatrix,
   Role,
   Permission,
+  ConfigurationsByCategory,
+  ConfigurationSaveRequest,
+  ConfigurationSaveResponse,
+  ConfigTestResponse,
 } from '@/types/api';
 
 // API URL configuration
@@ -590,6 +594,22 @@ export const adminAPI = {
 
   removeGuardrailFromPrompt: (promptId: string, guardrailId: string) =>
     client.delete(`/admin/prompts/${promptId}/guardrails/${guardrailId}`),
+
+  // Configuration Management
+  getConfigurations: () =>
+    client.get<ConfigurationsByCategory>('/admin/configurations'),
+
+  saveConfigurations: (request: ConfigurationSaveRequest) =>
+    client.post<ConfigurationSaveResponse>('/admin/configurations', request),
+
+  testConfiguration: (category: string) =>
+    client.post<ConfigTestResponse>(`/admin/configurations/test/${category}`),
+
+  getConfigurationsByCategory: (category: string) =>
+    client.get(`/admin/configurations/${category}`),
+
+  deleteConfiguration: (category: string, key: string) =>
+    client.delete(`/admin/configurations/${category}/${key}`),
 };
 
 
