@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store';
 import { useTheme, themeOptions, ThemeName } from '../contexts/ThemeContext';
-import { usersAPI } from '../api/client.ts';
+import { usersAPI } from '../api/client';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 
@@ -55,7 +55,7 @@ function NavBar() {
 
     try {
       setPermissionsLoading(true);
-      const response = await usersAPI.getMyPermissions();
+      const response = await usersAPI.getMyPermissions() as any;
       const pages = response.data?.accessible_pages || [];
       setAccessiblePages(pages);
     } catch (err) {
@@ -87,9 +87,16 @@ function NavBar() {
     router.push('/login');
   };
 
-  const handleRestoreRole = () => {
-    restoreRole();
-    fetchMyPermissions();
+  const handleRestoreRole = async () => {
+    try {
+      const response = await usersAPI.restoreRole() as any;
+      if (response.data) {
+        restoreRole(response.data.access_token, originalRole || '');
+        fetchMyPermissions();
+      }
+    } catch (err) {
+      console.error('[NavBar] Failed to restore role:', err);
+    }
   };
 
   const navItems = [

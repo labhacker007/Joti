@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '../store/index';
-import { usersAPI } from '../api/client.ts';
+import { usersAPI } from '../api/client';
 import { Spinner } from './ui/spinner';
 
 // Map route paths to page keys - defined outside component to avoid re-creation
@@ -38,7 +38,7 @@ function ProtectedRoute({
   children,
   requiredPageKey = null,
   requiredRole = null
-}: ProtectedRouteProps): JSX.Element {
+}: ProtectedRouteProps): React.JSX.Element {
   const { accessToken, isImpersonating, assumedRole } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
@@ -53,12 +53,12 @@ function ProtectedRoute({
     }
 
     try {
-      const response = await usersAPI.getMyPermissions();
+      const response = await usersAPI.getMyPermissions() as any;
       const pages = response.data?.accessible_pages || [];
       const effectiveRole = response.data?.effective_role;
 
       // Determine which page key to check
-      const pageKey = requiredPageKey || PATH_TO_PAGE_KEY[pathname];
+      const pageKey = requiredPageKey || PATH_TO_PAGE_KEY[pathname as keyof typeof PATH_TO_PAGE_KEY];
 
       let accessGranted = false;
 
@@ -106,7 +106,7 @@ function ProtectedRoute({
   if (!accessToken) {
     console.log('[ProtectedRoute] No token - redirecting to login');
     router.replace('/login');
-    return null;
+    return <></>;
   }
 
   // Still checking permissions
@@ -124,7 +124,7 @@ function ProtectedRoute({
   // No access - redirect to unauthorized
   if (!hasAccess) {
     router.replace('/unauthorized');
-    return null;
+    return <></>;
   }
 
   return <>{children}</>;

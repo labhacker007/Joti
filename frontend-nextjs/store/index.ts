@@ -9,8 +9,8 @@ import type { User, Article } from '@/types/api';
 export const useAuthStore = create<AuthState>((set, get) => ({
   // State
   user: null,
-  accessToken: localStorage.getItem('accessToken'),
-  refreshToken: localStorage.getItem('refreshToken'),
+  accessToken: typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null,
+  refreshToken: typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null,
   isAdmin: false,
   isImpersonating: false,
   assumedRole: null,
