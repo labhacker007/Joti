@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
+  output: 'standalone',
 
   // Proxy API requests to FastAPI backend
   async rewrites() {
