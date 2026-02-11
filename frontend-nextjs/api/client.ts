@@ -309,9 +309,14 @@ export const articlesAPI = {
     const params = new URLSearchParams({
       page: page.toString(),
       page_size: pageSize.toString(),
-      ...(filters && { filter: JSON.stringify(filters) }),
     });
-    return get(`/articles?${params}`);
+    if (filters?.status_filter) {
+      params.append('status_filter', filters.status_filter);
+    }
+    if (filters?.source_id) {
+      params.append('source_id', filters.source_id.toString());
+    }
+    return get(`/articles/?${params}`);
   },
 
   /**

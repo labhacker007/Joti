@@ -129,6 +129,56 @@ def article_to_response(article: Article, user_id: Optional[int] = None, db: Opt
     return ArticleResponse(**response_data)
 
 
+@router.get("/", tags=["articles"])
+def list_articles(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=500),
+    status_filter: Optional[str] = Query(None),
+    source_id: Optional[int] = Query(None),
+    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    db: Session = Depends(get_db)
+):
+    """Get paginated list of articles with optional filters."""
+    try:
+        query = db.query(Article).options(joinedload(Article.feed_source))
+
+        # Apply filters
+        if status_filter:
+            try:
+                query = query.filter(Article.status == status_filter)
+            except:
+                pass
+
+        if source_id:
+            query = query.filter(Article.source_id == source_id)
+
+        # Get total count before pagination
+        total = query.count()
+
+        # Order by newest first and apply pagination
+        articles = query.order_by(desc(Article.published_at)).offset(
+            (page - 1) * page_size
+        ).limit(page_size).all()
+
+        # Convert to response format
+        items = [article_to_response(article, current_user.id, db) for article in articles]
+
+        return {
+            "data": {
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size
+            }
+        }
+    except Exception as e:
+        logger.error("articles_list_error", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch articles"
+        )
+
+
 @router.get("/triage", response_model=TriageArticlesResponse)
 def get_triage_queue(
     page: int = Query(1, ge=1),
