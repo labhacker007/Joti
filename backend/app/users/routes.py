@@ -195,25 +195,25 @@ async def get_my_permissions(
 ):
     """
     Get the current user's page permissions using the UNIFIED permission system.
-    
+
     Returns which pages/features the user can access based on their effective role.
     When impersonating, returns permissions for the assumed role.
-    
+
     Uses the single source of truth: unified_permissions.py
     """
     from app.auth.dependencies import get_effective_role, is_user_impersonating, get_impersonation_context
     from app.auth.unified_permissions import get_role_page_details, get_role_api_permissions
-    
+
     effective_role = get_effective_role(current_user)
     is_impersonating = is_user_impersonating(current_user)
     impersonation_context = get_impersonation_context(current_user)
-    
+
     role_name = effective_role.value if hasattr(effective_role, 'value') else str(effective_role)
-    
+
     # Get accessible pages from unified permissions (single source of truth)
     accessible_pages = get_role_page_details(role_name)
     api_permissions = get_role_api_permissions(role_name)
-    
+
     logger.info(
         "permissions_fetched",
         user_id=current_user.id,
@@ -221,7 +221,7 @@ async def get_my_permissions(
         is_impersonating=is_impersonating,
         accessible_pages=[p["key"] for p in accessible_pages]
     )
-    
+
     original_role_value = None
     if impersonation_context:
         orig = impersonation_context.get("original_role")
@@ -229,7 +229,7 @@ async def get_my_permissions(
             original_role_value = orig.value
         elif isinstance(orig, str):
             original_role_value = orig
-    
+
     return {
         "effective_role": role_name,
         "is_impersonating": is_impersonating,
@@ -239,6 +239,63 @@ async def get_my_permissions(
         "api_permissions": api_permissions,
         # Preferred field name (used by current frontend)
         "all_permissions": api_permissions,
+    }
+
+
+@router.get("/me/permissions")
+async def get_me_permissions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the current user's page permissions using the UNIFIED permission system.
+
+    This is an alias for /my-permissions with the same functionality.
+    Returns which pages/features the user can access based on their effective role.
+    When impersonating, returns permissions for the assumed role.
+
+    Uses the single source of truth: unified_permissions.py
+    """
+    from app.auth.dependencies import get_effective_role, is_user_impersonating, get_impersonation_context
+    from app.auth.unified_permissions import get_role_page_details, get_role_api_permissions
+
+    effective_role = get_effective_role(current_user)
+    is_impersonating = is_user_impersonating(current_user)
+    impersonation_context = get_impersonation_context(current_user)
+
+    role_name = effective_role.value if hasattr(effective_role, 'value') else str(effective_role)
+
+    # Get accessible pages from unified permissions (single source of truth)
+    accessible_pages = get_role_page_details(role_name)
+    api_permissions = get_role_api_permissions(role_name)
+
+    logger.info(
+        "permissions_fetched",
+        user_id=current_user.id,
+        effective_role=role_name,
+        is_impersonating=is_impersonating,
+        accessible_pages=[p["key"] for p in accessible_pages]
+    )
+
+    original_role_value = None
+    if impersonation_context:
+        orig = impersonation_context.get("original_role")
+        if orig and hasattr(orig, 'value'):
+            original_role_value = orig.value
+        elif isinstance(orig, str):
+            original_role_value = orig
+
+    return {
+        "data": {
+            "effective_role": role_name,
+            "is_impersonating": is_impersonating,
+            "original_role": original_role_value,
+            "accessible_pages": accessible_pages,
+            # Backward-compatible field name (used by older clients)
+            "api_permissions": api_permissions,
+            # Preferred field name (used by current frontend)
+            "all_permissions": api_permissions,
+        }
     }
 
 

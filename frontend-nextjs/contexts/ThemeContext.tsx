@@ -38,10 +38,15 @@ export interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<ThemeName>(() => {
-    const saved = localStorage.getItem('jyoti-theme') as ThemeName;
-    return saved && themeOrder.includes(saved) ? saved : 'midnight';
-  });
+  const [theme, setThemeState] = useState<ThemeName>('midnight');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('jyoti-theme') as ThemeName : null;
+    const initialTheme = saved && themeOrder.includes(saved) ? saved : 'midnight';
+    setThemeState(initialTheme);
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);

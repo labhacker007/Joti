@@ -182,67 +182,67 @@ app.add_middleware(
     max_age=600,  # Cache preflight requests for 10 minutes
 )
 
-# Include routers
-app.include_router(auth_router)
-app.include_router(saml_router)  # SAML/SSO authentication
-app.include_router(articles_router)
-app.include_router(sources_router)
-app.include_router(watchlist_router)
-app.include_router(audit_router)
-app.include_router(users_router)
-app.include_router(admin_router)
+# Include routers with /api prefix
+app.include_router(auth_router, prefix="/api")
+app.include_router(saml_router, prefix="/api")  # SAML/SSO authentication
+app.include_router(articles_router, prefix="/api")
+app.include_router(sources_router, prefix="/api")
+app.include_router(watchlist_router, prefix="/api")
+app.include_router(audit_router, prefix="/api")
+app.include_router(users_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 # User Custom Feeds
 from app.users.feeds import router as user_feeds_router
-app.include_router(user_feeds_router)
+app.include_router(user_feeds_router, prefix="/api")
 
 # User Watchlist
 from app.users.watchlist import router as user_watchlist_router
-app.include_router(user_watchlist_router)
+app.include_router(user_watchlist_router, prefix="/api")
 
 # User Categories
 from app.users.categories import router as user_categories_router
-app.include_router(user_categories_router)
+app.include_router(user_categories_router, prefix="/api")
 
 # User Content Fetching
 from app.users.content import router as user_content_router
-app.include_router(user_content_router)
+app.include_router(user_content_router, prefix="/api")
 
 # Article Summarization (GenAI)
 from app.articles.summarization import router as article_summarization_router
-app.include_router(article_summarization_router)
+app.include_router(article_summarization_router, prefix="/api")
 
 # Article Reports (PDF/Word export)
 from app.articles.reports import router as article_reports_router
-app.include_router(article_reports_router)
+app.include_router(article_reports_router, prefix="/api")
 
 # Article Bookmarks & Read Tracking
 from app.articles.bookmarks import router as article_bookmarks_router
-app.include_router(article_bookmarks_router)
+app.include_router(article_bookmarks_router, prefix="/api")
 
 # Admin Default Feeds
 from app.admin.default_feeds import router as default_feeds_router
-app.include_router(default_feeds_router)
+app.include_router(default_feeds_router, prefix="/api")
 
 # Admin Ollama Setup (GenAI Day 2)
 from app.admin.ollama_setup import router as ollama_setup_router
-app.include_router(ollama_setup_router)
+app.include_router(ollama_setup_router, prefix="/api")
 
 # Admin GenAI Functions (GenAI Day 3)
 from app.admin.genai_functions import router as genai_functions_router
-app.include_router(genai_functions_router)
+app.include_router(genai_functions_router, prefix="/api")
 
 # Admin Prompts Management (GenAI Day 4)
 from app.admin.prompts import router as prompts_router
-app.include_router(prompts_router)
+app.include_router(prompts_router, prefix="/api")
 
 # Admin Guardrails Management (GenAI Day 5)
 from app.admin.guardrails import router as guardrails_router
-app.include_router(guardrails_router)
+app.include_router(guardrails_router, prefix="/api")
 
 # Source Refresh Settings
 from app.integrations.refresh_settings import router as refresh_settings_router
-app.include_router(refresh_settings_router)
+app.include_router(refresh_settings_router, prefix="/api")
 
 
 @app.get("/health")

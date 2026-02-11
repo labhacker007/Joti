@@ -9,8 +9,8 @@ import type { User, Article } from '@/types/api';
 export const useAuthStore = create<AuthState>((set, get) => ({
   // State
   user: null,
-  accessToken: typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null,
-  refreshToken: typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null,
+  accessToken: null,
+  refreshToken: null,
   isAdmin: false,
   isImpersonating: false,
   assumedRole: null,
@@ -102,6 +102,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (e) {
       console.error('Failed to load impersonation state:', e);
+    }
+  },
+
+  // Load auth state from localStorage on client side
+  loadAuthState: () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (accessToken) {
+        set({
+          accessToken,
+          refreshToken
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load auth state:', e);
     }
   }
 }));

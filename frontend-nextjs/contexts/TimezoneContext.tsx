@@ -83,27 +83,31 @@ export const useTimezone = (): TimezoneContextValue => {
 };
 
 export const TimezoneProvider = ({ children }: TimezoneProviderProps) => {
-  const [timezone, setTimezoneState] = useState<string>(() => {
-    const saved = localStorage.getItem('jyoti-timezone');
-    return saved || 'UTC';
-  });
+  const [timezone, setTimezoneState] = useState<string>('UTC');
+  const [use24Hour, setUse24HourState] = useState<boolean>(false);
+  const [showSeconds, setShowSecondsState] = useState<boolean>(false);
+  const [mounted, setMounted] = useState(false);
 
-  const [use24Hour, setUse24HourState] = useState<boolean>(() => {
-    const saved = localStorage.getItem('jyoti-24hour');
-    return saved === 'true';
-  });
+  // Load preferences from localStorage on client side
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('jyoti-timezone') : null;
+    const savedUse24 = typeof window !== 'undefined' ? localStorage.getItem('jyoti-24hour') : null;
+    const savedSeconds = typeof window !== 'undefined' ? localStorage.getItem('jyoti-show-seconds') : null;
 
-  const [showSeconds, setShowSecondsState] = useState<boolean>(() => {
-    const saved = localStorage.getItem('jyoti-show-seconds');
-    return saved === 'true';
-  });
+    setTimezoneState(saved || 'UTC');
+    setUse24HourState(savedUse24 === 'true');
+    setShowSecondsState(savedSeconds === 'true');
+    setMounted(true);
+  }, []);
 
   // Save preferences to localStorage
   useEffect(() => {
-    localStorage.setItem('jyoti-timezone', timezone);
-    localStorage.setItem('jyoti-24hour', use24Hour.toString());
-    localStorage.setItem('jyoti-show-seconds', showSeconds.toString());
-  }, [timezone, use24Hour, showSeconds]);
+    if (mounted && typeof window !== 'undefined') {
+      localStorage.setItem('jyoti-timezone', timezone);
+      localStorage.setItem('jyoti-24hour', use24Hour.toString());
+      localStorage.setItem('jyoti-show-seconds', showSeconds.toString());
+    }
+  }, [timezone, use24Hour, showSeconds, mounted]);
 
   // Get the actual timezone string for Intl API
   const getTimezoneString = useCallback((): string => {

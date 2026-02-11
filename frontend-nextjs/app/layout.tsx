@@ -3,6 +3,7 @@ import "./globals.css";
 import "../styles/styles/kimi-theme.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { TimezoneProvider } from "@/contexts/TimezoneContext";
+import { AuthInitializer } from "@/components/AuthInitializer";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <AuthInitializer />
         <ThemeProvider>
           <TimezoneProvider>
             {children}

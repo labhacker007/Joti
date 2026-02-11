@@ -26,6 +26,7 @@ export interface AuthState {
   switchRole: (newToken: string, assumedRole: string, originalRole: string) => void;
   restoreRole: (newToken: string, originalRole: string) => void;
   loadImpersonationState: () => void;
+  loadAuthState: () => void;
 }
 
 // ============================================
