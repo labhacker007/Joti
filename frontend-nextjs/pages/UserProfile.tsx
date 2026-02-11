@@ -1,12 +1,466 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+  User,
+  Mail,
+  Shield,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Lock,
+  Eye,
+  EyeOff,
+  Save,
+} from 'lucide-react';
+import { usersAPI } from '@/api/client';
+import { formatDate, cn } from '@/lib/utils';
+
+interface UserProfileData {
+  id: string;
+  username: string;
+  email: string;
+  full_name: string;
+  role: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  created_at: string;
+  last_login: string;
+  two_factor_enabled: boolean;
+}
 
 export default function UserProfile() {
+  const [profile, setProfile] = useState<UserProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+  });
+
+  const [passwordData, setPasswordData] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: '',
+  });
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await usersAPI.getProfile() as any;
+      setProfile(response.data);
+      setFormData({
+        full_name: response.data.full_name || '',
+        email: response.data.email || '',
+      });
+    } catch (err: any) {
+      setError(err.message || 'Failed to load profile');
+      console.error('Profile error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    try {
+      setError('');
+      setSuccess('');
+      await usersAPI.updateProfile({
+        full_name: formData.full_name,
+        email: formData.email,
+      });
+      setSuccess('Profile updated successfully');
+      setIsEditing(false);
+      await fetchProfile();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update profile');
+      console.error('Update error:', err);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    try {
+      setError('');
+      setSuccess('');
+
+      if (passwordData.new_password !== passwordData.confirm_password) {
+        setError('New passwords do not match');
+        return;
+      }
+
+      if (passwordData.new_password.length < 8) {
+        setError('Password must be at least 8 characters long');
+        return;
+      }
+
+      await usersAPI.changePassword(
+        passwordData.current_password,
+        passwordData.new_password
+      );
+
+      setSuccess('Password changed successfully');
+      setShowPasswordChange(false);
+      setPasswordData({
+        current_password: '',
+        new_password: '',
+        confirm_password: '',
+      });
+    } catch (err: any) {
+      setError(err.message || 'Failed to change password');
+      console.error('Password change error:', err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-muted-foreground">Loading profile...</div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-muted-foreground">Profile not found</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">UserProfile</h1>
-      <p className="text-muted-foreground">This page is under development.</p>
+    <div className="max-w-4xl mx-auto space-y-6 pb-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">User Profile</h1>
+        <p className="text-muted-foreground mt-2">Manage your account settings and preferences</p>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex gap-2">
+          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-red-600">Error</p>
+            <p className="text-sm text-red-600/80">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Success Alert */}
+      {success && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 flex gap-2">
+          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-green-600">Success</p>
+            <p className="text-sm text-green-600/80">{success}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Information Card */}
+      <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+        <div className="flex items-start justify-between">
+          <h2 className="text-xl font-bold text-foreground">Profile Information</h2>
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Edit Profile
+            </button>
+          )}
+        </div>
+
+        {/* Profile Content */}
+        {isEditing ? (
+          <div className="space-y-4">
+            {/* Full Name */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={formData.full_name}
+                onChange={(e) =>
+                  setFormData({ ...formData, full_name: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-4">
+              <button
+                onClick={handleUpdateProfile}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                Save Changes
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  setFormData({
+                    full_name: profile.full_name,
+                    email: profile.email,
+                  });
+                }}
+                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Username */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <User className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground font-medium">Username</p>
+              </div>
+              <p className="text-lg font-semibold text-foreground">{profile.username}</p>
+            </div>
+
+            {/* Email */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground font-medium">Email</p>
+              </div>
+              <p className="text-lg font-semibold text-foreground">{profile.email}</p>
+            </div>
+
+            {/* Full Name */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <User className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground font-medium">Full Name</p>
+              </div>
+              <p className="text-lg font-semibold text-foreground">{profile.full_name}</p>
+            </div>
+
+            {/* Role */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground font-medium">Role</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-500/10 text-blue-600">
+                  {profile.role}
+                </span>
+              </div>
+            </div>
+
+            {/* Status */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground font-medium">Status</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    'px-3 py-1 rounded-full text-sm font-medium',
+                    profile.status === 'ACTIVE'
+                      ? 'bg-green-500/10 text-green-600'
+                      : profile.status === 'INACTIVE'
+                        ? 'bg-gray-500/10 text-gray-600'
+                        : 'bg-red-500/10 text-red-600'
+                  )}
+                >
+                  {profile.status}
+                </span>
+              </div>
+            </div>
+
+            {/* Account Created */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground font-medium">Account Created</p>
+              </div>
+              <p className="text-lg font-semibold text-foreground">
+                {formatDate(profile.created_at)}
+              </p>
+            </div>
+
+            {/* Last Login */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground font-medium">Last Login</p>
+              </div>
+              <p className="text-lg font-semibold text-foreground">
+                {profile.last_login ? formatDate(profile.last_login) : 'Never'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Security Settings Card */}
+      <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+        <h2 className="text-xl font-bold text-foreground">Security Settings</h2>
+
+        {/* Two-Factor Authentication */}
+        <div className="flex items-start justify-between p-4 bg-muted rounded-lg">
+          <div>
+            <h3 className="font-semibold text-foreground">Two-Factor Authentication</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {profile.two_factor_enabled
+                ? 'Two-factor authentication is enabled'
+                : 'Enhance your account security with two-factor authentication'}
+            </p>
+          </div>
+          <div
+            className={cn(
+              'px-3 py-1 rounded-full text-sm font-medium',
+              profile.two_factor_enabled
+                ? 'bg-green-500/10 text-green-600'
+                : 'bg-gray-500/10 text-gray-600'
+            )}
+          >
+            {profile.two_factor_enabled ? 'Enabled' : 'Disabled'}
+          </div>
+        </div>
+
+        {/* Change Password */}
+        <div>
+          {!showPasswordChange ? (
+            <button
+              onClick={() => setShowPasswordChange(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
+            >
+              <Lock className="w-4 h-4" />
+              Change Password
+            </button>
+          ) : (
+            <div className="space-y-4 p-4 bg-muted rounded-lg">
+              {/* Current Password */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Current Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={passwordData.current_password}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        current_password: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 pr-10 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* New Password */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={passwordData.new_password}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        new_password: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 pr-10 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  <button
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  value={passwordData.confirm_password}
+                  onChange={(e) =>
+                    setPasswordData({
+                      ...passwordData,
+                      confirm_password: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-4">
+                <button
+                  onClick={handleChangePassword}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  <Lock className="w-4 h-4" />
+                  Change Password
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPasswordChange(false);
+                    setPasswordData({
+                      current_password: '',
+                      new_password: '',
+                      confirm_password: '',
+                    });
+                  }}
+                  className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
