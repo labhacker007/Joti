@@ -476,14 +476,14 @@ export const auditAPI = {
     if (filters) {
       params.append('filter', JSON.stringify(filters));
     }
-    return get(`/audit/logs?${params}`);
+    return get(`/audit/?${params}`);
   },
 
   /**
    * Get single audit log
    */
   getLog: async (id: string) => {
-    return get(`/audit/logs/${id}`);
+    return get(`/audit/${id}`);
   },
 };
 

@@ -51,11 +51,11 @@ export default function Dashboard() {
 
       // Fetch recent audit logs
       const auditResponse = await auditAPI.getLogs(1, 5) as any;
-      const activity = (auditResponse.data?.items || []).map((log: any) => ({
+      const activity = (auditResponse.data?.logs || auditResponse.logs || []).map((log: any) => ({
         id: log.id,
         action: log.action,
         resource: `${log.resource_type}${log.resource_id ? ': ' + log.resource_id : ''}`,
-        timestamp: log.timestamp,
+        timestamp: log.created_at || log.timestamp,
         status: log.status || 'SUCCESS',
       }));
       setRecentActivity(activity);
