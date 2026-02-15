@@ -101,6 +101,7 @@ function NavBar() {
 
   const navItems = [
     { key: 'feed', label: 'Feeds', path: '/feeds', icon: Rss },
+    { key: 'my-feeds', label: 'My Feeds', path: '/my-feeds', icon: Rss },
     { key: 'profile', label: 'Profile', path: '/profile', icon: User },
     { key: 'admin', label: 'Admin', path: '/admin', icon: Settings },
   ];

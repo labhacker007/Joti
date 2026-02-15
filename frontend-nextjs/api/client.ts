@@ -515,6 +515,61 @@ export const auditAPI = {
 };
 
 // ============================================
+// USER FEEDS API
+// ============================================
+
+export const userFeedsAPI = {
+  /**
+   * Get current user's custom feeds
+   */
+  getMyFeeds: async () => {
+    return get('/users/feeds');
+  },
+
+  /**
+   * Validate feed URL before creating
+   */
+  validateFeedUrl: async (url: string) => {
+    return post('/users/feeds/validate-url', { url });
+  },
+
+  /**
+   * Create new custom feed for current user
+   */
+  createFeed: async (data: any) => {
+    return post('/users/feeds', data);
+  },
+
+  /**
+   * Update user's custom feed
+   */
+  updateFeed: async (feedId: string, data: any) => {
+    return put(`/users/feeds/${feedId}`, data);
+  },
+
+  /**
+   * Delete user's custom feed
+   */
+  deleteFeed: async (feedId: string) => {
+    return del(`/users/feeds/${feedId}`);
+  },
+
+  /**
+   * Trigger ingestion for user's custom feed
+   */
+  triggerIngest: async (feedId: string) => {
+    return post(`/users/feeds/${feedId}/ingest`, {});
+  },
+
+  /**
+   * Get articles from user's custom feed
+   */
+  getFeedArticles: async (feedId: string, page = 1, pageSize = 10) => {
+    return get(`/users/feeds/${feedId}/articles?page=${page}&page_size=${pageSize}`);
+  },
+};
+
+// ============================================
 // ADMIN API
 // ============================================
 
