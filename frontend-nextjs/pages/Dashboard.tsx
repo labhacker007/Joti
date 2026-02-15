@@ -49,16 +49,22 @@ export default function Dashboard() {
       const statsResponse = await adminAPI.getSystemStats() as any;
       setStats(statsResponse.data);
 
-      // Fetch recent audit logs
-      const auditResponse = await auditAPI.getLogs(1, 5) as any;
-      const activity = (auditResponse.data?.logs || auditResponse.logs || []).map((log: any) => ({
-        id: log.id,
-        action: log.action,
-        resource: `${log.resource_type}${log.resource_id ? ': ' + log.resource_id : ''}`,
-        timestamp: log.created_at || log.timestamp,
-        status: log.status || 'SUCCESS',
-      }));
-      setRecentActivity(activity);
+      // Fetch recent audit logs (non-blocking - don't fail dashboard if unavailable)
+      try {
+        const auditResponse = await auditAPI.getLogs(1, 5) as any;
+        const activity = (auditResponse.data?.logs || auditResponse.logs || []).map((log: any) => ({
+          id: log.id,
+          action: log.action,
+          resource: `${log.resource_type}${log.resource_id ? ': ' + log.resource_id : ''}`,
+          timestamp: log.created_at || log.timestamp,
+          status: log.status || 'SUCCESS',
+        }));
+        setRecentActivity(activity);
+      } catch (auditErr) {
+        // Audit logs are optional - log but don't fail dashboard
+        console.warn('Could not load audit logs:', auditErr);
+        setRecentActivity([]);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard data');
       console.error('Dashboard error:', err);
