@@ -160,8 +160,11 @@ export default function UserProfile() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [sourceSearchTerm, setSourceSearchTerm] = useState('');
   const [sourceFilterCategory, setSourceFilterCategory] = useState<string | null>(null);
+  const [sourceFilterStatus, setSourceFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [sourcesCurrentPage, setSourcesCurrentPage] = useState(1);
+  const [sourcesPerPage, setSourcesPerPage] = useState(5);
 
   const [topKeywords, setTopKeywords] = useState<WatchlistItem[]>([]);
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
@@ -489,13 +492,33 @@ export default function UserProfile() {
     setSuccess('Sources exported successfully');
   };
 
+  // Day 4: Advanced filtering with status
   const filteredSources = sources.filter((source) => {
     const matchesSearch =
       source.name.toLowerCase().includes(sourceSearchTerm.toLowerCase()) ||
       source.url.toLowerCase().includes(sourceSearchTerm.toLowerCase());
     const matchesCategory = !sourceFilterCategory || source.category === sourceFilterCategory;
-    return matchesSearch && matchesCategory;
+    const matchesStatus =
+      sourceFilterStatus === 'all' ||
+      (sourceFilterStatus === 'active' && source.is_active) ||
+      (sourceFilterStatus === 'inactive' && !source.is_active);
+    return matchesSearch && matchesCategory && matchesStatus;
   });
+
+  // Day 4: Pagination logic
+  const totalPages = Math.ceil(filteredSources.length / sourcesPerPage);
+  const startIdx = (sourcesCurrentPage - 1) * sourcesPerPage;
+  const endIdx = startIdx + sourcesPerPage;
+  const paginatedSources = filteredSources.slice(startIdx, endIdx);
+
+  const handlePageChange = (page: number) => {
+    setSourcesCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const handleItemsPerPageChange = (count: number) => {
+    setSourcesPerPage(count);
+    setSourcesCurrentPage(1); // Reset to first page
+  };
 
   const fetchWatchlist = async () => {
     try {
@@ -845,28 +868,61 @@ export default function UserProfile() {
             </div>
 
             {/* Search and Filter Bar */}
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Search sources by name or URL..."
-                  value={sourceSearchTerm}
-                  onChange={(e) => setSourceSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="Search sources by name or URL..."
+                    value={sourceSearchTerm}
+                    onChange={(e) => setSourceSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+                <select
+                  value={sourceFilterCategory || ''}
+                  onChange={(e) => setSourceFilterCategory(e.target.value || null)}
+                  className="px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="">All Categories</option>
+                  {sourceCategories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={sourceFilterStatus}
+                  onChange={(e) => {
+                    setSourceFilterStatus(e.target.value as 'all' | 'active' | 'inactive');
+                    setSourcesCurrentPage(1);
+                  }}
+                  className="px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active Only</option>
+                  <option value="inactive">Inactive Only</option>
+                </select>
               </div>
-              <select
-                value={sourceFilterCategory || ''}
-                onChange={(e) => setSourceFilterCategory(e.target.value || null)}
-                className="px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              >
-                <option value="">All Categories</option>
-                {sourceCategories.map((cat) => (
-                  <option key={cat.id} value={cat.name}>
-                    {cat.name}
-                  </option>
+
+              {/* Items Per Page Selector */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-muted-foreground">Items per page:</label>
+                {[5, 10, 25, 50].map((count) => (
+                  <button
+                    key={count}
+                    onClick={() => handleItemsPerPageChange(count)}
+                    className={cn(
+                      'px-2 py-1 rounded text-xs font-medium transition-colors',
+                      sourcesPerPage === count
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-foreground hover:bg-accent'
+                    )}
+                  >
+                    {count}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
 
             {/* Bulk Actions Bar */}
@@ -915,20 +971,21 @@ export default function UserProfile() {
                 No sources match your search or filters.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {/* Select All Checkbox */}
-                {filteredSources.length > 1 && (
+                {paginatedSources.length > 1 && (
                   <div className="flex items-center gap-2 p-2 border-b border-border">
                     <input
                       type="checkbox"
-                      checked={selectedSources.size === filteredSources.length && filteredSources.length > 0}
+                      checked={selectedSources.size === paginatedSources.length && paginatedSources.length > 0}
                       onChange={handleSelectAllSources}
                       className="w-4 h-4 cursor-pointer"
                     />
-                    <span className="text-xs text-muted-foreground">Select all on page</span>
+                    <span className="text-xs text-muted-foreground">Select all on this page</span>
                   </div>
                 )}
-                {filteredSources.map((source) => (
+                <div className="space-y-3">
+                  {paginatedSources.map((source) => (
                   <div
                     key={source.id}
                     className={cn(
@@ -996,11 +1053,64 @@ export default function UserProfile() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {filteredSources.length > sourcesPerPage && (
+                  <div className="flex items-center justify-between pt-4 border-t border-border">
+                    <div className="text-xs text-muted-foreground">
+                      Showing {startIdx + 1} to {Math.min(endIdx, filteredSources.length)} of{' '}
+                      {filteredSources.length} sources
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handlePageChange(sourcesCurrentPage - 1)}
+                        disabled={sourcesCurrentPage === 1}
+                        className={cn(
+                          'px-2 py-1 rounded text-xs font-medium transition-colors',
+                          sourcesCurrentPage === 1
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                            : 'bg-muted text-foreground hover:bg-accent'
+                        )}
+                      >
+                        ← Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            onClick={() => handlePageChange(page)}
+                            className={cn(
+                              'px-2 py-1 rounded text-xs font-medium transition-colors',
+                              sourcesCurrentPage === page
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-foreground hover:bg-accent'
+                            )}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => handlePageChange(sourcesCurrentPage + 1)}
+                        disabled={sourcesCurrentPage === totalPages}
+                        className={cn(
+                          'px-2 py-1 rounded text-xs font-medium transition-colors',
+                          sourcesCurrentPage === totalPages
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                            : 'bg-muted text-foreground hover:bg-accent'
+                        )}
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {filteredSources.length > 0 && (
+            {filteredSources.length > 0 && filteredSources.length <= sourcesPerPage && (
               <div className="text-xs text-muted-foreground pt-2">
                 Showing {filteredSources.length} of {sources.length} sources
               </div>
