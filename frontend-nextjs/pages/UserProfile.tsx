@@ -26,6 +26,11 @@ import {
   MapPin,
   Smartphone,
   LogIn,
+  Tag,
+  Folder,
+  Download,
+  Upload,
+  Copy,
 } from 'lucide-react';
 import { usersAPI, sourcesAPI, watchlistAPI } from '@/api/client';
 import { formatDate, cn } from '@/lib/utils';
@@ -48,8 +53,16 @@ interface SourceItem {
   name: string;
   url: string;
   is_active: boolean;
+  category?: string;
+  tags?: string[];
   created_at?: string;
   updated_at?: string;
+}
+
+interface SourceCategory {
+  id: string;
+  name: string;
+  icon: string;
 }
 
 interface WatchlistItem {
@@ -136,7 +149,19 @@ export default function UserProfile() {
   const [sourcesLoading, setSourcesLoading] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
-  const [sourceFormData, setSourceFormData] = useState({ name: '', url: '' });
+  const [sourceFormData, setSourceFormData] = useState({ name: '', url: '', category: '', tags: '' });
+  const [sourceCategories, setSourceCategories] = useState<SourceCategory[]>([
+    { id: '1', name: 'Security', icon: 'Shield' },
+    { id: '2', name: 'Technology', icon: 'Code' },
+    { id: '3', name: 'News', icon: 'Newspaper' },
+    { id: '4', name: 'Research', icon: 'BookOpen' },
+  ]);
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [sourceSearchTerm, setSourceSearchTerm] = useState('');
+  const [sourceFilterCategory, setSourceFilterCategory] = useState<string | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   const [topKeywords, setTopKeywords] = useState<WatchlistItem[]>([]);
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
@@ -318,17 +343,26 @@ export default function UserProfile() {
         return;
       }
 
+      const sourceData = {
+        name: sourceFormData.name,
+        url: sourceFormData.url,
+        category: sourceFormData.category || undefined,
+        tags: sourceFormData.tags
+          ? sourceFormData.tags.split(',').map((t) => t.trim()).filter((t) => t)
+          : undefined,
+      };
+
       if (editingSourceId) {
-        await sourcesAPI.updateSource(editingSourceId, sourceFormData);
+        await sourcesAPI.updateSource(editingSourceId, sourceData);
         setSuccess('Source updated successfully');
       } else {
-        await sourcesAPI.createSource(sourceFormData);
+        await sourcesAPI.createSource(sourceData);
         setSuccess('Source added successfully');
       }
 
       setShowSourceModal(false);
       setEditingSourceId(null);
-      setSourceFormData({ name: '', url: '' });
+      setSourceFormData({ name: '', url: '', category: '', tags: '' });
       await fetchSources();
     } catch (err: any) {
       setError(getErrorMessage(err));
@@ -350,6 +384,118 @@ export default function UserProfile() {
       console.error('Source delete error:', err);
     }
   };
+
+  // Day 3: Source Management enhancements
+  const handleToggleSourceActive = async (id: string) => {
+    try {
+      setError('');
+      const source = sources.find((s) => s.id === id);
+      if (!source) return;
+
+      const updatedSource = { ...source, is_active: !source.is_active };
+      await sourcesAPI.updateSource(id, updatedSource);
+      setSources(sources.map((s) => (s.id === id ? updatedSource : s)));
+      setSuccess(`Source ${updatedSource.is_active ? 'activated' : 'deactivated'}`);
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+      console.error('Toggle source error:', err);
+    }
+  };
+
+  const handleSelectSource = (id: string) => {
+    const newSelected = new Set(selectedSources);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedSources(newSelected);
+    setShowBulkActions(newSelected.size > 0);
+  };
+
+  const handleSelectAllSources = () => {
+    if (selectedSources.size === filteredSources.length) {
+      setSelectedSources(new Set());
+      setShowBulkActions(false);
+    } else {
+      const allIds = new Set(filteredSources.map((s) => s.id));
+      setSelectedSources(allIds);
+      setShowBulkActions(true);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Delete ${selectedSources.size} sources?`)) return;
+
+    try {
+      setError('');
+      for (const id of selectedSources) {
+        await sourcesAPI.deleteSource(id);
+      }
+      setSuccess(`${selectedSources.size} sources deleted`);
+      setSelectedSources(new Set());
+      setShowBulkActions(false);
+      await fetchSources();
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+      console.error('Bulk delete error:', err);
+    }
+  };
+
+  const handleBulkToggleActive = async (activate: boolean) => {
+    try {
+      setError('');
+      for (const id of selectedSources) {
+        const source = sources.find((s) => s.id === id);
+        if (source) {
+          await sourcesAPI.updateSource(id, { ...source, is_active: activate });
+        }
+      }
+      setSources(
+        sources.map((s) => (selectedSources.has(s.id) ? { ...s, is_active: activate } : s))
+      );
+      setSuccess(`${selectedSources.size} sources ${activate ? 'activated' : 'deactivated'}`);
+      setSelectedSources(new Set());
+      setShowBulkActions(false);
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+      console.error('Bulk toggle error:', err);
+    }
+  };
+
+  const handleExportSources = () => {
+    const dataToExport = sources;
+    const csvContent = [
+      ['Name', 'URL', 'Category', 'Tags', 'Status'],
+      ...dataToExport.map((s) => [
+        s.name,
+        s.url,
+        s.category || 'Uncategorized',
+        s.tags?.join(';') || '',
+        s.is_active ? 'Active' : 'Inactive',
+      ]),
+    ]
+      .map((row) => row.map((cell) => `"${cell}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sources-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    setShowExportDialog(false);
+    setSuccess('Sources exported successfully');
+  };
+
+  const filteredSources = sources.filter((source) => {
+    const matchesSearch =
+      source.name.toLowerCase().includes(sourceSearchTerm.toLowerCase()) ||
+      source.url.toLowerCase().includes(sourceSearchTerm.toLowerCase());
+    const matchesCategory = !sourceFilterCategory || source.category === sourceFilterCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   const fetchWatchlist = async () => {
     try {
@@ -676,46 +822,154 @@ export default function UserProfile() {
           <div className="bg-card border border-border rounded-lg p-6 space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-foreground">Custom News Sources</h2>
-              <button
-                onClick={() => {
-                  setShowSourceModal(true);
-                  setEditingSourceId(null);
-                  setSourceFormData({ name: '', url: '' });
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Source
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowExportDialog(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSourceModal(true);
+                    setEditingSourceId(null);
+                    setSourceFormData({ name: '', url: '', category: '', tags: '' });
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Source
+                </button>
+              </div>
             </div>
+
+            {/* Search and Filter Bar */}
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search sources by name or URL..."
+                  value={sourceSearchTerm}
+                  onChange={(e) => setSourceSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+              <select
+                value={sourceFilterCategory || ''}
+                onChange={(e) => setSourceFilterCategory(e.target.value || null)}
+                className="px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              >
+                <option value="">All Categories</option>
+                {sourceCategories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Bulk Actions Bar */}
+            {showBulkActions && selectedSources.size > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <span className="text-sm font-medium text-foreground">{selectedSources.size} selected</span>
+                <div className="flex-1" />
+                <button
+                  onClick={() => handleBulkToggleActive(true)}
+                  className="text-xs px-2 py-1 bg-green-500/20 text-green-600 rounded hover:bg-green-500/30 transition-colors"
+                >
+                  Activate
+                </button>
+                <button
+                  onClick={() => handleBulkToggleActive(false)}
+                  className="text-xs px-2 py-1 bg-gray-500/20 text-gray-600 rounded hover:bg-gray-500/30 transition-colors"
+                >
+                  Deactivate
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="text-xs px-2 py-1 bg-red-500/20 text-red-600 rounded hover:bg-red-500/30 transition-colors"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedSources(new Set());
+                    setShowBulkActions(false);
+                  }}
+                  className="text-xs px-2 py-1 bg-muted text-foreground rounded hover:bg-accent transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
 
             {sourcesLoading ? (
               <div className="text-center py-8 text-muted-foreground">Loading sources...</div>
-            ) : sources.length === 0 ? (
+            ) : filteredSources.length === 0 && sources.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No custom sources yet. Add one to get started!
               </div>
+            ) : filteredSources.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No sources match your search or filters.
+              </div>
             ) : (
               <div className="space-y-3">
-                {sources.map((source) => (
+                {/* Select All Checkbox */}
+                {filteredSources.length > 1 && (
+                  <div className="flex items-center gap-2 p-2 border-b border-border">
+                    <input
+                      type="checkbox"
+                      checked={selectedSources.size === filteredSources.length && filteredSources.length > 0}
+                      onChange={handleSelectAllSources}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-xs text-muted-foreground">Select all on page</span>
+                  </div>
+                )}
+                {filteredSources.map((source) => (
                   <div
                     key={source.id}
-                    className="flex items-start justify-between p-4 bg-muted rounded-lg hover:bg-accent/50 transition-colors"
+                    className={cn(
+                      'flex items-start gap-3 p-4 bg-muted rounded-lg hover:bg-accent/50 transition-colors',
+                      selectedSources.has(source.id) && 'bg-blue-500/10 border border-blue-500/30'
+                    )}
                   >
+                    <input
+                      type="checkbox"
+                      checked={selectedSources.has(source.id)}
+                      onChange={() => handleSelectSource(source.id)}
+                      className="w-4 h-4 mt-1 cursor-pointer"
+                    />
                     <div className="flex-1">
                       <h3 className="font-semibold text-foreground">{source.name}</h3>
                       <p className="text-sm text-muted-foreground break-all">{source.url}</p>
                       <div className="flex gap-2 mt-2">
-                        <span
+                        <button
+                          onClick={() => handleToggleSourceActive(source.id)}
                           className={cn(
-                            'px-2 py-1 rounded text-xs font-medium',
+                            'px-2 py-1 rounded text-xs font-medium transition-colors',
                             source.is_active
-                              ? 'bg-green-500/10 text-green-600'
-                              : 'bg-gray-500/10 text-gray-600'
+                              ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20'
+                              : 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/20'
                           )}
                         >
-                          {source.is_active ? 'Active' : 'Inactive'}
-                        </span>
+                          {source.is_active ? '✓ Active' : '○ Inactive'}
+                        </button>
+                        {source.category && (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/10 text-blue-600">
+                            {source.category}
+                          </span>
+                        )}
+                        {source.tags?.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2 py-1 rounded text-xs font-medium bg-purple-500/10 text-purple-600"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
                       </div>
                     </div>
                     <div className="flex gap-2 ml-4">
@@ -725,6 +979,8 @@ export default function UserProfile() {
                           setSourceFormData({
                             name: source.name,
                             url: source.url,
+                            category: source.category || '',
+                            tags: source.tags?.join(',') || '',
                           });
                           setShowSourceModal(true);
                         }}
@@ -744,9 +1000,15 @@ export default function UserProfile() {
               </div>
             )}
 
+            {filteredSources.length > 0 && (
+              <div className="text-xs text-muted-foreground pt-2">
+                Showing {filteredSources.length} of {sources.length} sources
+              </div>
+            )}
+
             {showSourceModal && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4">
+                <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-foreground">
                       {editingSourceId ? 'Edit Source' : 'Add New Source'}
@@ -755,7 +1017,7 @@ export default function UserProfile() {
                       onClick={() => {
                         setShowSourceModal(false);
                         setEditingSourceId(null);
-                        setSourceFormData({ name: '', url: '' });
+                        setSourceFormData({ name: '', url: '', category: '', tags: '' });
                       }}
                       className="text-muted-foreground hover:text-foreground"
                     >
@@ -794,6 +1056,41 @@ export default function UserProfile() {
                       />
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Category
+                      </label>
+                      <select
+                        value={sourceFormData.category}
+                        onChange={(e) =>
+                          setSourceFormData({ ...sourceFormData, category: e.target.value })
+                        }
+                        className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      >
+                        <option value="">Select a category</option>
+                        {sourceCategories.map((cat) => (
+                          <option key={cat.id} value={cat.name}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Tags (comma-separated)
+                      </label>
+                      <input
+                        type="text"
+                        value={sourceFormData.tags}
+                        onChange={(e) =>
+                          setSourceFormData({ ...sourceFormData, tags: e.target.value })
+                        }
+                        className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        placeholder="e.g., security, threat-intelligence, news"
+                      />
+                    </div>
+
                     <div className="flex gap-2 pt-4">
                       <button
                         onClick={handleAddOrUpdateSource}
@@ -805,13 +1102,39 @@ export default function UserProfile() {
                         onClick={() => {
                           setShowSourceModal(false);
                           setEditingSourceId(null);
-                          setSourceFormData({ name: '', url: '' });
+                          setSourceFormData({ name: '', url: '', category: '', tags: '' });
                         }}
                         className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
                       >
                         Cancel
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Export Dialog */}
+            {showExportDialog && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-card border border-border rounded-lg p-6 max-w-sm w-full mx-4">
+                  <h3 className="text-lg font-bold text-foreground mb-4">Export Sources</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Export {sources.length} sources as CSV file?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleExportSources}
+                      className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                    >
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={() => setShowExportDialog(false)}
+                      className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
               </div>
