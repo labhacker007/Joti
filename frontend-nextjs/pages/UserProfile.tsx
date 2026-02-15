@@ -166,6 +166,11 @@ export default function UserProfile() {
   const [sourcesCurrentPage, setSourcesCurrentPage] = useState(1);
   const [sourcesPerPage, setSourcesPerPage] = useState(5);
 
+  // Day 5: Form validation state
+  const [formValidationErrors, setFormValidationErrors] = useState<Record<string, string>>({});
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successToastMessage, setSuccessToastMessage] = useState('');
+
   const [topKeywords, setTopKeywords] = useState<WatchlistItem[]>([]);
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
@@ -340,15 +345,39 @@ export default function UserProfile() {
     try {
       setError('');
       setSuccess('');
+      setFormValidationErrors({});
 
-      if (!sourceFormData.name || !sourceFormData.url) {
-        setError('Please fill in all fields');
+      // Day 5: Enhanced form validation
+      const errors: Record<string, string> = {};
+
+      if (!sourceFormData.name.trim()) {
+        errors.name = 'Source name is required';
+      } else if (sourceFormData.name.length < 2) {
+        errors.name = 'Source name must be at least 2 characters';
+      } else if (sourceFormData.name.length > 100) {
+        errors.name = 'Source name must be less than 100 characters';
+      }
+
+      if (!sourceFormData.url.trim()) {
+        errors.url = 'Source URL is required';
+      } else {
+        // Basic URL validation
+        try {
+          new URL(sourceFormData.url);
+        } catch {
+          errors.url = 'Please enter a valid URL';
+        }
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFormValidationErrors(errors);
+        setError('Please correct the highlighted errors');
         return;
       }
 
       const sourceData = {
-        name: sourceFormData.name,
-        url: sourceFormData.url,
+        name: sourceFormData.name.trim(),
+        url: sourceFormData.url.trim(),
         category: sourceFormData.category || undefined,
         tags: sourceFormData.tags
           ? sourceFormData.tags.split(',').map((t) => t.trim()).filter((t) => t)
@@ -357,15 +386,18 @@ export default function UserProfile() {
 
       if (editingSourceId) {
         await sourcesAPI.updateSource(editingSourceId, sourceData);
-        setSuccess('Source updated successfully');
+        setSuccessToastMessage('✓ Source updated successfully');
+        setShowSuccessToast(true);
       } else {
         await sourcesAPI.createSource(sourceData);
-        setSuccess('Source added successfully');
+        setSuccessToastMessage('✓ Source added successfully');
+        setShowSuccessToast(true);
       }
 
       setShowSourceModal(false);
       setEditingSourceId(null);
       setSourceFormData({ name: '', url: '', category: '', tags: '' });
+      setTimeout(() => setShowSuccessToast(false), 3000);
       await fetchSources();
     } catch (err: any) {
       setError(getErrorMessage(err));
@@ -1136,19 +1168,38 @@ export default function UserProfile() {
                   </div>
 
                   <div className="space-y-4">
+                    {/* Day 5: Enhanced form validation with error messages */}
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        Source Name
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-foreground">
+                          Source Name
+                        </label>
+                        {sourceFormData.name && (
+                          <span className="text-xs text-muted-foreground">
+                            {sourceFormData.name.length}/100
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="text"
                         value={sourceFormData.name}
                         onChange={(e) =>
                           setSourceFormData({ ...sourceFormData, name: e.target.value })
                         }
-                        className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        className={cn(
+                          'w-full px-4 py-2 bg-background border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2',
+                          formValidationErrors.name
+                            ? 'border-red-500/50 focus:ring-red-500/50'
+                            : 'border-border focus:ring-primary/50'
+                        )}
                         placeholder="e.g., SecurityAffairs"
                       />
+                      {formValidationErrors.name && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {formValidationErrors.name}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -1161,9 +1212,20 @@ export default function UserProfile() {
                         onChange={(e) =>
                           setSourceFormData({ ...sourceFormData, url: e.target.value })
                         }
-                        className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        className={cn(
+                          'w-full px-4 py-2 bg-background border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2',
+                          formValidationErrors.url
+                            ? 'border-red-500/50 focus:ring-red-500/50'
+                            : 'border-border focus:ring-primary/50'
+                        )}
                         placeholder="https://example.com/rss"
                       />
+                      {formValidationErrors.url && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {formValidationErrors.url}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -1246,6 +1308,22 @@ export default function UserProfile() {
                       Cancel
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Day 5: Success Toast Notification */}
+            {showSuccessToast && (
+              <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center gap-3 px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-600 font-medium shadow-lg">
+                  <CheckCircle className="w-5 h-5" />
+                  <span>{successToastMessage}</span>
+                  <button
+                    onClick={() => setShowSuccessToast(false)}
+                    className="ml-2 text-green-600/60 hover:text-green-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             )}
