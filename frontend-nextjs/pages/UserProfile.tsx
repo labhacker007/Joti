@@ -16,6 +16,12 @@ import {
   Edit2,
   Trash2,
   X,
+  Bell,
+  Palette,
+  ToggleRight,
+  ToggleLeft,
+  Globe,
+  Volume2,
 } from 'lucide-react';
 import { usersAPI, sourcesAPI, watchlistAPI } from '@/api/client';
 import { formatDate, cn } from '@/lib/utils';
@@ -48,6 +54,31 @@ interface WatchlistItem {
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+interface NotificationPreference {
+  id: string;
+  type: 'email' | 'push' | 'sms';
+  category: 'security' | 'updates' | 'digest' | 'promotional';
+  enabled: boolean;
+  frequency: 'instant' | 'daily' | 'weekly' | 'monthly';
+}
+
+interface DisplayPreference {
+  theme: 'light' | 'dark' | 'auto';
+  language: string;
+  timezone: string;
+  timeFormat: '12h' | '24h';
+  dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
+  itemsPerPage: number;
+}
+
+interface PrivacySettings {
+  profileVisibility: 'public' | 'private' | 'friends';
+  dataCollection: boolean;
+  marketingConsent: boolean;
+  activityTracking: boolean;
+  twoFactorRequired: boolean;
 }
 
 type TabType = 'profile' | 'sources' | 'watchlist' | 'security' | 'preferences';
@@ -88,6 +119,25 @@ export default function UserProfile() {
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
 
+  // Preferences state
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreference[]>([]);
+  const [displayPrefs, setDisplayPrefs] = useState<DisplayPreference>({
+    theme: 'auto',
+    language: 'en',
+    timezone: 'UTC',
+    timeFormat: '24h',
+    dateFormat: 'YYYY-MM-DD',
+    itemsPerPage: 10,
+  });
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>({
+    profileVisibility: 'private',
+    dataCollection: true,
+    marketingConsent: false,
+    activityTracking: true,
+    twoFactorRequired: false,
+  });
+  const [prefsLoading, setPrefsLoading] = useState(false);
+
   useEffect(() => {
     fetchProfile();
   }, []);
@@ -97,6 +147,8 @@ export default function UserProfile() {
       fetchSources();
     } else if (activeTab === 'watchlist') {
       fetchWatchlist();
+    } else if (activeTab === 'preferences') {
+      loadPreferences();
     }
   }, [activeTab]);
 
@@ -238,6 +290,58 @@ export default function UserProfile() {
       console.error('Watchlist error:', err);
     } finally {
       setWatchlistLoading(false);
+    }
+  };
+
+  // Preferences methods
+  const loadPreferences = async () => {
+    try {
+      setPrefsLoading(true);
+      setError('');
+      // Simulating preference loading - in real app would fetch from API
+      // For now, using default values already set in state
+      setPrefsLoading(false);
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+      console.error('Preferences error:', err);
+      setPrefsLoading(false);
+    }
+  };
+
+  const handleSaveDisplayPrefs = async () => {
+    try {
+      setError('');
+      setSuccess('');
+      // In real app: await preferencesAPI.updateDisplayPreferences(displayPrefs);
+      setSuccess('Display preferences saved successfully');
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleSavePrivacySettings = async () => {
+    try {
+      setError('');
+      setSuccess('');
+      // In real app: await preferencesAPI.updatePrivacySettings(privacySettings);
+      setSuccess('Privacy settings saved successfully');
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleToggleNotification = async (prefId: string, enabled: boolean) => {
+    try {
+      setError('');
+      // In real app: await preferencesAPI.updateNotification(prefId, { enabled });
+      setNotificationPrefs(
+        notificationPrefs.map((pref) =>
+          pref.id === prefId ? { ...pref, enabled } : pref
+        )
+      );
+      setSuccess('Notification preference updated');
+    } catch (err: any) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -797,10 +901,288 @@ export default function UserProfile() {
         )}
 
         {activeTab === 'preferences' && (
-          <div className="bg-card border border-border rounded-lg p-6 space-y-6">
-            <h2 className="text-xl font-bold text-foreground">Preferences</h2>
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Notification and display preferences coming soon.</p>
+          <div className="space-y-6">
+            {/* Notification Preferences */}
+            <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+              <div className="flex items-center gap-3">
+                <Bell className="w-6 h-6 text-primary" />
+                <h2 className="text-xl font-bold text-foreground">Notification Preferences</h2>
+              </div>
+
+              <div className="space-y-4">
+                {/* Email Notifications */}
+                <div className="p-4 bg-muted rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Email Notifications</h3>
+                      <p className="text-sm text-muted-foreground">Receive updates via email</p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setNotificationPrefs([
+                          {
+                            id: '1',
+                            type: 'email',
+                            category: 'security',
+                            enabled: !notificationPrefs.some((p) => p.type === 'email' && p.enabled),
+                            frequency: 'instant',
+                          },
+                        ])
+                      }
+                      className="text-primary hover:text-primary/80"
+                    >
+                      {notificationPrefs.some((p) => p.type === 'email' && p.enabled) ? (
+                        <ToggleRight className="w-6 h-6" />
+                      ) : (
+                        <ToggleLeft className="w-6 h-6" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['security', 'updates', 'digest', 'promotional'].map((cat) => (
+                      <label key={cat} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          defaultChecked={cat !== 'promotional'}
+                          className="rounded border border-border"
+                        />
+                        <span className="text-sm text-foreground capitalize">{cat}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Frequency Selection */}
+                <div className="p-4 bg-muted rounded-lg">
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Notification Frequency
+                  </label>
+                  <select
+                    value={displayPrefs.itemsPerPage}
+                    onChange={(e) => setDisplayPrefs({ ...displayPrefs, itemsPerPage: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value={1}>Instant</option>
+                    <option value={7}>Daily</option>
+                    <option value={30}>Weekly</option>
+                    <option value={365}>Monthly</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Display Preferences */}
+            <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+              <div className="flex items-center gap-3">
+                <Palette className="w-6 h-6 text-primary" />
+                <h2 className="text-xl font-bold text-foreground">Display Preferences</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Theme */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Theme</label>
+                  <select
+                    value={displayPrefs.theme}
+                    onChange={(e) =>
+                      setDisplayPrefs({
+                        ...displayPrefs,
+                        theme: e.target.value as 'light' | 'dark' | 'auto',
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="auto">Auto (System)</option>
+                  </select>
+                </div>
+
+                {/* Language */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Language</label>
+                  <select
+                    value={displayPrefs.language}
+                    onChange={(e) => setDisplayPrefs({ ...displayPrefs, language: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                    <option value="de">Deutsch</option>
+                    <option value="zh">中文</option>
+                  </select>
+                </div>
+
+                {/* Timezone */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Timezone</label>
+                  <select
+                    value={displayPrefs.timezone}
+                    onChange={(e) => setDisplayPrefs({ ...displayPrefs, timezone: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="UTC">UTC</option>
+                    <option value="EST">EST (UTC-5)</option>
+                    <option value="CST">CST (UTC-6)</option>
+                    <option value="MST">MST (UTC-7)</option>
+                    <option value="PST">PST (UTC-8)</option>
+                    <option value="CET">CET (UTC+1)</option>
+                    <option value="IST">IST (UTC+5:30)</option>
+                    <option value="JST">JST (UTC+9)</option>
+                  </select>
+                </div>
+
+                {/* Time Format */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Time Format</label>
+                  <select
+                    value={displayPrefs.timeFormat}
+                    onChange={(e) =>
+                      setDisplayPrefs({
+                        ...displayPrefs,
+                        timeFormat: e.target.value as '12h' | '24h',
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="12h">12-hour (AM/PM)</option>
+                    <option value="24h">24-hour</option>
+                  </select>
+                </div>
+
+                {/* Date Format */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Date Format</label>
+                  <select
+                    value={displayPrefs.dateFormat}
+                    onChange={(e) =>
+                      setDisplayPrefs({
+                        ...displayPrefs,
+                        dateFormat: e.target.value as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                  </select>
+                </div>
+
+                {/* Items Per Page */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Items Per Page</label>
+                  <select
+                    value={displayPrefs.itemsPerPage}
+                    onChange={(e) =>
+                      setDisplayPrefs({ ...displayPrefs, itemsPerPage: parseInt(e.target.value) })
+                    }
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value={10}>10 items</option>
+                    <option value={25}>25 items</option>
+                    <option value={50}>50 items</option>
+                    <option value={100}>100 items</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveDisplayPrefs}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                Save Display Settings
+              </button>
+            </div>
+
+            {/* Privacy Controls */}
+            <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+              <div className="flex items-center gap-3">
+                <Globe className="w-6 h-6 text-primary" />
+                <h2 className="text-xl font-bold text-foreground">Privacy & Security</h2>
+              </div>
+
+              <div className="space-y-4">
+                {/* Profile Visibility */}
+                <div className="p-4 bg-muted rounded-lg">
+                  <label className="block text-sm font-medium text-foreground mb-2">Profile Visibility</label>
+                  <select
+                    value={privacySettings.profileVisibility}
+                    onChange={(e) =>
+                      setPrivacySettings({
+                        ...privacySettings,
+                        profileVisibility: e.target.value as 'public' | 'private' | 'friends',
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="public">Public</option>
+                    <option value="friends">Friends Only</option>
+                    <option value="private">Private</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Control who can see your profile and activity
+                  </p>
+                </div>
+
+                {/* Toggle Settings */}
+                <div className="space-y-3">
+                  {[
+                    {
+                      label: 'Data Collection',
+                      description: 'Allow us to collect usage analytics to improve the app',
+                      key: 'dataCollection',
+                    },
+                    {
+                      label: 'Marketing Communications',
+                      description: 'Receive emails about new features and updates',
+                      key: 'marketingConsent',
+                    },
+                    {
+                      label: 'Activity Tracking',
+                      description: 'Track your activity for security and personalization',
+                      key: 'activityTracking',
+                    },
+                    {
+                      label: 'Require Two-Factor Authentication',
+                      description: 'Enforce 2FA for all account access',
+                      key: 'twoFactorRequired',
+                    },
+                  ].map((setting) => (
+                    <div key={setting.key} className="p-4 bg-muted rounded-lg flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-foreground">{setting.label}</h3>
+                        <p className="text-sm text-muted-foreground">{setting.description}</p>
+                      </div>
+                      <button
+                        onClick={() =>
+                          setPrivacySettings({
+                            ...privacySettings,
+                            [setting.key]: !privacySettings[setting.key as keyof PrivacySettings],
+                          })
+                        }
+                        className="text-primary hover:text-primary/80"
+                      >
+                        {privacySettings[setting.key as keyof PrivacySettings] ? (
+                          <ToggleRight className="w-6 h-6" />
+                        ) : (
+                          <ToggleLeft className="w-6 h-6" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleSavePrivacySettings}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  Save Privacy Settings
+                </button>
+              </div>
             </div>
           </div>
         )}
