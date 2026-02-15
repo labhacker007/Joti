@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Bookmark, BookmarkOff, Eye, EyeOff, Share2, AlertCircle } from 'lucide-react';
+import { Search, Filter, Bookmark, X, Eye, EyeOff, Share2, AlertCircle } from 'lucide-react';
 import { articlesAPI, sourcesAPI } from '@/api/client';
 
 interface Article {
@@ -308,11 +308,7 @@ export default function NewsFeed() {
                       className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary"
                       title="Bookmark article"
                     >
-                      {article.status === 'bookmarked' ? (
-                        <Bookmark className="w-4 h-4 fill-current" />
-                      ) : (
-                        <BookmarkOff className="w-4 h-4" />
-                      )}
+                      <Bookmark className={`w-4 h-4 ${article.status === 'bookmarked' ? 'fill-current' : ''}`} />
                     </button>
 
                     <a
