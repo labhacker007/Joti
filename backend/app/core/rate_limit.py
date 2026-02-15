@@ -45,10 +45,14 @@ class RateLimiter:
         
         # Endpoint-specific limits
         self.endpoint_limits = {
-            # Auth endpoints - stricter limits (relaxed for development)
-            "/auth/login": (30, 60),          # 30 requests per minute (dev: increased from 5)
-            "/auth/register": (20, 60),        # 20 requests per minute (dev: increased from 3)
-            "/auth/saml/login": (30, 60),     # 30 requests per minute (dev: increased from 10)
+            # Auth endpoints - strict limits to prevent brute force
+            "/auth/login": (5, 60),            # 5 requests per minute
+            "/auth/register": (3, 60),          # 3 requests per minute
+            "/auth/refresh": (10, 60),          # 10 refreshes per minute
+            "/auth/saml/login": (10, 60),       # 10 requests per minute
+            "/auth/change-password": (3, 60),   # 3 attempts per minute
+            "/auth/otp/enable": (3, 60),        # 3 attempts per minute
+            "/auth/otp/verify": (5, 60),        # 5 attempts per minute
 
             # GenAI endpoints - expensive operations
             "/hunts/generate": (20, 60),      # 20 requests per minute
@@ -211,8 +215,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 token = auth_header.replace("Bearer ", "")
                 payload = decode_token(token)
                 user_id = payload.get("sub")
-            except:
-                pass
+            except (ValueError, Exception):
+                pass  # Invalid/expired token - fall back to IP-based limiting
         
         # Build rate limit key
         path = normalize_path_for_rate_limit(request.url.path)

@@ -291,8 +291,9 @@ async def update_prompt(
     # Track if we need to increment version
     increment_version = False
 
-    # Update fields
+    # Update fields - only allow fields defined in the update schema
     update_data = payload.model_dump(exclude_unset=True)
+    _allowed_prompt_fields = {"name", "description", "template", "model_id", "temperature", "max_tokens", "is_active", "tags"}
 
     # Check if template changed (requires version increment)
     if "template" in update_data and update_data["template"] != prompt.template:
@@ -304,7 +305,8 @@ async def update_prompt(
         increment_version = True
 
     for field, value in update_data.items():
-        setattr(prompt, field, value)
+        if field in _allowed_prompt_fields:
+            setattr(prompt, field, value)
 
     if increment_version:
         prompt.version += 1
@@ -453,9 +455,11 @@ async def update_prompt_variable(
         )
 
     update_data = payload.model_dump(exclude_unset=True)
+    _allowed_variable_fields = {"description", "default_value", "is_required"}
 
     for field, value in update_data.items():
-        setattr(variable, field, value)
+        if field in _allowed_variable_fields:
+            setattr(variable, field, value)
 
     db.commit()
     db.refresh(variable)

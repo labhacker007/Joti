@@ -8,6 +8,8 @@
 .env.*.local
 .env.production
 .env.development
+.env.docker
+.env.myfeeds
 *.pem
 *.key
 *.crt
@@ -425,6 +427,9 @@ backend/tests/fixtures/sensitive/
 # Local development overrides
 docker-compose.local.yml
 config.local.json
+
+# Dev secret keys
+data/.dev_secret_key
 
 # User-specific IDE settings
 .vscode/settings.json

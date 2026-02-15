@@ -41,11 +41,11 @@ def get_saml_settings() -> Dict[str, Any]:
                 "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
             }
         ],
-        "allow_unsolicited": True,
+        "allow_unsolicited": False,
         "authn_requests_signed": False,
         "logout_requests_signed": False,
         "want_assertions_signed": True,
-        "want_response_signed": False,
+        "want_response_signed": True,
     }
     
     return {
@@ -81,19 +81,24 @@ def map_saml_role(saml_attributes: Dict) -> UserRole:
     if isinstance(role_attributes, str):
         role_attributes = [role_attributes]
     
-    # Map to application roles (case-insensitive)
-    role_str = role_attributes[0].lower() if role_attributes else ""
-    
-    if "admin" in role_str:
-        return UserRole.ADMIN
-    elif "threat_intel" in role_str or "ti" in role_str or "analyst" in role_str:
-        return UserRole.TI
-    elif "threat_hunt" in role_str or "th" in role_str or "hunter" in role_str:
-        return UserRole.TH
-    elif "incident" in role_str or "ir" in role_str or "responder" in role_str:
-        return UserRole.IR
-    else:
-        return UserRole.VIEWER
+    # Map to application roles using exact match (case-insensitive)
+    # to prevent privilege escalation via substring matching
+    _ROLE_MAP = {
+        "admin": UserRole.ADMIN,
+        "threat_intel": UserRole.TI,
+        "ti": UserRole.TI,
+        "analyst": UserRole.TI,
+        "threat_hunt": UserRole.TH,
+        "th": UserRole.TH,
+        "hunter": UserRole.TH,
+        "incident": UserRole.IR,
+        "ir": UserRole.IR,
+        "responder": UserRole.IR,
+        "viewer": UserRole.VIEWER,
+    }
+
+    role_str = role_attributes[0].strip().lower() if role_attributes else ""
+    return _ROLE_MAP.get(role_str, UserRole.VIEWER)
 
 
 def provision_saml_user(
@@ -211,7 +216,7 @@ async def saml_login(request: Request):
         logger.error("saml_login_error", error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"SAML login failed: {str(e)}"
+            detail="SAML login failed"
         )
 
 

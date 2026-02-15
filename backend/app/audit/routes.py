@@ -51,7 +51,16 @@ def list_audit_logs(
 ):
     """List audit logs with filters and pagination."""
     query = db.query(AuditLog).join(User, AuditLog.user_id == User.id, isouter=True)
-    
+
+    # IDOR protection: non-admin users can only view their own logs
+    if current_user.role.value != "admin":
+        if user_id and user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only view your own audit logs"
+            )
+        query = query.filter(AuditLog.user_id == current_user.id)
+
     # Apply filters
     if event_type:
         query = query.filter(AuditLog.event_type == event_type)

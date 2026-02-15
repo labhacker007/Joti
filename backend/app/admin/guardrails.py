@@ -546,11 +546,15 @@ async def update_guardrail(
             detail=f"Guardrail with ID {guardrail_id} not found"
         )
 
-    # Update fields
+    # Update fields (whitelist to prevent mass assignment)
+    _allowed_guardrail_fields = {
+        "name", "description", "config", "action", "max_retries", "is_active",
+    }
     update_data = payload.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
-        setattr(guardrail, field, value)
+        if field in _allowed_guardrail_fields:
+            setattr(guardrail, field, value)
 
     db.commit()
     db.refresh(guardrail)

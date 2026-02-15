@@ -207,8 +207,9 @@ async def test_single_model(
                     else:
                         raise Exception(f"Ollama returned status {ollama_response.status_code}")
             except Exception as e:
-                raise HTTPException(status_code=503, detail=f"Ollama call failed: {str(e)}")
-        
+                logger.error("ollama_test_call_failed", error=str(e))
+                raise HTTPException(status_code=503, detail="Ollama call failed")
+
         elif provider == "openai":
             try:
                 from openai import AsyncOpenAI
@@ -221,8 +222,9 @@ async def test_single_model(
                 )
                 response_text = completion.choices[0].message.content
             except Exception as e:
-                raise HTTPException(status_code=503, detail=f"OpenAI call failed: {str(e)}")
-        
+                logger.error("openai_test_call_failed", error=str(e))
+                raise HTTPException(status_code=503, detail="OpenAI call failed")
+
         elif provider == "anthropic":
             try:
                 import anthropic
@@ -236,8 +238,9 @@ async def test_single_model(
                 )
                 response_text = message.content[0].text
             except Exception as e:
-                raise HTTPException(status_code=503, detail=f"Anthropic call failed: {str(e)}")
-        
+                logger.error("anthropic_test_call_failed", error=str(e))
+                raise HTTPException(status_code=503, detail="Anthropic call failed")
+
         elif provider == "gemini":
             try:
                 import google.generativeai as genai
@@ -246,7 +249,8 @@ async def test_single_model(
                 response = await genai_model.generate_content_async(request.prompt)
                 response_text = response.text
             except Exception as e:
-                raise HTTPException(status_code=503, detail=f"Gemini call failed: {str(e)}")
+                logger.error("gemini_test_call_failed", error=str(e))
+                raise HTTPException(status_code=503, detail="Gemini call failed")
         
         end_time = time.time()
         response_time_ms = int((end_time - start_time) * 1000)
@@ -300,7 +304,7 @@ async def test_single_model(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Test failed: {str(e)}"
+            detail="GenAI test failed"
         )
 
 

@@ -333,10 +333,15 @@ async def update_user_feed(
                 detail="Category not found"
             )
 
-    # Update fields that were provided
+    # Update fields that were provided (whitelist to prevent mass assignment)
+    _allowed_feed_fields = {
+        "name", "description", "category_id", "category",
+        "is_active", "auto_ingest", "notify_on_new",
+    }
     update_data = feed_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
-        setattr(feed, field, value)
+        if field in _allowed_feed_fields:
+            setattr(feed, field, value)
 
     feed.updated_at = datetime.utcnow()
     db.commit()

@@ -15,32 +15,34 @@ router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 
 def reapply_watchlist_to_articles(db: Session):
     """Re-apply active watchlist keywords to all articles.
-    
+
     - Articles matching ACTIVE keywords are marked high priority
     - Articles that only matched NOW-INACTIVE keywords are unmarked
+    - Uses batched streaming to avoid loading all articles into memory
     """
     # Get all active keywords
     active_keywords = db.query(WatchListKeyword).filter(WatchListKeyword.is_active == True).all()
     active_keyword_list = [kw.keyword.lower() for kw in active_keywords]
-    
-    # Get all articles (we'll re-evaluate all of them)
-    articles = db.query(Article).all()
-    
+
+    # Stream articles in batches to avoid memory exhaustion
+    _BATCH_SIZE = 500
     updated_count = 0
-    for article in articles:
+
+    query = db.query(Article).yield_per(_BATCH_SIZE)
+    for article in query:
         content = ((article.title or "") + " " + (article.summary or "")).lower()
-        
+
         # Check which active keywords match
         matched = [kw for kw in active_keyword_list if kw in content]
-        
+
         # Update article based on current active matches
         new_priority = len(matched) > 0
-        
+
         if article.is_high_priority != new_priority or article.watchlist_match_keywords != matched:
             article.is_high_priority = new_priority
             article.watchlist_match_keywords = matched if matched else []
             updated_count += 1
-    
+
     db.commit()
     logger.info("watchlist_reapplied", updated_articles=updated_count, active_keywords=len(active_keyword_list))
     return updated_count

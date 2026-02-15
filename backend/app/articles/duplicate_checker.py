@@ -218,17 +218,22 @@ class DuplicateChecker:
             
             provider = GenAIProvider()
             
-            # Build comparison prompt
+            # Build comparison prompt with delimited user data to mitigate prompt injection
+            import html as _html
+            safe_title = _html.escape(title[:200])
+            safe_content = _html.escape(content[:500])
+
             prompt = f"""You are a cybersecurity intelligence analyst. Determine if the following article is a duplicate or substantially similar to any of the candidate articles.
 
-Article to Check:
-Title: {title}
-Content: {content[:500]}...
+<article_to_check>
+Title: {safe_title}
+Content: {safe_content}
+</article_to_check>
 
-Candidate Articles:
+<candidate_articles>
 """
             for i, article in enumerate(candidate_articles[:5], 1):  # Limit to 5 for performance
-                prompt += f"\n{i}. {article.title[:100]}"
+                prompt += f"\n{i}. {_html.escape(article.title[:100])}"
             
             prompt += """
 

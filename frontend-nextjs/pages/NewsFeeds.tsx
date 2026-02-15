@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { isSafeExternalUrl } from '@/utils/url';
 import {
   Search,
   Bookmark,
@@ -234,7 +235,7 @@ export default function NewsFeeds() {
                         <Calendar className="w-4 h-4" />
                         <span>{formatRelativeTime(article.published_at)}</span>
                       </div>
-                      {article.url && (
+                      {isSafeExternalUrl(article.url) && (
                         <a
                           href={article.url}
                           target="_blank"

@@ -1303,9 +1303,17 @@ async def update_config(
             detail="Configuration not found"
         )
     
-    # Update fields
+    # Update fields (whitelist to prevent mass assignment)
+    _allowed_config_fields = {
+        "temperature", "max_tokens", "top_p", "frequency_penalty",
+        "presence_penalty", "stop_sequences", "timeout_seconds",
+        "retry_attempts", "preferred_model", "max_cost_per_request",
+        "fallback_model", "daily_request_limit", "allowed_users",
+        "allowed_roles",
+    }
     for field, value in config_data.dict(exclude_unset=True).items():
-        setattr(config, field, value)
+        if field in _allowed_config_fields:
+            setattr(config, field, value)
     
     config.updated_by_user_id = current_user.id
     config.updated_at = datetime.utcnow()

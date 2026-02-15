@@ -15,17 +15,31 @@ Context:
 - Supports Linux auto-install, macOS/Windows manual download
 - Integrates with existing genai/provider.py
 """
+import re as _re
+import subprocess
+import platform
+import os
+import httpx
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from app.auth.dependencies import require_permission
 from app.auth.rbac import Permission
 from app.models import User
-import subprocess
-import platform
-import os
-import httpx
-from datetime import datetime
+
+# Allowlist pattern for Ollama model names: alphanumeric, hyphens, colons, dots, slashes
+_VALID_MODEL_NAME = _re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,200}$')
+
+
+def _validate_model_name(name: str) -> str:
+    """Validate and sanitize an Ollama model name."""
+    if not name or not _VALID_MODEL_NAME.match(name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid model name. Use only alphanumeric characters, hyphens, dots, colons, and slashes."
+        )
+    return name
 
 router = APIRouter(prefix="/admin/ollama", tags=["admin-ollama"])
 
@@ -210,38 +224,14 @@ async def install_ollama(
     system = platform.system().lower()
 
     if system == "linux":
-        # Linux: Automated installation via official script
-        try:
-            install_cmd = "curl -fsSL https://ollama.com/install.sh | sh"
-
-            result = subprocess.run(
-                install_cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes max
-            )
-
-            if result.returncode == 0:
-                return InstallResponse(
-                    success=True,
-                    message="Ollama installed successfully! Run 'ollama serve' to start the service.",
-                    manual=False
-                )
-            else:
-                return InstallResponse(
-                    success=False,
-                    message=f"Installation failed: {result.stderr}",
-                    manual=False
-                )
-
-        except subprocess.TimeoutExpired:
-            return InstallResponse(
-                success=False,
-                message="Installation timed out. Please try manual installation.",
-                manual=True,
-                download_url="https://ollama.com/download/linux"
-            )
+        # Security: Never pipe remote scripts into shell from a web API.
+        # Direct users to install manually instead.
+        return InstallResponse(
+            success=False,
+            message="Please install Ollama manually. Run: curl -fsSL https://ollama.com/install.sh | sh",
+            manual=True,
+            download_url="https://ollama.com/download/linux"
+        )
 
     elif system == "darwin":
         # macOS: Manual download
@@ -287,6 +277,9 @@ async def pull_model(
 
     Note: Large models may take 10+ minutes to download.
     """
+    # Validate model name to prevent command injection
+    model_name = _validate_model_name(model_name)
+
     # Check if Ollama is installed and running
     if not check_ollama_running():
         raise HTTPException(
@@ -363,6 +356,9 @@ async def delete_model(
 
     Permissions: ADMIN_GENAI_EDIT
     """
+    # Validate model name to prevent command injection
+    model_name = _validate_model_name(model_name)
+
     if not check_ollama_running():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

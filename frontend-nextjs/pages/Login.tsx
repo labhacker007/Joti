@@ -218,7 +218,7 @@ export default function Login() {
         </form>
 
         <p className="text-center text-gray-400 text-xs mt-6">
-          Demo credentials: admin@example.com / admin1234567
+          Joti Threat Intelligence Platform
         </p>
       </div>
     </div>

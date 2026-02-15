@@ -696,7 +696,7 @@ def ingest_custom_feed(
     except FetchError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to fetch URL: {str(e)}"
+            detail="Failed to fetch the specified URL"
         )
 
     content_type = (fetch_result.headers.get("content-type") or "").split(";")[0].lower()

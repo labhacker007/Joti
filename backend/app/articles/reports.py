@@ -10,6 +10,7 @@ from app.models import User, FetchedContent
 from typing import List, Optional
 from datetime import datetime
 from io import BytesIO
+from app.core.logging import logger
 
 router = APIRouter(prefix="/articles/reports", tags=["article-reports"])
 
@@ -224,7 +225,8 @@ async def export_to_pdf(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("pdf_export_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="PDF export failed")
 
 
 @router.get("/{content_id}/export/word")
@@ -261,7 +263,8 @@ async def export_to_word(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("report_export_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Report generation failed")
 
 
 @router.post("/batch-export/pdf")
@@ -274,6 +277,9 @@ async def batch_export_pdf(
     Export multiple content items as a single PDF report.
     Useful for generating weekly/monthly digest reports.
     """
+    if len(content_ids) > 50:
+        raise HTTPException(status_code=400, detail="Batch size cannot exceed 50 items")
+
     contents = db.query(FetchedContent).filter(
         FetchedContent.id.in_(content_ids),
         FetchedContent.user_id == current_user.id
@@ -327,4 +333,5 @@ async def batch_export_pdf(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("batch_export_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Batch export failed")

@@ -27,11 +27,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=UserResponse)
 def register(user_create: UserCreate, db: Session = Depends(get_db)):
     """Register a new user (local auth only)."""
-    # Basic password policy (avoid weak credentials by default)
+    # Password policy: length + complexity
     if not user_create.password or len(user_create.password) < 12:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password must be at least 12 characters long"
+        )
+
+    import re as _re
+    has_upper = bool(_re.search(r"[A-Z]", user_create.password))
+    has_lower = bool(_re.search(r"[a-z]", user_create.password))
+    has_digit = bool(_re.search(r"\d", user_create.password))
+    has_special = bool(_re.search(r"[^A-Za-z0-9]", user_create.password))
+    if not (has_upper and has_lower and has_digit and has_special):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain uppercase, lowercase, digit, and special character"
         )
 
     # Check if user already exists
@@ -56,7 +67,18 @@ def register(user_create: UserCreate, db: Session = Depends(get_db)):
     )
 
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as _exc:
+        db.rollback()
+        # Catch unique constraint violation (race condition: concurrent registration)
+        from sqlalchemy.exc import IntegrityError
+        if isinstance(_exc, IntegrityError):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email or username already registered"
+            )
+        raise
     db.refresh(user)
 
     # Auto-subscribe to default feeds
@@ -82,16 +104,25 @@ def register(user_create: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(login_request: LoginRequest, db: Session = Depends(get_db)):
+def login(login_request: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """Local email/password + OTP login. Accepts email or username.
-    
+
     Security features:
     - Constant-time comparison to prevent timing attacks
     - Rate limiting applied via middleware
+    - Account lockout after repeated failures
     - Generic error messages to prevent user enumeration
     """
-    import hmac
-    
+    from app.auth.security import is_account_locked, record_failed_login, clear_failed_logins
+
+    # Check account lockout before any processing
+    lockout_id = login_request.email.lower().strip() if login_request.email else ""
+    if lockout_id and is_account_locked(lockout_id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed attempts. Please try again later."
+        )
+
     # Input validation
     if not login_request.email or len(login_request.email) > 255:
         raise HTTPException(
@@ -123,6 +154,7 @@ def login(login_request: LoginRequest, db: Session = Depends(get_db)):
     
     # Generic error message to prevent user enumeration
     if not user or not credentials_valid:
+        record_failed_login(lockout_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
@@ -149,18 +181,21 @@ def login(login_request: LoginRequest, db: Session = Depends(get_db)):
                 detail="Invalid OTP code"
             )
     
+    # Clear lockout on successful login
+    clear_failed_logins(lockout_id)
+
     # Create tokens
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
-    
+
     # Update last login
     from datetime import datetime
     user.last_login = datetime.utcnow()
     db.commit()
-    
+
     # Audit log
     AuditManager.log_login(db, user.id, saml=False)
-    
+
     logger.info("user_login_success", user_id=user.id, username=user.username)
     
     return LoginResponse(
@@ -171,8 +206,9 @@ def login(login_request: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=TokenRefreshResponse)
-def refresh_token(refresh_request: TokenRefreshRequest):
+def refresh_token(refresh_request: TokenRefreshRequest, db: Session = Depends(get_db)):
     """Refresh access token using a valid refresh token."""
+    from app.auth.security import blacklist_token
     try:
         payload = decode_token(refresh_request.refresh_token)
         if payload.get("type") != "refresh":
@@ -181,6 +217,20 @@ def refresh_token(refresh_request: TokenRefreshRequest):
                 detail="Invalid refresh token"
             )
         user_id = payload.get("sub")
+
+        # Verify user still exists and is active
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not getattr(user, "is_active", True):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User account is deactivated"
+            )
+
+        # Blacklist the old refresh token to prevent replay attacks
+        old_jti = payload.get("jti")
+        if old_jti:
+            blacklist_token(old_jti, payload.get("exp", 0))
+
         access_token = create_access_token({"sub": user_id})
         return TokenRefreshResponse(access_token=access_token)
     except ValueError:
@@ -210,6 +260,17 @@ def change_password(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password must be at least 12 characters long"
+        )
+
+    import re as _re
+    has_upper = bool(_re.search(r"[A-Z]", new_password))
+    has_lower = bool(_re.search(r"[a-z]", new_password))
+    has_digit = bool(_re.search(r"\d", new_password))
+    has_special = bool(_re.search(r"[^A-Za-z0-9]", new_password))
+    if not (has_upper and has_lower and has_digit and has_special):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain uppercase, lowercase, digit, and special character"
         )
 
     if not current_user.hashed_password:
@@ -284,7 +345,7 @@ async def oauth_callback(
             if existing_email:
                 raise HTTPException(
                     status_code=409,
-                    detail=f"Email {email} is already registered with a different login method. Please use your original login method."
+                    detail="This account is already registered. Please use your original login method."
                 )
 
             # Create new user
@@ -335,18 +396,22 @@ async def oauth_callback(
 
         logger.info("oauth_login_success", user_id=user.id, provider=provider)
 
-        # Redirect to frontend with tokens
+        # Redirect to frontend with tokens in URL fragment (not query params)
+        # to avoid leaking them via server logs, referrers, proxies, and browser history sync.
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
-        redirect_url = (
-            f"{frontend_url}/login"
-            f"?access_token={access_token}"
-            f"&refresh_token={refresh_token}"
-        )
+        from urllib.parse import urlencode as _urlencode
+        fragment = _urlencode({
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+        })
+        redirect_url = f"{frontend_url}/login#{fragment}"
         return RedirectResponse(redirect_url)
 
     except OAuthError as e:
         logger.error("oauth_error", provider=provider, error=str(e))
-        raise HTTPException(status_code=400, detail=f"OAuth authentication failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="OAuth authentication failed")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("oauth_callback_error", provider=provider, error=str(e))
         raise HTTPException(status_code=500, detail="OAuth authentication failed")
@@ -359,8 +424,25 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/logout")
-def logout(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Log out a user (token blacklist in production)."""
+def logout(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Log out a user, blacklisting their current token."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        try:
+            payload = decode_token(token)
+            jti = payload.get("jti")
+            exp = payload.get("exp")
+            if jti and exp:
+                from app.auth.security import blacklist_token
+                blacklist_token(jti, exp)
+        except Exception:
+            pass
+    AuditManager.log_event(db=db, user_id=current_user.id, event_type="security", action="logout", resource_type="auth")
     logger.info("user_logout", user_id=current_user.id, username=current_user.username)
     return {"message": "Logged out successfully"}
 
