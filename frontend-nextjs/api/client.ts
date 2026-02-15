@@ -328,6 +328,9 @@ export const articlesAPI = {
     if (filters?.unread_only) {
       params.append('unread_only', 'true');
     }
+    if (filters?.watchlist_only) {
+      params.append('watchlist_only', 'true');
+    }
     return get(`/articles/?${params}`);
   },
 

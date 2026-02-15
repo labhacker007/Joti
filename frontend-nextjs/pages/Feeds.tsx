@@ -10,6 +10,7 @@ import {
   TrendingUp,
   AlertCircle,
   Eye,
+  Star,
 } from 'lucide-react';
 import { articlesAPI } from '@/api/client';
 import { formatRelativeTime, formatDate, truncateText, cn } from '@/lib/utils';
@@ -24,6 +25,9 @@ interface Article {
   published_at: string;
   url: string;
   is_bookmarked?: boolean;
+  is_read?: boolean;
+  watchlist_match_keywords?: string[];
+  is_high_priority?: boolean;
 }
 
 export default function Feeds() {
@@ -37,12 +41,14 @@ export default function Feeds() {
   const [totalPages, setTotalPages] = useState(1);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
+  const [watchlistCount, setWatchlistCount] = useState(0);
 
   const pageSize = 10;
 
   useEffect(() => {
     fetchArticles();
-  }, [currentPage, searchQuery, selectedSeverity, selectedCategory, showUnreadOnly]);
+  }, [currentPage, searchQuery, selectedSeverity, selectedCategory, showUnreadOnly, showWatchlistOnly]);
 
   const fetchArticles = async () => {
     try {
@@ -54,6 +60,7 @@ export default function Feeds() {
       if (selectedCategory !== 'ALL') filters.threat_category = selectedCategory;
       if (searchQuery) filters.search = searchQuery;
       if (showUnreadOnly) filters.unread_only = true;
+      if (showWatchlistOnly) filters.watchlist_only = true;
 
       const response = await articlesAPI.getArticles(
         currentPage,
@@ -68,6 +75,10 @@ export default function Feeds() {
       // Calculate unread count from all articles (not just current page)
       const allUnreadCount = fetchedArticles.filter(a => !a.is_read).length;
       setUnreadCount(allUnreadCount);
+
+      // Calculate watchlist match count from all articles
+      const allWatchlistCount = fetchedArticles.filter(a => a.watchlist_match_keywords && a.watchlist_match_keywords.length > 0).length;
+      setWatchlistCount(allWatchlistCount);
     } catch (err: any) {
       setError(err.message || 'Failed to load articles');
       console.error('Articles error:', err);
@@ -190,6 +201,28 @@ export default function Feeds() {
             )}
           </button>
 
+          {/* Watchlist Filter */}
+          <button
+            onClick={() => {
+              setShowWatchlistOnly(!showWatchlistOnly);
+              setCurrentPage(1);
+            }}
+            className={cn(
+              'px-3 py-1 rounded-full text-sm transition-colors flex items-center gap-1',
+              showWatchlistOnly
+                ? 'bg-yellow-500/20 text-yellow-600 border border-yellow-500/30'
+                : 'bg-muted text-foreground hover:bg-accent'
+            )}
+          >
+            <Star className="w-4 h-4" />
+            Watchlist
+            {watchlistCount > 0 && (
+              <span className="ml-1 px-2 py-0.5 bg-yellow-600 text-white rounded-full text-xs font-medium">
+                {watchlistCount}
+              </span>
+            )}
+          </button>
+
           {/* Severity Filter */}
           <div className="flex gap-2">
             <button
@@ -275,6 +308,14 @@ export default function Feeds() {
                         <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30">
                           {article.threat_category}
                         </span>
+                      )}
+                      {article.watchlist_match_keywords && article.watchlist_match_keywords.length > 0 && (
+                        article.watchlist_match_keywords.map((keyword) => (
+                          <span key={keyword} className="px-2 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 border border-yellow-500/30 flex items-center gap-1">
+                            <Star className="w-3 h-3" />
+                            {keyword}
+                          </span>
+                        ))
                       )}
                     </div>
 
