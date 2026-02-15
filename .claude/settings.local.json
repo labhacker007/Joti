@@ -69,7 +69,12 @@
       "Bash(docker-compose logs:*)",
       "Bash(git ls-tree:*)",
       "Bash(git diff:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(git merge:*)",
+      "Bash(echo:*)",
+      "Bash(/tmp/joti_summary.txt:*)",
+      "Bash(git reset:*)",
+      "Bash(cat:*)"
     ]
   }
 }
