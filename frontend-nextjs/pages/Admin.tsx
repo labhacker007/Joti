@@ -11,6 +11,7 @@ import {
   Key,
   Zap,
   Activity,
+  Rss,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -89,6 +90,14 @@ export default function Admin() {
       href: '/admin/monitoring',
       color: 'bg-indigo-500/10 text-indigo-600',
       priority: 'medium',
+    },
+    {
+      title: 'Feed Sources',
+      description: 'Manage global feed sources and RSS feeds',
+      icon: Rss,
+      href: '/admin/sources',
+      color: 'bg-orange-500/10 text-orange-600',
+      priority: 'high',
     },
   ];
 
