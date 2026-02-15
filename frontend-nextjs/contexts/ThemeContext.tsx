@@ -23,10 +23,10 @@ export interface ThemeContextValue {
 export const themeOptions: Record<ThemeName, ThemeOption> = {
   midnight: { emoji: '🌙', label: 'Midnight' },
   daylight: { emoji: '☀️', label: 'Daylight' },
-  'command-center': { emoji: '🖥️', label: 'Command Center' },
-  aurora: { emoji: '🌌', label: 'Aurora' },
-  'red-alert': { emoji: '🚨', label: 'Red Alert' },
-  matrix: { emoji: '💻', label: 'Matrix' },
+  'command-center': { emoji: '📡', label: 'Command Center' },
+  aurora: { emoji: '✨', label: 'Aurora' },
+  'red-alert': { emoji: '⚠️', label: 'Red Alert' },
+  matrix: { emoji: '⌨️', label: 'Matrix' },
 };
 
 const themeOrder: ThemeName[] = ['midnight', 'daylight', 'command-center', 'aurora', 'red-alert', 'matrix'];

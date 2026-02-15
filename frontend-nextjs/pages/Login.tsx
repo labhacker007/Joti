@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { usersAPI } from '@/api/client';
 import { useAuthStore } from '@/store';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Zap, Shield, Search, Gauge } from 'lucide-react';
+import { ThemeSwitcher, type ThemeType, THEME_CONFIGS } from '@/components/ThemeSwitcher';
 import {
   NeuralNetworkBackground,
   MatrixRainBackground,
@@ -13,11 +14,7 @@ import {
   ConstellationBackground
 } from '@/components/AnimatedBackgrounds';
 
-type ThemeType = 'command-center' | 'daylight' | 'midnight' | 'aurora' | 'red-alert' | 'matrix';
-
-interface ThemeConfig {
-  name: string;
-  emoji: string;
+interface ThemeDisplayConfig {
   background: 'neural' | 'matrix' | 'orbs' | 'constellation';
   colors: {
     primary: string;
@@ -25,44 +22,39 @@ interface ThemeConfig {
   };
 }
 
-const THEMES: Record<ThemeType, ThemeConfig> = {
+const THEME_DISPLAY: Record<ThemeType, ThemeDisplayConfig> = {
   'command-center': {
-    name: 'Command Center',
-    emoji: '🎯',
     background: 'neural',
-    colors: { primary: '#00ff88', secondary: '#00ccff' }
+    colors: { primary: '#00d9ff', secondary: '#00ccff' }
   },
   'daylight': {
-    name: 'Daylight',
-    emoji: '☀️',
     background: 'neural',
-    colors: { primary: '#3b82f6', secondary: '#60a5fa' }
+    colors: { primary: '#fbbf24', secondary: '#60a5fa' }
   },
   'midnight': {
-    name: 'Midnight',
-    emoji: '🌙',
     background: 'orbs',
-    colors: { primary: '#ff6600', secondary: '#00ccff' }
+    colors: { primary: '#ff6600', secondary: '#ff9900' }
   },
   'aurora': {
-    name: 'Aurora',
-    emoji: '🌌',
     background: 'orbs',
     colors: { primary: '#a855f7', secondary: '#3b82f6' }
   },
   'red-alert': {
-    name: 'Red Alert',
-    emoji: '🚨',
     background: 'constellation',
     colors: { primary: '#ff0000', secondary: '#ff6b6b' }
   },
   'matrix': {
-    name: 'Matrix',
-    emoji: '💻',
     background: 'matrix',
     colors: { primary: '#00ff00', secondary: '#00ff00' }
   }
 };
+
+const FEATURE_ICONS = [
+  { icon: Zap, label: 'Real-time Intelligence' },
+  { icon: Shield, label: 'Enterprise Security' },
+  { icon: Search, label: 'Advanced Search' },
+  { icon: Gauge, label: 'Smart Analytics' },
+];
 
 export default function Login() {
   const [mounted, setMounted] = useState(false);
@@ -78,7 +70,7 @@ export default function Login() {
   useEffect(() => {
     setMounted(true);
     const savedTheme = localStorage.getItem('login-theme') as ThemeType;
-    if (savedTheme && THEMES[savedTheme]) {
+    if (savedTheme && THEME_CONFIGS[savedTheme]) {
       setTheme(savedTheme);
     }
   }, []);
@@ -116,110 +108,167 @@ export default function Login() {
     return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
   }
 
-  const currentTheme = THEMES[theme];
+  const displayTheme = THEME_DISPLAY[theme];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background overflow-hidden">
       {/* Animated Background */}
-      {currentTheme.background === 'neural' && (
-        <NeuralNetworkBackground color={currentTheme.colors.primary} className="fixed inset-0 -z-10" />
+      {displayTheme.background === 'neural' && (
+        <NeuralNetworkBackground color={displayTheme.colors.primary} className="fixed inset-0 -z-10" />
       )}
-      {currentTheme.background === 'matrix' && (
-        <MatrixRainBackground color={currentTheme.colors.primary} className="fixed inset-0 -z-10" />
+      {displayTheme.background === 'matrix' && (
+        <MatrixRainBackground color={displayTheme.colors.primary} className="fixed inset-0 -z-10" />
       )}
-      {currentTheme.background === 'orbs' && (
+      {displayTheme.background === 'orbs' && (
         <FloatingOrbsBackground
-          primaryColor={currentTheme.colors.primary}
-          secondaryColor={currentTheme.colors.secondary}
+          primaryColor={displayTheme.colors.primary}
+          secondaryColor={displayTheme.colors.secondary}
           className="fixed inset-0 -z-10"
         />
       )}
-      {currentTheme.background === 'constellation' && (
-        <ConstellationBackground color={currentTheme.colors.primary} className="fixed inset-0 -z-10" />
+      {displayTheme.background === 'constellation' && (
+        <ConstellationBackground color={displayTheme.colors.primary} className="fixed inset-0 -z-10" />
       )}
 
       {/* Theme Switcher */}
       <div className="fixed top-6 right-6 z-50">
-        <div className="flex gap-2 bg-black/30 backdrop-blur-md rounded-lg p-2">
-          {Object.entries(THEMES).map(([key, val]) => (
-            <button
-              key={key}
-              onClick={() => handleThemeChange(key as ThemeType)}
-              className={`px-3 py-2 rounded text-sm font-medium transition ${
-                theme === key
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/60 hover:text-white hover:bg-white/10'
-              }`}
-              title={val.name}
-            >
-              {val.emoji} {val.name.split(' ')[0]}
-            </button>
-          ))}
-        </div>
+        <ThemeSwitcher
+          selectedTheme={theme}
+          onThemeChange={handleThemeChange}
+        />
       </div>
 
-      {/* Login Form */}
-      <div className="w-full max-w-md p-8 rounded-lg backdrop-blur-lg bg-black/30 border border-white/10 shadow-2xl">
-        <h1 className="text-3xl font-bold mb-2 text-white text-center">Joti</h1>
-        <p className="text-center text-gray-300 mb-6">Threat Intelligence News Aggregator</p>
+      {/* Main Content */}
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="w-full max-w-6xl mx-auto px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            {/* Left Column - Branding */}
+            <div className="hidden lg:flex flex-col justify-center space-y-8 animate-in">
+              <div>
+                <h1 className="text-5xl lg:text-6xl font-bold mb-4 text-white">
+                  Joti
+                </h1>
+                <p className="text-xl text-gray-300 font-light">
+                  Threat Intelligence News Aggregator
+                </p>
+              </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 text-red-200 rounded text-sm">
-            ⚠️ {error}
-          </div>
-        )}
+              {/* Feature Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                {FEATURE_ICONS.map((feature, idx) => {
+                  const Icon = feature.icon;
+                  return (
+                    <div
+                      key={idx}
+                      className="group p-4 rounded-lg backdrop-blur-md bg-white/10 border border-white/20 hover:border-white/40 transition-all duration-300 hover-lift"
+                    >
+                      <Icon className="w-6 h-6 mb-3 text-primary transition-transform group-hover:scale-110 duration-300" />
+                      <p className="text-sm font-medium text-white/80">
+                        {feature.label}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur"
-              placeholder="admin@example.com"
-              required
-            />
-          </div>
+              {/* Tagline */}
+              <div className="pt-4 border-t border-white/10">
+                <p className="text-sm text-gray-400">
+                  Built for SOC teams, threat researchers, and security analysts
+                </p>
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">Password</label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur"
-                placeholder="Enter your password"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
-                tabIndex={-1}
-              >
-                {showPassword ? (
-                  <EyeOff size={18} />
-                ) : (
-                  <Eye size={18} />
+            {/* Right Column - Login Form */}
+            <div className="w-full max-w-md mx-auto slide-in-right">
+              <div className="p-8 rounded-xl backdrop-blur-xl bg-black/30 border border-white/10 shadow-2xl hover-lift">
+                {/* Mobile Header */}
+                <div className="lg:hidden mb-6">
+                  <h1 className="text-3xl font-bold text-white mb-2">Joti</h1>
+                  <p className="text-sm text-gray-300">
+                    Threat Intelligence Platform
+                  </p>
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 text-red-200 rounded-lg text-sm animate-in">
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg">⚠️</span>
+                      <span>{error}</span>
+                    </div>
+                  </div>
                 )}
-              </button>
+
+                {/* Login Form */}
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-200 mb-2">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 backdrop-blur transition-all duration-300"
+                      placeholder="admin@example.com"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-200 mb-2">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 backdrop-blur transition-all duration-300"
+                        placeholder="Enter your password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-8 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:shadow-lg hover:shadow-primary/50 disabled:opacity-50 py-3 text-base font-semibold rounded-lg transition-all duration-300"
+                  >
+                    {loading ? '🔄 Signing in...' : '🚀 Sign In'}
+                  </Button>
+                </form>
+
+                {/* Demo Credentials */}
+                <div className="mt-8 pt-6 border-t border-white/10">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400 mb-3">
+                      Demo Credentials
+                    </p>
+                    <div className="space-y-1 text-xs font-mono text-gray-300">
+                      <p>Email: <span className="text-white/80">admin@example.com</span></p>
+                      <p>Password: <span className="text-white/80">admin1234567</span></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-6 bg-white text-black hover:bg-white/90 disabled:opacity-50"
-          >
-            {loading ? '🔄 Logging in...' : '🚀 Login'}
-          </Button>
-        </form>
-
-        <p className="text-center text-gray-400 text-xs mt-6">
-          Demo credentials: admin@example.com / admin1234567
-        </p>
+        </div>
       </div>
     </div>
   );
