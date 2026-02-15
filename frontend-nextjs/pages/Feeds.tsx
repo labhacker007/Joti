@@ -25,7 +25,7 @@ interface Article {
   is_bookmarked?: boolean;
 }
 
-export default function NewsFeeds() {
+export default function Feeds() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -115,8 +115,8 @@ export default function NewsFeeds() {
     <div className="space-y-6 pb-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">News Feed</h1>
-        <p className="text-muted-foreground mt-2">Latest threat intelligence and security news</p>
+        <h1 className="text-3xl font-bold text-foreground">Feeds</h1>
+        <p className="text-muted-foreground mt-2">Latest threat intelligence and security feeds</p>
       </div>
 
       {/* Error Alert */}

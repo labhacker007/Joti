@@ -1,7 +1,5 @@
-export const dynamic = 'force-dynamic';
+import { redirect } from 'next/navigation';
 
-import NewsFeeds from '@/pages/NewsFeeds';
-
-export default function NewsPage() {
-  return <NewsFeeds />;
+export default function NewsRedirect() {
+  redirect('/feeds');
 }

@@ -4,8 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
-  LayoutDashboard,
-  FileText,
+  Rss,
   Settings,
   User,
   LogOut,
@@ -101,8 +100,7 @@ function NavBar() {
   };
 
   const navItems = [
-    { key: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { key: 'feed', label: 'News', path: '/news', icon: FileText },
+    { key: 'feed', label: 'Feeds', path: '/feeds', icon: Rss },
     { key: 'profile', label: 'Profile', path: '/profile', icon: User },
     { key: 'admin', label: 'Admin', path: '/admin', icon: Settings },
   ];
@@ -112,7 +110,7 @@ function NavBar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
-          <Link href="/news" className="text-lg font-bold text-foreground hover:text-primary transition-colors">
+          <Link href="/feeds" className="text-lg font-bold text-foreground hover:text-primary transition-colors">
             Joti
           </Link>
 
