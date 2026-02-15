@@ -316,6 +316,18 @@ export const articlesAPI = {
     if (filters?.source_id) {
       params.append('source_id', filters.source_id.toString());
     }
+    if (filters?.severity) {
+      params.append('severity', filters.severity);
+    }
+    if (filters?.threat_category) {
+      params.append('threat_category', filters.threat_category);
+    }
+    if (filters?.search) {
+      params.append('search', filters.search);
+    }
+    if (filters?.unread_only) {
+      params.append('unread_only', 'true');
+    }
     return get(`/articles/?${params}`);
   },
 
@@ -359,6 +371,13 @@ export const articlesAPI = {
    */
   generateSummary: async (id: string) => {
     return post(`/articles/${id}/generate-summary`, {});
+  },
+
+  /**
+   * Mark all articles as read
+   */
+  markAllAsRead: async () => {
+    return post('/articles/mark-all-read', {});
   },
 
   /**

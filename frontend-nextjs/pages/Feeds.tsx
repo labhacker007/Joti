@@ -9,6 +9,7 @@ import {
   Calendar,
   TrendingUp,
   AlertCircle,
+  Eye,
 } from 'lucide-react';
 import { articlesAPI } from '@/api/client';
 import { formatRelativeTime, formatDate, truncateText, cn } from '@/lib/utils';
@@ -34,12 +35,14 @@ export default function Feeds() {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const pageSize = 10;
 
   useEffect(() => {
     fetchArticles();
-  }, [currentPage, searchQuery, selectedSeverity, selectedCategory]);
+  }, [currentPage, searchQuery, selectedSeverity, selectedCategory, showUnreadOnly]);
 
   const fetchArticles = async () => {
     try {
@@ -50,6 +53,7 @@ export default function Feeds() {
       if (selectedSeverity !== 'ALL') filters.severity = selectedSeverity;
       if (selectedCategory !== 'ALL') filters.threat_category = selectedCategory;
       if (searchQuery) filters.search = searchQuery;
+      if (showUnreadOnly) filters.unread_only = true;
 
       const response = await articlesAPI.getArticles(
         currentPage,
@@ -57,8 +61,13 @@ export default function Feeds() {
         Object.keys(filters).length > 0 ? filters : undefined
       ) as any;
 
-      setArticles(response.data?.items || []);
+      const fetchedArticles = response.data?.items || [];
+      setArticles(fetchedArticles);
       setTotalPages(Math.ceil((response.data?.total || 0) / pageSize));
+
+      // Calculate unread count from all articles (not just current page)
+      const allUnreadCount = fetchedArticles.filter(a => !a.is_read).length;
+      setUnreadCount(allUnreadCount);
     } catch (err: any) {
       setError(err.message || 'Failed to load articles');
       console.error('Articles error:', err);
@@ -74,6 +83,19 @@ export default function Feeds() {
       await fetchArticles();
     } catch (err) {
       console.error('Bookmark error:', err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      setLoading(true);
+      await articlesAPI.markAllAsRead();
+      // Refresh articles to get updated read state
+      await fetchArticles();
+    } catch (err) {
+      console.error('Mark all as read error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -146,6 +168,28 @@ export default function Feeds() {
 
         {/* Filter Buttons */}
         <div className="flex flex-wrap gap-2">
+          {/* Unread Filter */}
+          <button
+            onClick={() => {
+              setShowUnreadOnly(!showUnreadOnly);
+              setCurrentPage(1);
+            }}
+            className={cn(
+              'px-3 py-1 rounded-full text-sm transition-colors flex items-center gap-1',
+              showUnreadOnly
+                ? 'bg-blue-500/20 text-blue-600 border border-blue-500/30'
+                : 'bg-muted text-foreground hover:bg-accent'
+            )}
+          >
+            <Eye className="w-4 h-4" />
+            Unread
+            {unreadCount > 0 && (
+              <span className="ml-1 px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs font-medium">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
           {/* Severity Filter */}
           <div className="flex gap-2">
             <button
@@ -174,6 +218,16 @@ export default function Feeds() {
               </button>
             ))}
           </div>
+
+          {/* Mark All as Read Button */}
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="ml-auto px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-600 border border-green-500/30 hover:bg-green-500/30 transition-colors"
+            >
+              Mark All as Read
+            </button>
+          )}
         </div>
       </div>
 
