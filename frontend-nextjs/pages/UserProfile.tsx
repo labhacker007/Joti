@@ -22,6 +22,10 @@ import {
   ToggleLeft,
   Globe,
   Volume2,
+  LogOut,
+  MapPin,
+  Smartphone,
+  LogIn,
 } from 'lucide-react';
 import { usersAPI, sourcesAPI, watchlistAPI } from '@/api/client';
 import { formatDate, cn } from '@/lib/utils';
@@ -81,6 +85,25 @@ interface PrivacySettings {
   twoFactorRequired: boolean;
 }
 
+interface LoginHistory {
+  id: string;
+  ip_address: string;
+  device: string;
+  location: string;
+  status: 'success' | 'failed';
+  timestamp: string;
+}
+
+interface ActiveSession {
+  id: string;
+  device_name: string;
+  browser: string;
+  ip_address: string;
+  location: string;
+  last_active: string;
+  is_current: boolean;
+}
+
 type TabType = 'profile' | 'sources' | 'watchlist' | 'security' | 'preferences';
 
 const TABS: { id: TabType; label: string }[] = [
@@ -138,6 +161,55 @@ export default function UserProfile() {
   });
   const [prefsLoading, setPrefsLoading] = useState(false);
 
+  // Security state
+  const [loginHistory, setLoginHistory] = useState<LoginHistory[]>([
+    {
+      id: '1',
+      ip_address: '192.168.1.100',
+      device: 'Chrome on Windows',
+      location: 'New York, USA',
+      status: 'success',
+      timestamp: new Date(Date.now() - 60000).toISOString(),
+    },
+    {
+      id: '2',
+      ip_address: '192.168.1.101',
+      device: 'Safari on macOS',
+      location: 'San Francisco, USA',
+      status: 'success',
+      timestamp: new Date(Date.now() - 86400000).toISOString(),
+    },
+    {
+      id: '3',
+      ip_address: '192.168.1.102',
+      device: 'Firefox on Linux',
+      location: 'London, UK',
+      status: 'failed',
+      timestamp: new Date(Date.now() - 172800000).toISOString(),
+    },
+  ]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([
+    {
+      id: '1',
+      device_name: 'My Windows PC',
+      browser: 'Chrome 120',
+      ip_address: '192.168.1.100',
+      location: 'New York, USA',
+      last_active: new Date(Date.now() - 300000).toISOString(),
+      is_current: true,
+    },
+    {
+      id: '2',
+      device_name: 'MacBook Pro',
+      browser: 'Safari 17',
+      ip_address: '192.168.1.101',
+      location: 'San Francisco, USA',
+      last_active: new Date(Date.now() - 3600000).toISOString(),
+      is_current: false,
+    },
+  ]);
+  const [securityLoading, setSecurityLoading] = useState(false);
+
   useEffect(() => {
     fetchProfile();
   }, []);
@@ -149,6 +221,8 @@ export default function UserProfile() {
       fetchWatchlist();
     } else if (activeTab === 'preferences') {
       loadPreferences();
+    } else if (activeTab === 'security') {
+      loadSecurityData();
     }
   }, [activeTab]);
 
@@ -340,6 +414,47 @@ export default function UserProfile() {
         )
       );
       setSuccess('Notification preference updated');
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  // Security methods
+  const loadSecurityData = async () => {
+    try {
+      setSecurityLoading(true);
+      setError('');
+      // In real app: would fetch login history and sessions from API
+      // Using mock data for now
+      setSecurityLoading(false);
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+      console.error('Security data error:', err);
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleTerminateSession = async (sessionId: string) => {
+    if (!window.confirm('Are you sure you want to terminate this session?')) return;
+
+    try {
+      setError('');
+      // In real app: await securityAPI.terminateSession(sessionId);
+      setActiveSessions(activeSessions.filter((s) => s.id !== sessionId));
+      setSuccess('Session terminated successfully');
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleTerminateAllOtherSessions = async () => {
+    if (!window.confirm('Terminate all other sessions? You will be logged out everywhere except here.')) return;
+
+    try {
+      setError('');
+      // In real app: await securityAPI.terminateAllOtherSessions();
+      setActiveSessions(activeSessions.filter((s) => s.is_current));
+      setSuccess('All other sessions terminated successfully');
     } catch (err: any) {
       setError(getErrorMessage(err));
     }
@@ -762,140 +877,241 @@ export default function UserProfile() {
         )}
 
         {activeTab === 'security' && (
-          <div className="bg-card border border-border rounded-lg p-6 space-y-6">
-            <h2 className="text-xl font-bold text-foreground">Security Settings</h2>
+          <div className="space-y-6">
+            {/* Security Settings Card */}
+            <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+              <h2 className="text-xl font-bold text-foreground">Security Settings</h2>
 
-            <div className="flex items-start justify-between p-4 bg-muted rounded-lg">
-              <div>
-                <h3 className="font-semibold text-foreground">Two-Factor Authentication</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {profile.two_factor_enabled
-                    ? 'Two-factor authentication is enabled'
-                    : 'Enhance your account security with two-factor authentication'}
-                </p>
+              <div className="flex items-start justify-between p-4 bg-muted rounded-lg">
+                <div>
+                  <h3 className="font-semibold text-foreground">Two-Factor Authentication</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {profile.two_factor_enabled
+                      ? 'Two-factor authentication is enabled'
+                      : 'Enhance your account security with two-factor authentication'}
+                  </p>
+                </div>
+                <div
+                  className={cn(
+                    'px-3 py-1 rounded-full text-sm font-medium',
+                    profile.two_factor_enabled
+                      ? 'bg-green-500/10 text-green-600'
+                      : 'bg-gray-500/10 text-gray-600'
+                  )}
+                >
+                  {profile.two_factor_enabled ? 'Enabled' : 'Disabled'}
+                </div>
               </div>
-              <div
-                className={cn(
-                  'px-3 py-1 rounded-full text-sm font-medium',
-                  profile.two_factor_enabled
-                    ? 'bg-green-500/10 text-green-600'
-                    : 'bg-gray-500/10 text-gray-600'
+
+              <div>
+                {!showPasswordChange ? (
+                  <button
+                    onClick={() => setShowPasswordChange(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <Lock className="w-4 h-4" />
+                    Change Password
+                  </button>
+                ) : (
+                  <div className="space-y-4 p-4 bg-muted rounded-lg">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Current Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={passwordData.current_password}
+                          onChange={(e) =>
+                            setPasswordData({
+                              ...passwordData,
+                              current_password: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2 pr-10 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                        <button
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        New Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={passwordData.new_password}
+                          onChange={(e) =>
+                            setPasswordData({
+                              ...passwordData,
+                              new_password: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2 pr-10 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                        <button
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                        >
+                          {showNewPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Confirm Password
+                      </label>
+                      <input
+                        type="password"
+                        value={passwordData.confirm_password}
+                        onChange={(e) =>
+                          setPasswordData({
+                            ...passwordData,
+                            confirm_password: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                      <button
+                        onClick={handleChangePassword}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                      >
+                        <Lock className="w-4 h-4" />
+                        Change Password
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowPasswordChange(false);
+                          setPasswordData({
+                            current_password: '',
+                            new_password: '',
+                            confirm_password: '',
+                          });
+                        }}
+                        className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
-              >
-                {profile.two_factor_enabled ? 'Enabled' : 'Disabled'}
               </div>
             </div>
 
-            <div>
-              {!showPasswordChange ? (
-                <button
-                  onClick={() => setShowPasswordChange(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
-                >
-                  <Lock className="w-4 h-4" />
-                  Change Password
-                </button>
-              ) : (
-                <div className="space-y-4 p-4 bg-muted rounded-lg">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Current Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={passwordData.current_password}
-                        onChange={(e) =>
-                          setPasswordData({
-                            ...passwordData,
-                            current_password: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-2 pr-10 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                      />
-                      <button
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      New Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showNewPassword ? 'text' : 'password'}
-                        value={passwordData.new_password}
-                        onChange={(e) =>
-                          setPasswordData({
-                            ...passwordData,
-                            new_password: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-2 pr-10 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                      />
-                      <button
-                        onClick={() => setShowNewPassword(!showNewPassword)}
-                        className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
-                      >
-                        {showNewPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Confirm Password
-                    </label>
-                    <input
-                      type="password"
-                      value={passwordData.confirm_password}
-                      onChange={(e) =>
-                        setPasswordData({
-                          ...passwordData,
-                          confirm_password: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                  </div>
-
-                  <div className="flex gap-2 pt-4">
-                    <button
-                      onClick={handleChangePassword}
-                      className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                    >
-                      <Lock className="w-4 h-4" />
-                      Change Password
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowPasswordChange(false);
-                        setPasswordData({
-                          current_password: '',
-                          new_password: '',
-                          confirm_password: '',
-                        });
-                      }}
-                      className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+            {/* Active Sessions Card */}
+            <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Smartphone className="w-6 h-6 text-primary" />
+                  <h2 className="text-xl font-bold text-foreground">Active Sessions</h2>
                 </div>
-              )}
+                <button
+                  onClick={handleTerminateAllOtherSessions}
+                  className="text-sm px-3 py-1 bg-red-500/10 text-red-600 rounded hover:bg-red-500/20 transition-colors"
+                >
+                  <LogOut className="w-4 h-4 inline mr-1" />
+                  Sign Out All Other
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {activeSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="p-4 bg-muted rounded-lg flex items-start justify-between"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-foreground">{session.device_name}</h3>
+                        {session.is_current && (
+                          <span className="px-2 py-0.5 bg-green-500/10 text-green-600 text-xs rounded font-medium">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{session.browser}</p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {session.location}
+                        </span>
+                        <span>{session.ip_address}</span>
+                        <span>Last active: {formatDate(session.last_active)}</span>
+                      </div>
+                    </div>
+                    {!session.is_current && (
+                      <button
+                        onClick={() => handleTerminateSession(session.id)}
+                        className="ml-4 px-3 py-1 bg-red-500/10 text-red-600 rounded hover:bg-red-500/20 transition-colors text-sm"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Login History Card */}
+            <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+              <div className="flex items-center gap-3">
+                <LogIn className="w-6 h-6 text-primary" />
+                <h2 className="text-xl font-bold text-foreground">Login History</h2>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Date & Time</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Device</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Location</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">IP Address</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loginHistory.map((entry) => (
+                      <tr key={entry.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                        <td className="py-3 px-4 text-foreground">{formatDate(entry.timestamp)}</td>
+                        <td className="py-3 px-4 text-foreground">{entry.device}</td>
+                        <td className="py-3 px-4 text-foreground">{entry.location}</td>
+                        <td className="py-3 px-4 text-foreground font-mono text-xs">{entry.ip_address}</td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={cn(
+                              'px-2 py-1 rounded text-xs font-medium',
+                              entry.status === 'success'
+                                ? 'bg-green-500/10 text-green-600'
+                                : 'bg-red-500/10 text-red-600'
+                            )}
+                          >
+                            {entry.status === 'success' ? 'Success' : 'Failed'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
