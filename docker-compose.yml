@@ -61,17 +61,15 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../infra/Dockerfile.frontend
-      args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000}
+      context: ./frontend-nextjs
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     ports:
       - "3000:3000"
     depends_on:
       backend:
         condition: service_healthy
-    environment:
-      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000}
 
 volumes:
   postgres_data:
