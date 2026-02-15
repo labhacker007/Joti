@@ -567,6 +567,22 @@ export const userFeedsAPI = {
   getFeedArticles: async (feedId: string, page = 1, pageSize = 10) => {
     return get(`/users/feeds/${feedId}/articles?page=${page}&page_size=${pageSize}`);
   },
+
+  /**
+   * Upload and ingest custom document (PDF, Word, Excel, HTML, etc.)
+   */
+  uploadDocument: async (file: File, metadata?: { title?: string; description?: string }) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (metadata?.title) formData.append('title', metadata.title);
+    if (metadata?.description) formData.append('description', metadata.description);
+
+    return post('/sources/custom/ingest', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    } as any);
+  },
 };
 
 // ============================================

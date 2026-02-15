@@ -11,7 +11,8 @@ import {
   ChevronDown,
   Shield,
   Sun,
-  Moon
+  Moon,
+  Upload
 } from 'lucide-react';
 import { useAuthStore } from '../store';
 import { useTheme, themeOptions, ThemeName } from '../contexts/ThemeContext';
@@ -102,6 +103,7 @@ function NavBar() {
   const navItems = [
     { key: 'feed', label: 'Feeds', path: '/feeds', icon: Rss },
     { key: 'my-feeds', label: 'My Feeds', path: '/my-feeds', icon: Rss },
+    { key: 'upload', label: 'Upload', path: '/document-upload', icon: Upload },
     { key: 'profile', label: 'Profile', path: '/profile', icon: User },
     { key: 'admin', label: 'Admin', path: '/admin', icon: Settings },
   ];
