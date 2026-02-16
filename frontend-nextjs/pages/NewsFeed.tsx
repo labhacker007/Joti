@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Search, Filter, Bookmark, X, Eye, EyeOff, Share2, AlertCircle } from 'lucide-react';
+import { isSafeExternalUrl } from '@/utils/url';
 import { articlesAPI, sourcesAPI } from '@/api/client';
 
 interface Article {
@@ -312,7 +313,7 @@ export default function NewsFeed() {
                     </button>
 
                     <a
-                      href={article.url}
+                      href={isSafeExternalUrl(article.url) ? article.url : '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary"

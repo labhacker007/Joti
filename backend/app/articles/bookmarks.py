@@ -8,7 +8,7 @@ from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean, String, T
 from app.core.database import get_db, Base
 from app.auth.dependencies import get_current_user
 from app.models import User
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from datetime import datetime
 
@@ -64,6 +64,13 @@ class BookmarkResponse(BaseModel):
 
 class MarkAsReadRequest(BaseModel):
     content_ids: List[int]
+
+    @field_validator('content_ids')
+    @classmethod
+    def limit_batch_size(cls, v):
+        if len(v) > 100:
+            raise ValueError('Batch size cannot exceed 100 items')
+        return v
 
 
 # ============================================================================

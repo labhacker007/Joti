@@ -58,11 +58,24 @@ def _host_in_allowlist(host: str, allowlist_domains: Sequence[str]) -> bool:
     return False
 
 
+_dns_cache: dict[str, tuple[list[ipaddress._BaseAddress], float]] = {}
+_DNS_CACHE_TTL = 300  # 5 minutes - prevents DNS rebinding attacks
+
+
 def resolve_host_ips(host: str) -> list[ipaddress._BaseAddress]:
-    """Resolve a hostname to IP addresses (IPv4/IPv6)."""
-    # Avoid resolving empty/None
+    """Resolve a hostname to IP addresses (IPv4/IPv6) with DNS cache to prevent rebinding."""
+    import time as _time
+
     if not host:
         return []
+
+    # Check cache to prevent DNS rebinding
+    cached = _dns_cache.get(host)
+    if cached:
+        ips, expiry = cached
+        if _time.time() < expiry:
+            return ips
+
     infos = socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)
     ips: list[ipaddress._BaseAddress] = []
     for family, _, _, _, sockaddr in infos:
@@ -70,6 +83,17 @@ def resolve_host_ips(host: str) -> list[ipaddress._BaseAddress]:
             ips.append(ipaddress.ip_address(sockaddr[0]))
         elif family == socket.AF_INET6:
             ips.append(ipaddress.ip_address(sockaddr[0]))
+
+    # Cache the result
+    _dns_cache[host] = (ips, _time.time() + _DNS_CACHE_TTL)
+
+    # Evict stale entries periodically
+    if len(_dns_cache) > 5000:
+        now = _time.time()
+        stale = [k for k, (_, exp) in _dns_cache.items() if exp < now]
+        for k in stale:
+            _dns_cache.pop(k, None)
+
     return ips
 
 
@@ -174,3 +198,42 @@ def ssrf_policy_from_settings(
         allowlist_domains=tuple(allowlist),
         allowed_ports=ports,
     )
+
+
+# Convenience aliases used by other modules
+build_ssrf_policy = ssrf_policy_from_settings
+
+
+def validate_url(url: str, policy: SSRFPolicy) -> None:
+    """Alias for validate_outbound_url — validates a URL against an SSRF policy."""
+    validate_outbound_url(url, policy=policy)
+
+
+def validate_and_resolve_url(url: str, policy: SSRFPolicy) -> list[str]:
+    """Validate a URL and return resolved IP addresses to prevent DNS rebinding TOCTOU.
+
+    Returns the list of validated IP address strings. Callers should connect to
+    these IPs directly (via Host header override or transport mapping) rather than
+    re-resolving DNS.
+    """
+    validate_outbound_url(url, policy=policy)
+
+    parsed = urlparse(url)
+    hostname = parsed.hostname or ""
+
+    # If it's already an IP literal, return it directly
+    try:
+        ip = ipaddress.ip_address(hostname)
+        return [str(ip)]
+    except ValueError:
+        pass
+
+    # Return the cached resolved IPs (populated by validate_outbound_url)
+    cached = _dns_cache.get(hostname)
+    if cached:
+        ips, _ = cached
+        return [str(ip) for ip in ips]
+
+    # Fallback: resolve again (shouldn't happen since validate_outbound_url caches)
+    ips = resolve_host_ips(hostname)
+    return [str(ip) for ip in ips]

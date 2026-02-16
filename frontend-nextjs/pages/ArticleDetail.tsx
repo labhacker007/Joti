@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { isSafeExternalUrl } from '@/utils/url';
 import {
   ArrowLeft,
   Bookmark,
@@ -240,7 +241,7 @@ export default function ArticleDetail() {
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Original</p>
             <a
-              href={article.url}
+              href={isSafeExternalUrl(article.url) ? article.url : '#'}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm font-medium text-primary hover:underline flex items-center gap-1 mt-1"

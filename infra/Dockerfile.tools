@@ -1,12 +1,16 @@
-FROM node:18-slim
+FROM node:20-slim
 
 # Install pandoc for markdown -> HTML rendering and markdownlint dependency
 RUN apt-get update && apt-get install -y pandoc git ca-certificates && rm -rf /var/lib/apt/lists/*
 
+RUN groupadd -r appgroup && useradd -r -g appgroup -m appuser
+
 WORKDIR /workspace
 
 # Copy repository into the image so tests can run without mounting host volumes
-COPY . /workspace
+COPY --chown=appuser:appgroup . /workspace
+
+USER appuser
 
 # Keep container running for interactive use (exec into it)
 CMD ["tail", "-f", "/dev/null"]

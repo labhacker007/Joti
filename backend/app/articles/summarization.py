@@ -5,7 +5,8 @@ Simplified for Jyoti news aggregator.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permission
+from app.auth.rbac import Permission
 from app.models import User, FetchedContent
 from app.genai.summarization import get_summarization_service
 from app.genai.prompts import SummaryType
@@ -13,6 +14,7 @@ from app.genai.provider import get_model_manager
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime
+from app.core.logging import logger
 
 router = APIRouter(prefix="/articles", tags=["articles-genai"])
 
@@ -69,7 +71,8 @@ async def summarize_article(
         return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("summarization_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Summarization failed")
 
 
 @router.post("/extract-iocs")
@@ -94,7 +97,8 @@ async def extract_iocs(
         return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("ioc_extraction_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="IOC extraction failed")
 
 
 @router.post("/{content_id}/analyze")
@@ -156,7 +160,8 @@ async def analyze_content(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("content_analysis_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Content analysis failed")
 
 
 @router.get("/models")
@@ -179,16 +184,16 @@ async def list_available_models(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("list_models_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to list models")
 
 
 @router.post("/models/set-primary")
 async def set_primary_model(
     model_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
 ):
     """Set the primary GenAI model (admin only)."""
-    # TODO: Add permission check for admin
     try:
         model_manager = get_model_manager()
         model_manager.set_primary_model(model_id)
@@ -196,7 +201,8 @@ async def set_primary_model(
         return {"message": f"Primary model set to: {model_id}"}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("set_primary_model_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to set primary model")
 
 
 @router.get("/test-genai")

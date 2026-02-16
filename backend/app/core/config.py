@@ -34,8 +34,8 @@ class Settings(BaseSettings):
         description="Fernet key for encrypting stored configuration secrets (recommended).",
     )
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRATION_HOURS: int = 24  # Back to 24 hours for development convenience
-    REFRESH_TOKEN_EXPIRATION_DAYS: int = 7
+    JWT_EXPIRATION_HOURS: int = 1  # 1 hour access token (use refresh for longer sessions)
+    REFRESH_TOKEN_EXPIRATION_DAYS: int = 2  # 2-day refresh tokens
     OTP_EXPIRATION_SECONDS: int = 300
 
     # Reverse proxy / client IP handling
@@ -193,7 +193,7 @@ class Settings(BaseSettings):
     HUNT_RESULTS_RETENTION_DAYS: int = 180
     
     # JWT (aliases for flexibility)
-    JWT_EXPIRE_MINUTES: int = 1440  # 24 hours default
+    JWT_EXPIRE_MINUTES: int = 60  # 1 hour default
     
     # Features
     ENABLE_WATCH_LISTS: bool = True

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import mimetypes
 from bs4 import BeautifulSoup
 from app.core.logging import logger
+from app.core.ssrf import build_ssrf_policy, validate_and_resolve_url, SSRFError
 
 
 class ContentFetchError(Exception):
@@ -40,11 +41,56 @@ class ContentFetcherService:
             ContentFetchError: If fetching or parsing fails
         """
         try:
-            # Fetch the content
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-                headers = {"User-Agent": self.user_agent}
-                response = await client.get(url, headers=headers)
+            # SSRF validation + DNS resolution (prevents DNS rebinding TOCTOU)
+            policy = build_ssrf_policy()
+            resolved_ips = validate_and_resolve_url(url, policy)
+
+            # Build the fetch URL using the resolved IP to prevent DNS rebinding
+            parsed = urlparse(url)
+            hostname = parsed.hostname or ""
+            fetch_url = url
+            extra_headers: Dict[str, str] = {"User-Agent": self.user_agent}
+
+            # If we resolved a hostname (not IP literal), connect to IP directly
+            if resolved_ips and hostname:
+                import ipaddress as _ipa
+                try:
+                    _ipa.ip_address(hostname)
+                except ValueError:
+                    # hostname is not an IP — rewrite URL to use resolved IP
+                    target_ip = resolved_ips[0]
+                    port = parsed.port
+                    if port:
+                        netloc = f"{target_ip}:{port}"
+                    else:
+                        netloc = target_ip
+                    fetch_url = parsed._replace(netloc=netloc).geturl()
+                    extra_headers["Host"] = hostname
+
+            # Fetch the content with size limit to prevent DoS
+            _max_response_size = 50 * 1024 * 1024  # 50 MB
+            async with httpx.AsyncClient(
+                timeout=self.timeout,
+                follow_redirects=False,  # Disable auto-redirects to validate each hop
+                max_redirects=0,
+            ) as client:
+                # Manual redirect loop with SSRF re-validation
+                _max_hops = 5
+                for _hop in range(_max_hops):
+                    response = await client.get(fetch_url, headers=extra_headers)
+                    if response.is_redirect:
+                        redirect_url = str(response.next_request.url) if response.next_request else None
+                        if not redirect_url:
+                            break
+                        # Re-validate each redirect destination against SSRF policy
+                        resolved_ips = validate_and_resolve_url(redirect_url, policy)
+                        fetch_url = redirect_url
+                        extra_headers = {"User-Agent": self.user_agent}
+                        continue
+                    break
                 response.raise_for_status()
+                if len(response.content) > _max_response_size:
+                    raise ContentFetchError(f"Response too large ({len(response.content)} bytes)")
 
             # Detect content type
             content_type = response.headers.get("content-type", "").lower()

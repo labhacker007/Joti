@@ -15,9 +15,16 @@ class CryptoError(RuntimeError):
 
 
 def _derive_legacy_fernet_key_from_secret_key(secret_key: str) -> bytes:
-    # Legacy behavior: use first 32 bytes (padded) from SECRET_KEY.
-    raw = secret_key[:32].ljust(32, "0").encode()
-    return base64.urlsafe_b64encode(raw)
+    # Derive a proper Fernet key from SECRET_KEY using PBKDF2 with a stable salt.
+    import hashlib
+    dk = hashlib.pbkdf2_hmac(
+        "sha256",
+        secret_key.encode(),
+        b"joti-config-encryption-salt",  # stable salt tied to application
+        iterations=100_000,
+        dklen=32,
+    )
+    return base64.urlsafe_b64encode(dk)
 
 
 def _load_config_encryption_key() -> Optional[bytes]:

@@ -337,7 +337,8 @@ def _require_setup_access(request: Request) -> None:
     # Optional bootstrap token for shared dev environments.
     if settings.SETUP_TOKEN:
         provided = request.headers.get("X-Setup-Token")
-        if not provided or provided != settings.SETUP_TOKEN:
+        import hmac as _hmac
+        if not provided or not _hmac.compare_digest(provided, settings.SETUP_TOKEN):
             raise HTTPException(status_code=403, detail="Forbidden")
 
 

@@ -11,6 +11,7 @@ from app.services.content_fetcher import content_fetcher, ContentFetchError
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional
 from datetime import datetime
+from app.core.logging import logger
 
 router = APIRouter(prefix="/users/content", tags=["user-content"])
 
@@ -79,9 +80,10 @@ async def fetch_content_from_url(
     try:
         parsed_content = await content_fetcher.fetch_content(request.url)
     except ContentFetchError as e:
+        logger.warning("content_fetch_failed", url=str(request.url), error=str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Failed to fetch content from the specified URL"
         )
 
     # Save to database

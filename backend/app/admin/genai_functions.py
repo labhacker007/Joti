@@ -376,10 +376,15 @@ async def update_function_config(
                 detail=f"Prompt ID {payload.active_prompt_id} not found"
             )
 
-    # Update fields
+    # Update fields (whitelist to prevent mass assignment)
+    _allowed_function_config_fields = {
+        "display_name", "description", "active_prompt_id",
+        "primary_model_id", "secondary_model_id",
+    }
     update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
-        setattr(config, field, value)
+        if field in _allowed_function_config_fields:
+            setattr(config, field, value)
 
     config.updated_by_id = current_user.id
     config.updated_at = datetime.utcnow()

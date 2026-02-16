@@ -164,8 +164,8 @@ def list_articles(
         if status_filter:
             try:
                 query = query.filter(Article.status == status_filter)
-            except:
-                pass
+            except (ValueError, KeyError) as e:
+                logger.warning("invalid_status_filter", status=status_filter, error=str(e))
 
         if source_id:
             query = query.filter(Article.source_id == source_id)
@@ -1620,7 +1620,7 @@ Be thorough and technical, suitable for SOC analysts and threat hunters.""",
         logger.error("summarization_failed", article_id=article_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate summary: {str(e)}"
+            detail="Failed to generate summary"
         )
 
 
@@ -1634,10 +1634,16 @@ def delete_intelligence_item(
 ):
     """Delete a specific extracted intelligence item (IOC, TTP, or ATLAS)."""
     intel = db.query(ExtractedIntelligence).filter(ExtractedIntelligence.id == intel_id).first()
-    
+
     if not intel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Intelligence item not found")
-    
+
+    # Ownership check: non-admins can only modify intel on articles they created
+    _parent_article = db.query(Article).filter(Article.id == intel.article_id).first()
+    if _parent_article and hasattr(_parent_article, 'created_by_id') and _parent_article.created_by_id:
+        if _parent_article.created_by_id != current_user.id and current_user.role.value != "admin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this intelligence item")
+
     article_id = intel.article_id
     intel_type = intel.intelligence_type.value if hasattr(intel.intelligence_type, 'value') else str(intel.intelligence_type)
     intel_value = intel.value
@@ -1686,10 +1692,16 @@ def update_intelligence_item(
     - Metadata (IOC type, etc.)
     """
     intel = db.query(ExtractedIntelligence).filter(ExtractedIntelligence.id == intel_id).first()
-    
+
     if not intel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Intelligence item not found")
-    
+
+    # Ownership check: non-admins can only modify intel on articles they created
+    _parent_article = db.query(Article).filter(Article.id == intel.article_id).first()
+    if _parent_article and hasattr(_parent_article, 'created_by_id') and _parent_article.created_by_id:
+        if _parent_article.created_by_id != current_user.id and current_user.role.value != "admin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to modify this intelligence item")
+
     old_value = intel.value
     
     # Update fields if provided
