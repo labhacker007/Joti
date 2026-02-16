@@ -73,11 +73,11 @@ export default function Feeds() {
       setTotalPages(Math.ceil((response.data?.total || 0) / pageSize));
 
       // Calculate unread count from all articles (not just current page)
-      const allUnreadCount = fetchedArticles.filter(a => !a.is_read).length;
+      const allUnreadCount = fetchedArticles.filter((a: Article) => !a.is_read).length;
       setUnreadCount(allUnreadCount);
 
       // Calculate watchlist match count from all articles
-      const allWatchlistCount = fetchedArticles.filter(a => a.watchlist_match_keywords && a.watchlist_match_keywords.length > 0).length;
+      const allWatchlistCount = fetchedArticles.filter((a: Article) => a.watchlist_match_keywords && a.watchlist_match_keywords.length > 0).length;
       setWatchlistCount(allWatchlistCount);
     } catch (err: any) {
       setError(err.message || 'Failed to load articles');
