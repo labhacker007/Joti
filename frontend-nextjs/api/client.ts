@@ -568,123 +568,173 @@ export const userFeedsAPI = {
 // ============================================
 
 export const adminAPI = {
-  /**
-   * Get system statistics
-   */
   getSystemStats: async () => {
     return get('/admin/stats');
   },
-
-  /**
-   * Get system settings
-   */
   getSettings: async () => {
     return get('/admin/settings');
   },
-
-  /**
-   * Update system settings
-   */
   updateSettings: async (settings: any) => {
     return put('/admin/settings', settings);
   },
+  seedDatabase: async () => {
+    return post('/admin/seed-database', {});
+  },
+  getSchedulerStatus: async () => {
+    return get('/admin/scheduler/status');
+  },
+  runSchedulerJob: async (jobId: string) => {
+    return post(`/admin/scheduler/jobs/${jobId}/run`, {});
+  },
+  getGuardrails: async () => {
+    return get('/admin/genai-guardrails/guardrails/global');
+  },
+  createGuardrail: async (data: any) => {
+    return post('/admin/genai-guardrails/guardrails/global', data);
+  },
+  updateGuardrail: async (id: string, data: any) => {
+    return put(`/admin/genai-guardrails/guardrails/global/${id}`, data);
+  },
+  deleteGuardrail: async (id: string) => {
+    return del(`/admin/genai-guardrails/guardrails/global/${id}`);
+  },
+  testGuardrail: async (id: string, input: string) => {
+    return post('/admin/genai-guardrails/test', { input_text: input, guardrail_id: id });
+  },
+};
 
-  /**
-   * Get RBAC matrix
-   */
-  getRBACMatrix: async () => {
+// ============================================
+// RBAC API
+// ============================================
+
+export const rbacAPI = {
+  getPermissions: async () => {
+    return get('/admin/rbac/permissions');
+  },
+  getRoles: async () => {
+    return get('/admin/rbac/roles');
+  },
+  getMatrix: async () => {
     return get('/admin/rbac/matrix');
   },
-
-  /**
-   * Update role permissions
-   */
-  updateRolePermissions: async (roleId: string, permissions: string[]) => {
-    return put(`/admin/rbac/roles/${roleId}/permissions`, { permissions });
+  updateRolePermissions: async (role: string, permissions: string[]) => {
+    return put(`/admin/rbac/roles/${role}/permissions`, { permissions });
   },
-
-  /**
-   * Get guardrails
-   */
-  getGuardrails: async () => {
-    return get('/admin/guardrails');
+  getComprehensivePermissions: async () => {
+    return get('/admin/rbac/comprehensive/permissions');
   },
-
-  /**
-   * Create guardrail
-   */
-  createGuardrail: async (data: any) => {
-    return post('/admin/guardrails', data);
+  getComprehensiveAreas: async () => {
+    return get('/admin/rbac/comprehensive/areas');
   },
-
-  /**
-   * Update guardrail
-   */
-  updateGuardrail: async (id: string, data: any) => {
-    return put(`/admin/guardrails/${id}`, data);
+  getComprehensiveRole: async (role: string) => {
+    return get(`/admin/rbac/comprehensive/role/${role}`);
   },
-
-  /**
-   * Delete guardrail
-   */
-  deleteGuardrail: async (id: string) => {
-    return del(`/admin/guardrails/${id}`);
+  updateComprehensiveRole: async (role: string, permissions: any) => {
+    return put(`/admin/rbac/comprehensive/role/${role}`, permissions);
   },
-
-  /**
-   * Test guardrail
-   */
-  testGuardrail: async (id: string, input: string) => {
-    return post(`/admin/guardrails/${id}/test`, { input_text: input });
+  getUserOverrides: async (userId: string) => {
+    return get(`/admin/rbac/users/${userId}/permissions`);
   },
+  setUserOverride: async (userId: string, data: any) => {
+    return post(`/admin/rbac/users/${userId}/permissions`, data);
+  },
+  removeUserOverride: async (userId: string, permission: string) => {
+    return del(`/admin/rbac/users/${userId}/permissions/${permission}`);
+  },
+  getPages: async () => {
+    return get('/admin/rbac/pages');
+  },
+  getRolePageAccess: async (role: string) => {
+    return get(`/admin/rbac/pages/role/${role}`);
+  },
+  updatePageAccess: async (pageKey: string, role: string, data: any) => {
+    return put(`/admin/rbac/pages/${pageKey}/role/${role}`, data);
+  },
+};
 
-  /**
-   * Get connectors
-   */
+// ============================================
+// CONNECTORS API
+// ============================================
+
+export const connectorsAPI = {
   getConnectors: async () => {
     return get('/admin/connectors');
   },
-
-  /**
-   * Create connector
-   */
-  createConnector: async (data: any) => {
-    return post('/admin/connectors', data);
+  getConfigurations: async (category?: string) => {
+    if (category) {
+      return get(`/admin/configurations/${category}`);
+    }
+    return get('/admin/configurations');
   },
-
-  /**
-   * Update connector
-   */
-  updateConnector: async (id: string, data: any) => {
-    return put(`/admin/connectors/${id}`, data);
+  saveConfiguration: async (data: any) => {
+    return post('/admin/configuration', data);
   },
-
-  /**
-   * Delete connector
-   */
-  deleteConnector: async (id: string) => {
-    return del(`/admin/connectors/${id}`);
+  saveConfigurations: async (data: any) => {
+    return post('/admin/configurations', data);
   },
-
-  /**
-   * Test connector connection
-   */
-  testConnector: async (id: string) => {
-    return post(`/admin/connectors/${id}/test`, {});
+  deleteConfiguration: async (category: string, key: string) => {
+    return del(`/admin/configurations/${category}/${key}`);
   },
-
-  /**
-   * Get GenAI status
-   */
-  getGenAIStatus: async () => {
-    return get('/admin/genai/status');
+  testConfiguration: async (category: string, data?: any) => {
+    return post(`/admin/configurations/test/${category}`, data || {});
   },
+};
 
-  /**
-   * Test GenAI configuration
-   */
+// ============================================
+// GENAI API
+// ============================================
+
+export const genaiAPI = {
+  getProviderStatus: async () => {
+    return get('/genai/providers/status');
+  },
+  getAvailableModels: async () => {
+    return get('/genai/models/available');
+  },
+  getAdminModels: async () => {
+    return get('/genai/admin/models/all');
+  },
+  getAvailableAdminModels: async () => {
+    return get('/genai/admin/models/available');
+  },
+  registerModel: async (data: any) => {
+    return post('/genai/admin/models/register', data);
+  },
+  toggleModel: async (modelId: string) => {
+    return patch(`/genai/admin/models/${modelId}/toggle`, {});
+  },
+  syncModels: async () => {
+    return post('/genai/admin/models/sync', {});
+  },
+  getConfigs: async () => {
+    return get('/genai/admin/configs');
+  },
+  createConfig: async (data: any) => {
+    return post('/genai/admin/configs', data);
+  },
+  updateConfig: async (configId: string, data: any) => {
+    return put(`/genai/admin/configs/${configId}`, data);
+  },
+  deleteConfig: async (configId: string) => {
+    return del(`/genai/admin/configs/${configId}`);
+  },
+  getQuotas: async () => {
+    return get('/genai/admin/quotas');
+  },
+  getUsageStats: async () => {
+    return get('/genai/admin/usage/stats');
+  },
+  getMyQuota: async () => {
+    return get('/genai/my-quota');
+  },
+  getHelp: async (data: any) => {
+    return post('/genai/help', data);
+  },
+  getSuggestions: async () => {
+    return get('/genai/suggestions');
+  },
   testGenAI: async () => {
-    return post('/admin/genai/test', {});
+    return get('/articles/test-genai');
   },
 };
 

@@ -10,8 +10,12 @@ import {
   CheckCircle,
   Eye,
   Lock,
+  Users as UsersIcon,
+  Shield,
+  UserCheck,
 } from 'lucide-react';
 import { usersAPI } from '@/api/client';
+import { getErrorMessage } from '@/api/client';
 import { formatDate, cn } from '@/lib/utils';
 import { Table, Column } from '@/components/Table';
 import { Pagination } from '@/components/Pagination';
@@ -52,6 +56,13 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers();
   }, [currentPage, searchQuery]);
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   const fetchUsers = async () => {
     try {
@@ -262,13 +273,19 @@ export default function UserManagement() {
     },
   ];
 
+  const activeUsers = users.filter((u) => u.status === 'ACTIVE').length;
+  const adminUsers = users.filter((u) => u.role === 'ADMIN').length;
+
   return (
-    <div className="space-y-6 pb-8">
+    <div className="container mx-auto p-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">User Management</h1>
-          <p className="text-muted-foreground mt-2">Manage system users and permissions</p>
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+            <UsersIcon className="w-8 h-8" />
+            User Management
+          </h1>
+          <p className="text-muted-foreground mt-1">Manage system users and permissions</p>
         </div>
         <button
           onClick={() => {
@@ -281,6 +298,31 @@ export default function UserManagement() {
           <Plus className="w-4 h-4" />
           Add User
         </button>
+      </div>
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Total Users</p>
+          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <UsersIcon className="w-5 h-5 text-blue-600" />
+            {users.length}
+          </p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Active Users</p>
+          <p className="text-2xl font-bold text-green-600 flex items-center gap-2">
+            <UserCheck className="w-5 h-5" />
+            {activeUsers}
+          </p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Admins</p>
+          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Shield className="w-5 h-5 text-purple-600" />
+            {adminUsers}
+          </p>
+        </div>
       </div>
 
       {/* Error Alert */}

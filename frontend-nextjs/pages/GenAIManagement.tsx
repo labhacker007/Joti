@@ -5,310 +5,430 @@ import {
   Brain,
   AlertCircle,
   CheckCircle,
-  Save,
+  RefreshCw,
+  Zap,
+  Server,
   ToggleRight,
   ToggleLeft,
+  Settings,
+  Activity,
 } from 'lucide-react';
-import { adminAPI } from '@/api/client';
+import { genaiAPI } from '@/api/client';
+import { getErrorMessage } from '@/api/client';
 import { cn } from '@/lib/utils';
 
+interface ProviderInfo {
+  provider: string;
+  status: string;
+  models?: string[];
+  error?: string;
+}
+
+interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  enabled: boolean;
+  model_type?: string;
+}
+
 interface GenAIConfig {
+  id: string;
+  name: string;
   provider: string;
   model: string;
-  api_key: string;
-  enabled: boolean;
-  max_tokens: number;
-  temperature: number;
-  base_url?: string;
+  is_default?: boolean;
+  max_tokens?: number;
+  temperature?: number;
 }
 
 export default function GenAIManagement() {
-  const [config, setConfig] = useState<GenAIConfig | null>(null);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [configs, setConfigs] = useState<GenAIConfig[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [editMode, setEditMode] = useState(false);
-  const [formData, setFormData] = useState<GenAIConfig | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'status' | 'models' | 'configs'>('status');
 
   useEffect(() => {
-    fetchConfig();
+    loadData();
   }, []);
 
-  const fetchConfig = async () => {
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
+  const loadData = async () => {
     try {
       setLoading(true);
       setError('');
-      // Mock config retrieval
-      const mockConfig: GenAIConfig = {
-        provider: 'openai',
-        model: 'gpt-4',
-        api_key: '***hidden***',
-        enabled: true,
-        max_tokens: 2000,
-        temperature: 0.7,
-      };
-      setConfig(mockConfig);
-      setFormData(mockConfig);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load GenAI config');
+
+      const [providerRes, modelRes, configRes] = await Promise.allSettled([
+        genaiAPI.getProviderStatus(),
+        genaiAPI.getAdminModels(),
+        genaiAPI.getConfigs(),
+      ]);
+
+      if (providerRes.status === 'fulfilled') {
+        const data = (providerRes.value as any)?.data || providerRes.value;
+        setProviders(Array.isArray(data) ? data : data?.providers || []);
+      }
+
+      if (modelRes.status === 'fulfilled') {
+        const data = (modelRes.value as any)?.data || modelRes.value;
+        setModels(Array.isArray(data) ? data : data?.models || []);
+      }
+
+      if (configRes.status === 'fulfilled') {
+        const data = (configRes.value as any)?.data || configRes.value;
+        setConfigs(Array.isArray(data) ? data : data?.configs || []);
+      }
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveConfig = async () => {
-    if (!formData) return;
-
+  const handleSyncModels = async () => {
     try {
-      setSaving(true);
+      setSyncing(true);
       setError('');
-      setSuccess('');
-
-      // Mock save
-      setConfig(formData);
-      setSuccess('GenAI configuration updated successfully');
-      setEditMode(false);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save config');
+      await genaiAPI.syncModels();
+      setSuccess('Models synced successfully');
+      await loadData();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
-      setSaving(false);
+      setSyncing(false);
     }
   };
 
+  const handleToggleModel = async (modelId: string) => {
+    try {
+      setError('');
+      await genaiAPI.toggleModel(modelId);
+      setModels((prev) =>
+        prev.map((m) =>
+          m.id === modelId ? { ...m, enabled: !m.enabled } : m
+        )
+      );
+      setSuccess('Model toggled successfully');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleTestGenAI = async () => {
+    try {
+      setTesting(true);
+      setError('');
+      const result = await genaiAPI.testGenAI() as any;
+      const data = result?.data || result;
+      if (data?.status === 'ok' || data?.success) {
+        setSuccess('GenAI connection test passed');
+      } else {
+        setSuccess(`Test result: ${data?.message || 'Completed'}`);
+      }
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const enabledModels = models.filter((m) => m.enabled).length;
+
+  const tabs = [
+    { key: 'status' as const, label: 'Provider Status', icon: Activity },
+    { key: 'models' as const, label: 'Models', icon: Brain },
+    { key: 'configs' as const, label: 'Configurations', icon: Settings },
+  ];
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-muted-foreground">Loading GenAI configuration...</div>
-      </div>
-    );
-  }
-
-  if (!config || !formData) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-muted-foreground">GenAI configuration not available</div>
+      <div className="flex justify-center items-center py-20">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading GenAI configuration...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-8">
+    <div className="container mx-auto p-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">GenAI Management</h1>
-          <p className="text-muted-foreground mt-2">Configure AI model providers and settings</p>
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+            <Brain className="w-8 h-8" />
+            GenAI Management
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Configure AI providers, models, and settings
+          </p>
         </div>
-        {!editMode && (
+        <div className="flex gap-2">
           <button
-            onClick={() => {
-              setEditMode(true);
-              setFormData(config);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            onClick={handleTestGenAI}
+            disabled={testing}
+            className="flex items-center gap-2 px-4 py-2 bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
           >
-            <Brain className="w-4 h-4" />
-            Edit Configuration
+            <Zap className={cn('w-4 h-4', testing && 'animate-pulse')} />
+            {testing ? 'Testing...' : 'Test Connection'}
           </button>
-        )}
+          <button
+            onClick={handleSyncModels}
+            disabled={syncing}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+          >
+            <RefreshCw className={cn('w-4 h-4', syncing && 'animate-spin')} />
+            Sync Models
+          </button>
+        </div>
       </div>
 
-      {/* Error Alert */}
+      {/* Stats Row */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Providers</p>
+          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Server className="w-5 h-5 text-blue-600" />
+            {providers.length}
+          </p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Available Models</p>
+          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Brain className="w-5 h-5 text-purple-600" />
+            {models.length}
+          </p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Enabled Models</p>
+          <p className="text-2xl font-bold text-green-600 flex items-center gap-2">
+            <Zap className="w-5 h-5" />
+            {enabledModels}
+          </p>
+        </div>
+      </div>
+
+      {/* Alerts */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex gap-2">
-          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-red-600">Error</p>
-            <p className="text-sm text-red-600/80">{error}</p>
-          </div>
+        <div className="mb-4 p-4 bg-red-500/10 text-red-700 rounded-md flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>{error}</div>
         </div>
       )}
-
-      {/* Success Alert */}
       {success && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 flex gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-green-600">Success</p>
-            <p className="text-sm text-green-600/80">{success}</p>
-          </div>
+        <div className="mb-4 p-4 bg-green-500/10 text-green-700 rounded-md flex items-start gap-3">
+          <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>{success}</div>
         </div>
       )}
 
-      {/* Configuration Card */}
-      <div className="bg-card border border-border rounded-lg p-6 space-y-6">
-        <h2 className="text-xl font-bold text-foreground">Provider Configuration</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Provider */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              AI Provider
-            </label>
-            {editMode ? (
-              <select
-                value={formData.provider}
-                onChange={(e) =>
-                  setFormData({ ...formData, provider: e.target.value })
-                }
-                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="ollama">Ollama</option>
-                <option value="huggingface">HuggingFace</option>
-              </select>
-            ) : (
-              <p className="text-lg font-semibold text-foreground capitalize">{config.provider}</p>
-            )}
-          </div>
-
-          {/* Model */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Model
-            </label>
-            {editMode ? (
-              <input
-                type="text"
-                value={formData.model}
-                onChange={(e) =>
-                  setFormData({ ...formData, model: e.target.value })
-                }
-                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            ) : (
-              <p className="text-lg font-semibold text-foreground">{config.model}</p>
-            )}
-          </div>
-
-          {/* Max Tokens */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Max Tokens
-            </label>
-            {editMode ? (
-              <input
-                type="number"
-                value={formData.max_tokens}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    max_tokens: parseInt(e.target.value, 10),
-                  })
-                }
-                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            ) : (
-              <p className="text-lg font-semibold text-foreground">{config.max_tokens}</p>
-            )}
-          </div>
-
-          {/* Temperature */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Temperature
-            </label>
-            {editMode ? (
-              <input
-                type="number"
-                min="0"
-                max="1"
-                step="0.1"
-                value={formData.temperature}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    temperature: parseFloat(e.target.value),
-                  })
-                }
-                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            ) : (
-              <p className="text-lg font-semibold text-foreground">{config.temperature}</p>
-            )}
-          </div>
-        </div>
-
-        {/* API Key */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            API Key
-          </label>
-          {editMode ? (
-            <input
-              type="password"
-              value={formData.api_key}
-              onChange={(e) =>
-                setFormData({ ...formData, api_key: e.target.value })
-              }
-              placeholder="Enter your API key"
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          ) : (
-            <p className="text-sm font-mono text-muted-foreground">
-              {config.api_key === '***hidden***' ? '●●●●●●●●●●●●●●●●' : config.api_key}
-            </p>
-          )}
-        </div>
-
-        {/* Enabled Status */}
-        <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-          <div>
-            <h3 className="font-semibold text-foreground">Status</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {config.enabled ? 'GenAI is active and ready to use' : 'GenAI is currently disabled'}
-            </p>
-          </div>
-          {editMode ? (
+      {/* Tabs */}
+      <div className="flex border-b border-border mb-6">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
             <button
-              onClick={() =>
-                setFormData({ ...formData, enabled: !formData.enabled })
-              }
-              className="transition-colors"
-            >
-              {formData.enabled ? (
-                <ToggleRight className="w-6 h-6 text-primary" />
-              ) : (
-                <ToggleLeft className="w-6 h-6 text-muted-foreground" />
-              )}
-            </button>
-          ) : (
-            <div
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
               className={cn(
-                'px-3 py-1 rounded-full text-sm font-medium',
-                config.enabled
-                  ? 'bg-green-500/10 text-green-600'
-                  : 'bg-gray-500/10 text-gray-600'
+                'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+                activeTab === tab.key
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
-              {config.enabled ? 'Enabled' : 'Disabled'}
-            </div>
-          )}
-        </div>
+              <Icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Action Buttons */}
-      {editMode && (
-        <div className="flex gap-2 justify-end">
-          <button
-            onClick={() => {
-              setEditMode(false);
-              setFormData(config);
-            }}
-            className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSaveConfig}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? 'Saving...' : 'Save Configuration'}
-          </button>
+      {/* Tab Content: Provider Status */}
+      {activeTab === 'status' && (
+        <div className="space-y-4">
+          {providers.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-border rounded-lg">
+              <Server className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground">No AI providers configured</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Configure environment variables for OpenAI, Anthropic, or Ollama
+              </p>
+            </div>
+          ) : (
+            providers.map((provider, idx) => (
+              <div
+                key={idx}
+                className="bg-card border border-border rounded-lg p-4 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <Server className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="font-medium text-foreground capitalize">
+                      {provider.provider}
+                    </p>
+                    {provider.models && (
+                      <p className="text-xs text-muted-foreground">
+                        {provider.models.length} models available
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <span
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium',
+                    provider.status === 'available' || provider.status === 'connected'
+                      ? 'bg-green-500/10 text-green-700'
+                      : provider.status === 'error'
+                        ? 'bg-red-500/10 text-red-700'
+                        : 'bg-yellow-500/10 text-yellow-700'
+                  )}
+                >
+                  {provider.status}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Tab Content: Models */}
+      {activeTab === 'models' && (
+        <div className="space-y-2">
+          {models.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-border rounded-lg">
+              <Brain className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground">No models available</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Click &quot;Sync Models&quot; to discover available models from configured providers
+              </p>
+            </div>
+          ) : (
+            models.map((model) => (
+              <div
+                key={model.id}
+                className={cn(
+                  'bg-card border rounded-lg p-4 flex items-center justify-between transition-all',
+                  model.enabled
+                    ? 'border-border hover:border-primary/50'
+                    : 'border-border/50 opacity-60'
+                )}
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  <Brain
+                    className={cn(
+                      'w-5 h-5',
+                      model.enabled ? 'text-purple-500' : 'text-gray-400'
+                    )}
+                  />
+                  <div>
+                    <span className="text-foreground font-medium">{model.name}</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-600 capitalize">
+                        {model.provider}
+                      </span>
+                      {model.model_type && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-500/10 text-gray-600">
+                          {model.model_type}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {model.enabled ? (
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/10 text-green-700">
+                      Enabled
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-500/10 text-gray-600">
+                      Disabled
+                    </span>
+                  )}
+                  <button
+                    onClick={() => handleToggleModel(model.id)}
+                    className={cn(
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                      model.enabled ? 'bg-primary' : 'bg-gray-300'
+                    )}
+                    title={model.enabled ? 'Disable' : 'Enable'}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                        model.enabled ? 'translate-x-6' : 'translate-x-1'
+                      )}
+                    />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Tab Content: Configurations */}
+      {activeTab === 'configs' && (
+        <div className="space-y-4">
+          {configs.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-border rounded-lg">
+              <Settings className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground">No GenAI configurations</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Configurations will appear once models are synced and enabled
+              </p>
+            </div>
+          ) : (
+            configs.map((config) => (
+              <div
+                key={config.id}
+                className="bg-card border border-border rounded-lg p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-foreground">{config.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-muted-foreground capitalize">
+                        {config.provider}
+                      </span>
+                      <span className="text-xs text-muted-foreground">/</span>
+                      <span className="text-xs text-muted-foreground">{config.model}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {config.is_default && (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/10 text-yellow-700">
+                        Default
+                      </span>
+                    )}
+                    {config.max_tokens && (
+                      <span className="text-xs text-muted-foreground">
+                        {config.max_tokens} tokens
+                      </span>
+                    )}
+                    {config.temperature !== undefined && (
+                      <span className="text-xs text-muted-foreground">
+                        temp: {config.temperature}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

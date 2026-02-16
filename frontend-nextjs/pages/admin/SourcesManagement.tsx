@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, RefreshCw, ExternalLink, CheckCircle, AlertCircle, Edit2 } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, ExternalLink, CheckCircle, AlertCircle, Edit2, Rss, Activity } from 'lucide-react';
 import { sourcesAPI } from '@/api/client';
+import { getErrorMessage } from '@/api/client';
+import { cn } from '@/lib/utils';
 
 interface Source {
   id: string;
@@ -31,6 +33,7 @@ export default function SourcesManagement() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [ingesting, setIngesting] = useState<string | null>(null);
+  const [ingestingAll, setIngestingAll] = useState(false);
   const [form, setForm] = useState<AddSourceForm>({
     name: '',
     url: '',
@@ -149,6 +152,23 @@ export default function SourcesManagement() {
     }
   };
 
+  const handleIngestAll = async () => {
+    try {
+      setIngestingAll(true);
+      setError('');
+      await sourcesAPI.ingestAll();
+      setSuccessMessage('Ingestion started for all active sources');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      await fetchSources();
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIngestingAll(false);
+    }
+  };
+
+  const activeCount = sources.filter((s) => s.is_active).length;
+
   const sourceTypeLabels: Record<string, string> = {
     rss: 'RSS Feed',
     atom: 'Atom Feed',
@@ -180,19 +200,56 @@ export default function SourcesManagement() {
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Feed Sources Management</h1>
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+            <Rss className="w-8 h-8" />
+            Feed Sources Management
+          </h1>
           <p className="text-muted-foreground mt-1">Manage global feed sources for all users</p>
         </div>
-        <button
-          onClick={() => {
-            setShowAddForm(!showAddForm);
-            if (editingSourceId) handleCancelEdit();
-          }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-        >
-          <Plus className="w-4 h-4" />
-          Add Source
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleIngestAll}
+            disabled={ingestingAll}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+          >
+            <RefreshCw className={cn('w-4 h-4', ingestingAll && 'animate-spin')} />
+            {ingestingAll ? 'Ingesting...' : 'Ingest All'}
+          </button>
+          <button
+            onClick={() => {
+              setShowAddForm(!showAddForm);
+              if (editingSourceId) handleCancelEdit();
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            <Plus className="w-4 h-4" />
+            Add Source
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Total Sources</p>
+          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Rss className="w-5 h-5 text-blue-600" />
+            {sources.length}
+          </p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Active Sources</p>
+          <p className="text-2xl font-bold text-green-600 flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            {activeCount}
+          </p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Disabled</p>
+          <p className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+            {sources.length - activeCount}
+          </p>
+        </div>
       </div>
 
       {error && (
