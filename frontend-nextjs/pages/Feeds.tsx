@@ -256,35 +256,6 @@ export default function Feeds() {
             )}
           </button>
 
-          {/* Severity Filter */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleSeverityFilter('ALL')}
-              className={cn(
-                'px-3 py-1 rounded-full text-sm transition-colors',
-                selectedSeverity === 'ALL'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-accent'
-              )}
-            >
-              All Severities
-            </button>
-            {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].map((severity) => (
-              <button
-                key={severity}
-                onClick={() => handleSeverityFilter(severity)}
-                className={cn(
-                  'px-3 py-1 rounded-full text-sm transition-colors',
-                  selectedSeverity === severity
-                    ? getSeverityColor(severity) + ' border'
-                    : 'bg-muted text-foreground hover:bg-accent'
-                )}
-              >
-                {severity}
-              </button>
-            ))}
-          </div>
-
           {/* Mark All as Read Button */}
           {unreadCount > 0 && (
             <button

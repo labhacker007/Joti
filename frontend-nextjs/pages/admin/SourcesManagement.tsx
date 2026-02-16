@@ -9,8 +9,9 @@ interface Source {
   name: string;
   url: string;
   source_type: string;
-  enabled: boolean;
-  last_ingested_at?: string;
+  feed_type?: string;
+  is_active: boolean;
+  last_fetched?: string;
   article_count?: number;
   description?: string;
 }
@@ -66,8 +67,8 @@ export default function SourcesManagement() {
       const sourceData: any = {
         name: form.name,
         url: form.url,
-        source_type: form.sourceType,
-        enabled: true,
+        feed_type: form.sourceType,
+        is_active: true,
       };
       if (form.description) {
         sourceData.description = form.description;
@@ -97,11 +98,22 @@ export default function SourcesManagement() {
     setForm({
       name: source.name,
       url: source.url,
-      sourceType: (source.source_type as any) || 'rss',
+      sourceType: ((source.feed_type || source.source_type) as any) || 'rss',
       description: source.description || '',
     });
     setEditingSourceId(source.id);
     setShowAddForm(true);
+  };
+
+  const handleToggleActive = async (source: Source) => {
+    try {
+      await sourcesAPI.updateSource(source.id, { is_active: !source.is_active });
+      setSuccessMessage(`Source ${!source.is_active ? 'enabled' : 'disabled'} successfully`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      await fetchSources();
+    } catch (err: any) {
+      setError(err.message || 'Failed to toggle source status');
+    }
   };
 
   const handleCancelEdit = () => {
@@ -301,15 +313,21 @@ export default function SourcesManagement() {
                     <h3 className="text-lg font-semibold text-foreground">{source.name}</h3>
                     <span
                       className={`px-2 py-1 rounded text-xs font-medium ${
-                        sourceTypeColors[source.source_type] || 'bg-gray-500/10 text-gray-700'
+                        sourceTypeColors[(source.feed_type || source.source_type)] || 'bg-gray-500/10 text-gray-700'
                       }`}
                     >
-                      {sourceTypeLabels[source.source_type] || source.source_type}
+                      {sourceTypeLabels[(source.feed_type || source.source_type)] || (source.feed_type || source.source_type)}
                     </span>
-                    {source.enabled ? (
-                      <CheckCircle className="w-4 h-4 text-green-600" />
+                    {source.is_active ? (
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-green-500/10 text-green-700 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Active
+                      </span>
                     ) : (
-                      <AlertCircle className="w-4 h-4 text-yellow-600" />
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-gray-500/10 text-gray-700 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        Disabled
+                      </span>
                     )}
                   </div>
 
@@ -325,11 +343,11 @@ export default function SourcesManagement() {
                         <span className="font-medium">{source.article_count}</span> articles
                       </div>
                     )}
-                    {source.last_ingested_at && (
+                    {source.last_fetched && (
                       <div>
-                        Last ingested:{' '}
+                        Last fetched:{' '}
                         <span className="font-medium">
-                          {new Date(source.last_ingested_at).toLocaleDateString()}
+                          {new Date(source.last_fetched).toLocaleDateString()}
                         </span>
                       </div>
                     )}
@@ -338,8 +356,20 @@ export default function SourcesManagement() {
 
                 <div className="flex gap-2 ml-4">
                   <button
+                    onClick={() => handleToggleActive(source)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${
+                      source.is_active
+                        ? 'bg-gray-500/10 text-gray-700 hover:bg-gray-500/20'
+                        : 'bg-green-500/10 text-green-700 hover:bg-green-500/20'
+                    }`}
+                    title={source.is_active ? 'Disable source' : 'Enable source'}
+                  >
+                    {source.is_active ? 'Disable' : 'Enable'}
+                  </button>
+
+                  <button
                     onClick={() => handleIngestSource(source.id)}
-                    disabled={ingesting === source.id}
+                    disabled={ingesting === source.id || !source.is_active}
                     className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary disabled:opacity-50"
                     title="Trigger manual ingestion"
                   >
