@@ -1,20 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Home,
   Rss,
   User,
   Settings,
-  Shield,
   Upload,
   ChevronLeft,
   ChevronRight,
-  Users,
   Star,
+  Eye,
+  Users,
+  Shield,
   FileText,
+  BarChart,
+  Plug,
+  Bot,
+  Lock,
+  Activity,
 } from 'lucide-react';
 
 interface NavItem {
@@ -27,21 +32,31 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Feeds', path: '/feeds', icon: Rss },
   { label: 'My Feeds', path: '/my-feeds', icon: User },
-  { label: 'Watchlist', path: '/watchlist', icon: Star },
+  { label: 'Watchlist', path: '/watchlist', icon: Eye },
   { label: 'Document Upload', path: '/document-upload', icon: Upload },
-  { label: 'Admin Sources', path: '/admin/sources', icon: Settings, requireAdmin: true },
+  { label: 'Sources', path: '/admin/sources', icon: Settings, requireAdmin: true },
+  { label: 'Users', path: '/admin/users', icon: Users, requireAdmin: true },
+  { label: 'RBAC', path: '/admin/rbac', icon: Lock, requireAdmin: true },
+  { label: 'Connectors', path: '/admin/connectors', icon: Plug, requireAdmin: true },
+  { label: 'GenAI', path: '/admin/genai', icon: Bot, requireAdmin: true },
+  { label: 'Audit Logs', path: '/admin/audit', icon: FileText, requireAdmin: true },
 ];
 
 interface SidebarProps {
   userRole?: string;
+  collapsed: boolean;
+  onToggle: () => void;
 }
 
-export default function Sidebar({ userRole }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const isAdmin = userRole === 'ADMIN';
 
   const filteredItems = navItems.filter(item => !item.requireAdmin || isAdmin);
+
+  // Split into user items and admin items
+  const userItems = filteredItems.filter(item => !item.requireAdmin);
+  const adminItems = filteredItems.filter(item => item.requireAdmin);
 
   return (
     <aside
@@ -56,7 +71,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
             <h1 className="text-xl font-bold text-foreground">Joti</h1>
           )}
           <button
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={onToggle}
             className="p-2 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
@@ -71,7 +86,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-2">
           <ul className="space-y-1">
-            {filteredItems.map((item) => {
+            {userItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path || (pathname?.startsWith(item.path + '/') ?? false);
 
@@ -93,6 +108,41 @@ export default function Sidebar({ userRole }: SidebarProps) {
               );
             })}
           </ul>
+
+          {/* Admin Section */}
+          {adminItems.length > 0 && (
+            <>
+              <div className="my-3 border-t border-border" />
+              {!collapsed && (
+                <p className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Admin
+                </p>
+              )}
+              <ul className="space-y-1">
+                {adminItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.path || (pathname?.startsWith(item.path + '/') ?? false);
+
+                  return (
+                    <li key={item.path}>
+                      <Link
+                        href={item.path}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-md transition ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                        }`}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <Icon className="w-5 h-5 flex-shrink-0" />
+                        {!collapsed && <span>{item.label}</span>}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </nav>
 
         {/* Footer */}

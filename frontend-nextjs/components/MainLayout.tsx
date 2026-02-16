@@ -17,7 +17,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const showSidebar = pathname !== '/login';
 
   useEffect(() => {
-    // Get user role from localStorage
     if (typeof window !== 'undefined') {
       const user = localStorage.getItem('user');
       if (user) {
@@ -25,7 +24,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           const userData = JSON.parse(user);
           setUserRole(userData.role);
         } catch (e) {
-          console.error('Failed to parse user data', e);
+          // ignore parse errors
         }
       }
     }
@@ -37,7 +36,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar userRole={userRole} />
+      <Sidebar
+        userRole={userRole}
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
       <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         {children}
       </main>

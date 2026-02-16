@@ -414,53 +414,29 @@ export const articlesAPI = {
 // ============================================
 
 export const sourcesAPI = {
-  /**
-   * Get all sources
-   */
-  getSources: async (page = 1, pageSize = 10) => {
-    return get(`/sources?page=${page}&page_size=${pageSize}`);
+  getSources: async (page = 1, pageSize = 100) => {
+    return get(`/sources/?page=${page}&page_size=${pageSize}`);
   },
-
-  /**
-   * Get source by ID
-   */
   getSource: async (id: string) => {
     return get(`/sources/${id}`);
   },
-
-  /**
-   * Create new source
-   */
   createSource: async (data: any) => {
-    return post('/sources', data);
+    return post('/sources/', data);
   },
-
-  /**
-   * Update source
-   */
   updateSource: async (id: string, data: any) => {
-    return put(`/sources/${id}`, data);
+    return patch(`/sources/${id}`, data);
   },
-
-  /**
-   * Delete source
-   */
-  deleteSource: async (id: string) => {
-    return del(`/sources/${id}`);
+  deleteSource: async (id: string, deleteArticles = false) => {
+    return del(`/sources/${id}?delete_articles=${deleteArticles}`);
   },
-
-  /**
-   * Get source statistics
-   */
   getStats: async () => {
-    return get('/sources/stats');
+    return get('/sources/stats/summary');
   },
-
-  /**
-   * Trigger source fetch
-   */
   triggerFetch: async (id: string) => {
-    return post(`/sources/${id}/fetch`, {});
+    return post(`/sources/${id}/ingest`, {});
+  },
+  ingestAll: async () => {
+    return post('/sources/ingest-all', {});
   },
 };
 
@@ -469,39 +445,23 @@ export const sourcesAPI = {
 // ============================================
 
 export const watchlistAPI = {
-  /**
-   * Get all watchlist keywords
-   */
-  getKeywords: async (page = 1, pageSize = 10) => {
-    return get(`/watchlist?page=${page}&page_size=${pageSize}`);
+  getKeywords: async () => {
+    return get('/watchlist/');
   },
-
-  /**
-   * Add keyword to watchlist
-   */
-  addKeyword: async (data: any) => {
-    return post('/watchlist', data);
+  addKeyword: async (keyword: string) => {
+    return post('/watchlist/', { keyword });
   },
-
-  /**
-   * Update watchlist keyword
-   */
   updateKeyword: async (id: string, data: any) => {
-    return put(`/watchlist/${id}`, data);
+    return patch(`/watchlist/${id}`, data);
   },
-
-  /**
-   * Delete watchlist keyword
-   */
+  toggleKeyword: async (id: string, isActive: boolean) => {
+    return patch(`/watchlist/${id}`, { is_active: isActive });
+  },
   deleteKeyword: async (id: string) => {
     return del(`/watchlist/${id}`);
   },
-
-  /**
-   * Get watchlist matches for article
-   */
-  getMatches: async (articleId: string) => {
-    return get(`/articles/${articleId}/watchlist-matches`);
+  refresh: async () => {
+    return post('/watchlist/refresh', {});
   },
 };
 
