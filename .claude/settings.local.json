@@ -74,7 +74,10 @@
       "Bash(echo:*)",
       "Bash(/tmp/joti_summary.txt:*)",
       "Bash(git reset:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git rm:*)",
+      "Bash(git worktree remove:*)",
+      "Bash(git worktree:*)"
     ]
   }
 }
