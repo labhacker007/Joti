@@ -114,20 +114,21 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background overflow-hidden">
       {/* Animated Background */}
       {displayTheme.background === 'neural' && (
-        <NeuralNetworkBackground color={displayTheme.colors.primary} className="fixed inset-0 -z-10" />
+        <NeuralNetworkBackground key={theme} color={displayTheme.colors.primary} className="fixed inset-0 -z-10" />
       )}
       {displayTheme.background === 'matrix' && (
-        <MatrixRainBackground color={displayTheme.colors.primary} className="fixed inset-0 -z-10" />
+        <MatrixRainBackground key={theme} color={displayTheme.colors.primary} className="fixed inset-0 -z-10" />
       )}
       {displayTheme.background === 'orbs' && (
         <FloatingOrbsBackground
+          key={theme}
           primaryColor={displayTheme.colors.primary}
           secondaryColor={displayTheme.colors.secondary}
           className="fixed inset-0 -z-10"
         />
       )}
       {displayTheme.background === 'constellation' && (
-        <ConstellationBackground color={displayTheme.colors.primary} className="fixed inset-0 -z-10" />
+        <ConstellationBackground key={theme} color={displayTheme.colors.primary} className="fixed inset-0 -z-10" />
       )}
 
       {/* Theme Switcher */}
