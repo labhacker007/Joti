@@ -118,5 +118,185 @@
     "url": "https://blog.malwarebytes.com/feed/",
     "feed_type": "rss",
     "description": "Malware analysis, threat intelligence, and cybersecurity research"
+  },
+  {
+    "name": "Kaspersky Securelist",
+    "url": "https://securelist.com/feed/",
+    "feed_type": "rss",
+    "description": "Advanced threat research and APT tracking from Kaspersky Lab"
+  },
+  {
+    "name": "Sophos News",
+    "url": "https://news.sophos.com/feed/",
+    "feed_type": "rss",
+    "description": "Threat research, malware analysis, and security news from Sophos"
+  },
+  {
+    "name": "ESET WeLiveSecurity",
+    "url": "https://www.welivesecurity.com/feed/",
+    "feed_type": "rss",
+    "description": "Expert cybersecurity insights and threat research from ESET"
+  },
+  {
+    "name": "McAfee Labs",
+    "url": "https://www.mcafee.com/blogs/other-blogs/mcafee-labs/feed/",
+    "feed_type": "rss",
+    "description": "Malware research and threat intelligence from McAfee"
+  },
+  {
+    "name": "Trend Micro Research",
+    "url": "https://www.trendmicro.com/en_us/research.rss.xml",
+    "feed_type": "rss",
+    "description": "Cybersecurity research and threat analysis from Trend Micro"
+  },
+  {
+    "name": "Check Point Research",
+    "url": "https://research.checkpoint.com/feed/",
+    "feed_type": "rss",
+    "description": "Vulnerability research and threat intelligence from Check Point"
+  },
+  {
+    "name": "Fortinet Threat Research",
+    "url": "https://www.fortinet.com/blog/threat-research.rss",
+    "feed_type": "rss",
+    "description": "FortiGuard Labs threat research and analysis"
+  },
+  {
+    "name": "Qualys Security Blog",
+    "url": "https://blog.qualys.com/feed",
+    "feed_type": "rss",
+    "description": "Vulnerability management and cloud security research"
+  },
+  {
+    "name": "IBM Security Intelligence",
+    "url": "https://securityintelligence.com/feed/",
+    "feed_type": "rss",
+    "description": "Threat intelligence and security research from IBM X-Force"
+  },
+  {
+    "name": "Tenable Blog",
+    "url": "https://www.tenable.com/blog/feed",
+    "feed_type": "rss",
+    "description": "Vulnerability research and exposure management insights"
+  },
+  {
+    "name": "Rapid7 Blog",
+    "url": "https://blog.rapid7.com/rss/",
+    "feed_type": "rss",
+    "description": "Vulnerability research, threat intelligence, and security operations"
+  },
+  {
+    "name": "Akamai Security Research",
+    "url": "https://www.akamai.com/blog/security/feed",
+    "feed_type": "rss",
+    "description": "DDoS intelligence, bot management, and web security research"
+  },
+  {
+    "name": "Cloudflare Blog Security",
+    "url": "https://blog.cloudflare.com/tag/security/rss/",
+    "feed_type": "rss",
+    "description": "DDoS mitigation, web security, and Zero Trust research"
+  },
+  {
+    "name": "NIST Cybersecurity",
+    "url": "https://www.nist.gov/news-events/cybersecurity/rss.xml",
+    "feed_type": "rss",
+    "description": "Standards, frameworks, and guidance from NIST"
+  },
+  {
+    "name": "US-CERT Alerts",
+    "url": "https://www.cisa.gov/uscert/ncas/current-activity.xml",
+    "feed_type": "rss",
+    "description": "Current cybersecurity activity and alerts from US-CERT"
+  },
+  {
+    "name": "CVE Recent Entries",
+    "url": "https://cve.mitre.org/data/downloads/allitems.xml",
+    "feed_type": "rss",
+    "description": "Latest CVE vulnerability entries from MITRE"
+  },
+  {
+    "name": "NVD Recent Vulnerabilities",
+    "url": "https://nvd.nist.gov/feeds/xml/cve/misc/nvd-rss.xml",
+    "feed_type": "rss",
+    "description": "Recent vulnerabilities from NIST National Vulnerability Database"
+  },
+  {
+    "name": "Exploit Database",
+    "url": "https://www.exploit-db.com/rss.xml",
+    "feed_type": "rss",
+    "description": "Latest exploits and vulnerable software from Exploit-DB"
+  },
+  {
+    "name": "HackerOne Disclosed Reports",
+    "url": "https://hackerone.com/hacktivity.rss",
+    "feed_type": "rss",
+    "description": "Publicly disclosed vulnerability reports from HackerOne"
+  },
+  {
+    "name": "SecurityFocus Vulnerabilities",
+    "url": "https://www.securityfocus.com/rss/vulnerabilities.xml",
+    "feed_type": "rss",
+    "description": "Comprehensive vulnerability database and tracking"
+  },
+  {
+    "name": "PacketStorm Security",
+    "url": "https://packetstormsecurity.com/feeds/news/",
+    "feed_type": "rss",
+    "description": "Security tools, exploits, advisories, and whitepapers"
+  },
+  {
+    "name": "SANS NewsBites",
+    "url": "https://www.sans.org/newsletters/newsbites/feed/",
+    "feed_type": "rss",
+    "description": "Curated cybersecurity news digest from SANS"
+  },
+  {
+    "name": "Security Affairs",
+    "url": "https://securityaffairs.com/feed",
+    "feed_type": "rss",
+    "description": "Information security news, hacking, and data breaches"
+  },
+  {
+    "name": "Troy Hunt's Blog",
+    "url": "https://www.troyhunt.com/rss/",
+    "feed_type": "rss",
+    "description": "Web security, data breaches, and Have I Been Pwned updates"
+  },
+  {
+    "name": "Graham Cluley",
+    "url": "https://grahamcluley.com/feed/",
+    "feed_type": "rss",
+    "description": "Computer security news, advice, and opinion"
+  },
+  {
+    "name": "Naked Security by Sophos",
+    "url": "https://nakedsecurity.sophos.com/feed/",
+    "feed_type": "rss",
+    "description": "Security news explained in plain English"
+  },
+  {
+    "name": "KnowBe4 Security Blog",
+    "url": "https://blog.knowbe4.com/rss.xml",
+    "feed_type": "rss",
+    "description": "Security awareness training and phishing defense insights"
+  },
+  {
+    "name": "Sucuri Blog",
+    "url": "https://blog.sucuri.net/feed",
+    "feed_type": "rss",
+    "description": "Website security, malware removal, and WordPress security"
+  },
+  {
+    "name": "Wordfence Blog",
+    "url": "https://www.wordfence.com/blog/feed/",
+    "feed_type": "rss",
+    "description": "WordPress security intelligence and threat research"
+  },
+  {
+    "name": "OWASP News",
+    "url": "https://owasp.org/feeds/news.xml",
+    "feed_type": "rss",
+    "description": "Web application security news and resources from OWASP"
   }
 ]

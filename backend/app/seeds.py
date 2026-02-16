@@ -104,7 +104,19 @@ def seed_database():
             "data breach",
             "APT",
             "supply chain attack",
-            "phishing"
+            "phishing",
+            "exploitation",
+            "remote code execution",
+            "privilege escalation",
+            "SQL injection",
+            "cross-site scripting",
+            "denial of service",
+            "credential theft",
+            "backdoor",
+            "trojan",
+            "botnet",
+            "advanced persistent threat",
+            "state-sponsored"
         ]
         
         for keyword in default_keywords:

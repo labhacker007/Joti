@@ -11,6 +11,8 @@ import {
   AlertCircle,
   Eye,
   Star,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { articlesAPI } from '@/api/client';
 import { formatRelativeTime, formatDate, truncateText, cn } from '@/lib/utils';
@@ -28,6 +30,7 @@ interface Article {
   is_read?: boolean;
   watchlist_match_keywords?: string[];
   is_high_priority?: boolean;
+  image_url?: string;
 }
 
 export default function Feeds() {
@@ -43,6 +46,7 @@ export default function Feeds() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
   const [watchlistCount, setWatchlistCount] = useState(0);
+  const [viewMode, setViewMode] = useState<'list' | 'card'>('list');
 
   const pageSize = 10;
 
@@ -147,9 +151,38 @@ export default function Feeds() {
   return (
     <div className="space-y-6 pb-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Feeds</h1>
-        <p className="text-muted-foreground mt-2">Latest threat intelligence and security feeds</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Feeds</h1>
+          <p className="text-muted-foreground mt-2">Latest threat intelligence and security feeds</p>
+        </div>
+        {/* View Mode Toggle */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode('list')}
+            className={cn(
+              'p-2 rounded-lg transition-colors',
+              viewMode === 'list'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-foreground hover:bg-accent'
+            )}
+            title="List View"
+          >
+            <List className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setViewMode('card')}
+            className={cn(
+              'p-2 rounded-lg transition-colors',
+              viewMode === 'card'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-foreground hover:bg-accent'
+            )}
+            title="Card View"
+          >
+            <LayoutGrid className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -264,88 +297,184 @@ export default function Feeds() {
         </div>
       </div>
 
-      {/* Articles List */}
-      <div className="space-y-4">
-        {articles.length === 0 ? (
-          <div className="bg-card border border-border rounded-lg p-8 text-center">
-            <p className="text-muted-foreground">No articles found</p>
-          </div>
-        ) : (
-          articles.map((article) => (
-              <div
-                key={article.id}
-                className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors"
-              >
-                <div className="flex gap-4">
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <h3 className="text-lg font-semibold text-foreground line-clamp-2">
-                        {article.title}
-                      </h3>
-                      <button
-                        onClick={() => toggleBookmark(article.id)}
-                        className="flex-shrink-0 p-2 hover:bg-muted rounded-lg transition-colors"
-                      >
-                        {article.is_bookmarked ? (
-                          <BookmarkCheck className="w-5 h-5 text-primary" />
-                        ) : (
-                          <Bookmark className="w-5 h-5 text-muted-foreground" />
-                        )}
-                      </button>
-                    </div>
+      {/* Articles Display */}
+      {articles.length === 0 ? (
+        <div className="bg-card border border-border rounded-lg p-8 text-center">
+          <p className="text-muted-foreground">No articles found</p>
+        </div>
+      ) : viewMode === 'list' ? (
+        /* List View */
+        <div className="space-y-4">
+          {articles.map((article) => (
+            <div
+              key={article.id}
+              className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors"
+            >
+              <div className="flex gap-4">
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <h3 className="text-lg font-semibold text-foreground line-clamp-2">
+                      {article.title}
+                    </h3>
+                    <button
+                      onClick={() => toggleBookmark(article.id)}
+                      className="flex-shrink-0 p-2 hover:bg-muted rounded-lg transition-colors"
+                    >
+                      {article.is_bookmarked ? (
+                        <BookmarkCheck className="w-5 h-5 text-primary" />
+                      ) : (
+                        <Bookmark className="w-5 h-5 text-muted-foreground" />
+                      )}
+                    </button>
+                  </div>
 
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                      {article.summary}
-                    </p>
+                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                    {article.summary}
+                  </p>
 
-                    {/* Tags and Metadata */}
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <span className={cn('px-2 py-1 rounded text-xs font-medium border', getSeverityColor(article.severity))}>
-                        {article.severity}
+                  {/* Tags and Metadata */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <span className={cn('px-2 py-1 rounded text-xs font-medium border', getSeverityColor(article.severity))}>
+                      {article.severity}
+                    </span>
+                    {article.threat_category && (
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30">
+                        {article.threat_category}
                       </span>
-                      {article.threat_category && (
-                        <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30">
-                          {article.threat_category}
+                    )}
+                    {article.watchlist_match_keywords && article.watchlist_match_keywords.length > 0 && (
+                      article.watchlist_match_keywords.map((keyword) => (
+                        <span key={keyword} className="px-2 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 border border-yellow-500/30 flex items-center gap-1">
+                          <Star className="w-3 h-3" />
+                          {keyword}
                         </span>
-                      )}
-                      {article.watchlist_match_keywords && article.watchlist_match_keywords.length > 0 && (
-                        article.watchlist_match_keywords.map((keyword) => (
-                          <span key={keyword} className="px-2 py-1 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 border border-yellow-500/30 flex items-center gap-1">
-                            <Star className="w-3 h-3" />
-                            {keyword}
-                          </span>
-                        ))
-                      )}
-                    </div>
+                      ))
+                    )}
+                  </div>
 
-                    {/* Footer */}
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Globe className="w-4 h-4" />
-                        <span>{article.source_name}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{formatRelativeTime(article.published_at)}</span>
-                      </div>
-                      {article.url && (
-                        <a
-                          href={article.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          Read Full Article →
-                        </a>
-                      )}
+                  {/* Footer */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Globe className="w-4 h-4" />
+                      <span>{article.source_name}</span>
                     </div>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>{formatRelativeTime(article.published_at)}</span>
+                    </div>
+                    {article.url && (
+                      <a
+                        href={article.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        Read Full Article →
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
-            ))
-        )}
-      </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Card View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {articles.map((article) => (
+            <div
+              key={article.id}
+              className="bg-card border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors flex flex-col"
+            >
+              {/* Image */}
+              {article.image_url ? (
+                <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                  <img
+                    src={article.image_url}
+                    alt={article.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="aspect-video w-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                  <TrendingUp className="w-12 h-12 text-primary/30" />
+                </div>
+              )}
+
+              {/* Content */}
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h3 className="text-base font-semibold text-foreground line-clamp-2 flex-1">
+                    {article.title}
+                  </h3>
+                  <button
+                    onClick={() => toggleBookmark(article.id)}
+                    className="flex-shrink-0 p-1 hover:bg-muted rounded-lg transition-colors"
+                  >
+                    {article.is_bookmarked ? (
+                      <BookmarkCheck className="w-4 h-4 text-primary" />
+                    ) : (
+                      <Bookmark className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-xs text-muted-foreground mb-3 line-clamp-3">
+                  {article.summary}
+                </p>
+
+                {/* Tags */}
+                <div className="flex flex-wrap gap-1 mb-3">
+                  <span className={cn('px-2 py-0.5 rounded text-xs font-medium border', getSeverityColor(article.severity))}>
+                    {article.severity}
+                  </span>
+                  {article.threat_category && (
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30">
+                      {article.threat_category}
+                    </span>
+                  )}
+                  {article.watchlist_match_keywords && article.watchlist_match_keywords.length > 0 && (
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600 border border-yellow-500/30 flex items-center gap-1">
+                      <Star className="w-3 h-3" />
+                      {article.watchlist_match_keywords[0]}
+                      {article.watchlist_match_keywords.length > 1 && `+${article.watchlist_match_keywords.length - 1}`}
+                    </span>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="mt-auto space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      <span className="truncate">{article.source_name}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      <span>{formatRelativeTime(article.published_at)}</span>
+                    </div>
+                  </div>
+                  {article.url && (
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline block"
+                    >
+                      Read Full Article →
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
