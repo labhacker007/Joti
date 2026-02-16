@@ -135,14 +135,32 @@ def list_articles(
     page_size: int = Query(20, ge=1, le=500),
     status_filter: Optional[str] = Query(None),
     source_id: Optional[int] = Query(None),
+    severity: Optional[str] = Query(None, description="Filter by severity level"),
+    threat_category: Optional[str] = Query(None, description="Filter by threat category"),
+    search: Optional[str] = Query(None, description="Search in title and summary"),
+    unread_only: bool = Query(False, description="Filter unread articles only"),
+    watchlist_only: bool = Query(False, description="Filter watchlist matches only"),
     current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
     db: Session = Depends(get_db)
 ):
-    """Get paginated list of articles with optional filters."""
+    """Get paginated list of articles with optional filters.
+
+    Supports filters for:
+    - status_filter: Article status
+    - source_id: Feed source ID
+    - severity: Article severity level
+    - threat_category: Threat category
+    - search: Search in title/summary
+    - unread_only: Show only unread articles
+    - watchlist_only: Show only watchlist matches
+    """
     try:
+        from sqlalchemy import or_
+        from app.models import ArticleReadStatus
+
         query = db.query(Article).options(joinedload(Article.feed_source))
 
-        # Apply filters
+        # Apply basic filters
         if status_filter:
             try:
                 query = query.filter(Article.status == status_filter)
@@ -151,6 +169,40 @@ def list_articles(
 
         if source_id:
             query = query.filter(Article.source_id == source_id)
+
+        # Apply severity filter
+        if severity:
+            query = query.filter(Article.severity == severity.upper())
+
+        # Apply threat category filter
+        if threat_category:
+            query = query.filter(Article.threat_category == threat_category)
+
+        # Apply search filter (search in title and summary)
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Article.title.ilike(search_term),
+                    Article.summary.ilike(search_term)
+                )
+            )
+
+        # Apply unread filter
+        if unread_only:
+            # Left join with ArticleReadStatus to find unread articles
+            query = query.outerjoin(ArticleReadStatus, (Article.id == ArticleReadStatus.article_id) & (ArticleReadStatus.user_id == current_user.id))
+            query = query.filter(
+                or_(
+                    ArticleReadStatus.is_read == False,
+                    ArticleReadStatus.id == None  # Articles without read status are unread
+                )
+            )
+
+        # Apply watchlist filter
+        if watchlist_only:
+            # Filter articles that have watchlist matches
+            query = query.filter(Article.is_high_priority == True)
 
         # Get total count before pagination
         total = query.count()
@@ -176,6 +228,68 @@ def list_articles(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch articles"
+        )
+
+
+@router.get("/counts")
+def get_article_counts(
+    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    db: Session = Depends(get_db)
+):
+    """Get counts of articles by category for badge display.
+
+    Returns:
+    - total: Total number of articles
+    - unread: Number of unread articles for current user
+    - watchlist_matches: Number of articles matching watchlist keywords
+    - unread_watchlist: Number of unread articles matching watchlist
+    """
+    try:
+        from app.models import ArticleReadStatus
+        from sqlalchemy import and_, or_
+
+        # Total articles count
+        total = db.query(Article).count()
+
+        # Unread articles count (for current user)
+        unread_query = db.query(Article).outerjoin(
+            ArticleReadStatus, (Article.id == ArticleReadStatus.article_id) & (ArticleReadStatus.user_id == current_user.id)
+        ).filter(
+            or_(
+                ArticleReadStatus.is_read == False,
+                ArticleReadStatus.id == None
+            )
+        )
+        unread = unread_query.count()
+
+        # Watchlist matches count
+        watchlist_matches = db.query(Article).filter(Article.is_high_priority == True).count()
+
+        # Unread watchlist matches count
+        unread_watchlist_query = db.query(Article).outerjoin(
+            ArticleReadStatus, (Article.id == ArticleReadStatus.article_id) & (ArticleReadStatus.user_id == current_user.id)
+        ).filter(
+            Article.is_high_priority == True,
+            or_(
+                ArticleReadStatus.is_read == False,
+                ArticleReadStatus.id == None
+            )
+        )
+        unread_watchlist = unread_watchlist_query.count()
+
+        return {
+            "data": {
+                "total": total,
+                "unread": unread,
+                "watchlist_matches": watchlist_matches,
+                "unread_watchlist": unread_watchlist
+            }
+        }
+    except Exception as e:
+        logger.error("articles_counts_error", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch article counts"
         )
 
 

@@ -377,6 +377,13 @@ export const articlesAPI = {
   },
 
   /**
+   * Get article counts by category
+   */
+  getCounts: async () => {
+    return get('/articles/counts');
+  },
+
+  /**
    * Mark all articles as read
    */
   markAllAsRead: async () => {
