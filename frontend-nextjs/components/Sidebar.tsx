@@ -73,7 +73,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
           <ul className="space-y-1">
             {filteredItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
+              const isActive = pathname === item.path || (pathname?.startsWith(item.path + '/') ?? false);
 
               return (
                 <li key={item.path}>
