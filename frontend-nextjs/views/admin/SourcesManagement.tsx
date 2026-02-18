@@ -411,17 +411,18 @@ export default function SourcesManagement() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 ml-4">
+                <div className="flex items-center gap-2 ml-4">
                   <button
                     onClick={() => handleToggleActive(source)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${
-                      source.is_active
-                        ? 'bg-gray-500/10 text-gray-700 hover:bg-gray-500/20'
-                        : 'bg-green-500/10 text-green-700 hover:bg-green-500/20'
-                    }`}
+                    className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                    style={{ backgroundColor: source.is_active ? 'var(--color-primary, #3b82f6)' : '#d1d5db' }}
                     title={source.is_active ? 'Disable source' : 'Enable source'}
                   >
-                    {source.is_active ? 'Disable' : 'Enable'}
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                        source.is_active ? 'translate-x-4.5' : 'translate-x-0.5'
+                      }`}
+                    />
                   </button>
 
                   <button

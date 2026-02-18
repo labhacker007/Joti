@@ -29,9 +29,12 @@ class HuntTriggerType(str, Enum):
 
 
 class UserRole(str, Enum):
-    ADMIN = "ADMIN"      # Full access: manage sources, users, global watchlist
-    ANALYST = "ANALYST"  # Threat intel analyst: reports, analysis, extraction, but not admin
-    VIEWER = "VIEWER"    # Standard user: view feeds, manage personal feeds/watchlist
+    ADMIN = "ADMIN"          # Full access: manage sources, users, global watchlist
+    ANALYST = "ANALYST"      # Threat intel analyst: reports, analysis, extraction, but not admin
+    ENGINEER = "ENGINEER"    # Technical: manages connectors/sources + analyst capabilities
+    MANAGER = "MANAGER"      # Team lead: reports, metrics, team oversight
+    EXECUTIVE = "EXECUTIVE"  # C-Suite/CISO: read-only dashboards and reports
+    VIEWER = "VIEWER"        # Standard user: view feeds, manage personal feeds/watchlist
 
 
 class ExtractedIntelligenceType(str, Enum):

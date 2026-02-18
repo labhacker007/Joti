@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.auth.dependencies import require_permission
 from app.auth.rbac import Permission
-from app.models import WatchListKeyword, User, Article
+from app.models import WatchListKeyword, UserWatchListKeyword, User, Article
+from app.auth.dependencies import get_current_user
 from app.core.logging import logger
 from app.audit.manager import AuditManager
 from pydantic import BaseModel
@@ -49,7 +50,13 @@ def reapply_watchlist_to_articles(db: Session):
     return updated_count
 
 
-WATCHLIST_CATEGORIES = ["TTP", "Threat Actor", "Attack Type", "Vulnerability", "Malware", "Custom"]
+WATCHLIST_CATEGORIES = [
+    "TTP", "Threat Actor", "Attack Type", "Vulnerability", "Malware",
+    "APT Group", "Campaign", "CVE", "Exploit", "Ransomware",
+    "C2 Infrastructure", "Phishing", "Data Exfiltration", "Insider Threat",
+    "Supply Chain", "Zero Day", "Compliance", "Executive Risk",
+    "Industry Sector", "Custom",
+]
 
 
 class WatchlistKeywordCreate(BaseModel):
@@ -248,3 +255,125 @@ def list_categories(
     in_use_cats = {r[0] for r in in_use if r[0]}
     all_cats = set(WATCHLIST_CATEGORIES) | in_use_cats
     return sorted(all_cats)
+
+
+# ============================================================================
+# User-scoped personal watchlist endpoints
+# ============================================================================
+
+class UserWatchlistKeywordResponse(BaseModel):
+    id: int
+    keyword: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/mine", response_model=list[UserWatchlistKeywordResponse])
+def list_my_keywords(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List current user's personal watchlist keywords."""
+    keywords = db.query(UserWatchListKeyword).filter(
+        UserWatchListKeyword.user_id == current_user.id
+    ).order_by(UserWatchListKeyword.keyword).all()
+    return [UserWatchlistKeywordResponse.model_validate(k) for k in keywords]
+
+
+@router.post("/mine", response_model=UserWatchlistKeywordResponse, status_code=status.HTTP_201_CREATED)
+def create_my_keyword(
+    payload: WatchlistKeywordCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Add a personal watchlist keyword (private to current user)."""
+    existing = db.query(UserWatchListKeyword).filter(
+        UserWatchListKeyword.user_id == current_user.id,
+        UserWatchListKeyword.keyword.ilike(payload.keyword)
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already have this keyword in your personal watchlist"
+        )
+
+    keyword = UserWatchListKeyword(
+        user_id=current_user.id,
+        keyword=payload.keyword.strip(),
+        is_active=True
+    )
+    db.add(keyword)
+    db.commit()
+    db.refresh(keyword)
+
+    AuditManager.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="WATCHLIST_CHANGE",
+        action=f"Personal keyword added: {keyword.keyword}",
+        resource_type="user_watchlist_keyword",
+        resource_id=keyword.id,
+    )
+
+    return UserWatchlistKeywordResponse.model_validate(keyword)
+
+
+@router.delete("/mine/{keyword_id}")
+def delete_my_keyword(
+    keyword_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Remove a personal watchlist keyword."""
+    keyword = db.query(UserWatchListKeyword).filter(
+        UserWatchListKeyword.id == keyword_id,
+        UserWatchListKeyword.user_id == current_user.id
+    ).first()
+
+    if not keyword:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Keyword not found")
+
+    deleted_keyword = keyword.keyword
+    db.delete(keyword)
+    db.commit()
+
+    AuditManager.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="WATCHLIST_CHANGE",
+        action=f"Personal keyword deleted: {deleted_keyword}",
+        resource_type="user_watchlist_keyword",
+        resource_id=keyword_id,
+    )
+
+    return {"message": f"Personal keyword '{deleted_keyword}' removed"}
+
+
+@router.patch("/mine/{keyword_id}", response_model=UserWatchlistKeywordResponse)
+def toggle_my_keyword(
+    keyword_id: int,
+    update: WatchlistKeywordUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Toggle a personal watchlist keyword's active status."""
+    keyword = db.query(UserWatchListKeyword).filter(
+        UserWatchListKeyword.id == keyword_id,
+        UserWatchListKeyword.user_id == current_user.id
+    ).first()
+
+    if not keyword:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Keyword not found")
+
+    if update.is_active is not None:
+        keyword.is_active = update.is_active
+
+    db.commit()
+    db.refresh(keyword)
+
+    return UserWatchlistKeywordResponse.model_validate(keyword)

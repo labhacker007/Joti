@@ -76,7 +76,24 @@ export default function RBACManager() {
 
       if (matrixRes.status === 'fulfilled') {
         const data = (matrixRes.value as any)?.data || matrixRes.value;
-        const rolesData = Array.isArray(data) ? data : data?.roles || [];
+
+        // Backend returns { roles: [{key,name,description}], permissions: [...], matrix: { ROLE: { permissions: {perm: bool} } } }
+        const rawRoles = Array.isArray(data) ? data : data?.roles || [];
+        const matrixData = data?.matrix || {};
+
+        // Build RoleInfo[] from roles list + matrix permission data
+        const rolesData: RoleInfo[] = rawRoles.map((r: any) => {
+          const roleKey = r.key || r.role || r.name;
+          const roleMatrix = matrixData[roleKey];
+          const perms: string[] = [];
+          if (roleMatrix?.permissions) {
+            Object.entries(roleMatrix.permissions).forEach(([perm, granted]) => {
+              if (granted) perms.push(perm);
+            });
+          }
+          return { role: roleKey, permissions: perms };
+        });
+
         setRoles(rolesData);
         // Initialize pending changes from current state
         const changes: Record<string, string[]> = {};
@@ -88,7 +105,15 @@ export default function RBACManager() {
 
       if (permsRes.status === 'fulfilled') {
         const data = (permsRes.value as any)?.data || permsRes.value;
-        setPermissions(Array.isArray(data) ? data : data?.permissions || []);
+        const rawPerms = Array.isArray(data) ? data : data?.permissions || [];
+        // Normalize: backend may return {key, name, description, category} or {name, ...}
+        setPermissions(
+          rawPerms.map((p: any) => ({
+            name: p.key || p.name,
+            description: p.description,
+            category: p.category,
+          }))
+        );
       }
 
       if (usersRes.status === 'fulfilled') {

@@ -378,6 +378,20 @@ export default function GenAIManagement() {
     provider: m.provider,
   }));
 
+  // Merge installed Ollama models into the dropdown (if not already present via sync)
+  const existingModelIds = new Set(modelOptions.map((m) => m.value));
+  ollamaLibrary
+    .filter((m) => m.installed)
+    .forEach((m) => {
+      if (!existingModelIds.has(m.name)) {
+        modelOptions.push({
+          value: m.name,
+          label: m.name,
+          provider: 'ollama',
+        });
+      }
+    });
+
   const tabs = [
     { key: 'providers' as const, label: 'Providers', icon: Key },
     { key: 'models' as const, label: 'Models', icon: Brain },

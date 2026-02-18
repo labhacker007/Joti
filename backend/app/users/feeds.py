@@ -450,6 +450,7 @@ async def ingest_user_feed(
     """
     from app.models import Article, FeedSource
     from app.ingestion.parser import FeedParser
+    from app.integrations.sources import _auto_analyze_article
     import hashlib
     
     feed = db.query(UserFeed).filter(
@@ -488,7 +489,6 @@ async def ingest_user_feed(
             feed_source = FeedSource(
                 name=source_name,
                 url=feed.url,
-                category=feed.category or "custom",
                 feed_type=feed.feed_type or "rss",
                 is_active=True
             )
@@ -532,6 +532,25 @@ async def ingest_user_feed(
                 external_id=external_id
             )
             db.add(article)
+            db.flush()  # Get article.id for extraction
+
+            # Run GenAI extraction + summarization
+            content_text = entry.get("raw_content") or entry.get("summary", "")
+            source_url = entry.get("url") or feed.url
+            try:
+                _auto_analyze_article(
+                    db=db,
+                    article=article,
+                    content=content_text,
+                    source_url=source_url
+                )
+            except Exception as analysis_err:
+                logger.warning(
+                    "user_feed_auto_analysis_failed",
+                    article_id=article.id,
+                    error=str(analysis_err)
+                )
+
             articles_created += 1
             created_articles.append({
                 "title": article.title[:100],
@@ -578,7 +597,7 @@ async def get_feed_articles(
     current_user: User = Depends(get_current_user)
 ):
     """Get articles from a user's custom feed."""
-    from app.models import Article, FeedSource
+    from app.models import Article, FeedSource, ExtractedIntelligence, ExtractedIntelligenceType
     
     feed = db.query(UserFeed).filter(
         UserFeed.id == feed_id,
@@ -613,20 +632,33 @@ async def get_feed_articles(
         .limit(limit)\
         .all()
     
+    article_list = []
+    for a in articles:
+        ioc_count = db.query(ExtractedIntelligence).filter(
+            ExtractedIntelligence.article_id == a.id,
+            ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.IOC
+        ).count()
+        ttp_count = db.query(ExtractedIntelligence).filter(
+            ExtractedIntelligence.article_id == a.id,
+            ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.TTP
+        ).count()
+        article_list.append({
+            "id": a.id,
+            "title": a.title,
+            "url": a.url,
+            "summary": a.summary,
+            "image_url": a.image_url,
+            "status": a.status,
+            "executive_summary": a.executive_summary,
+            "technical_summary": a.technical_summary,
+            "ioc_count": ioc_count,
+            "ttp_count": ttp_count,
+            "published_at": a.published_at.isoformat() if a.published_at else None,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+
     return {
-        "articles": [
-            {
-                "id": a.id,
-                "title": a.title,
-                "url": a.url,
-                "summary": a.summary,
-                "image_url": a.image_url,
-                "status": a.status,
-                "published_at": a.published_at.isoformat() if a.published_at else None,
-                "created_at": a.created_at.isoformat() if a.created_at else None
-            }
-            for a in articles
-        ],
+        "articles": article_list,
         "total": total,
         "page": page,
         "limit": limit

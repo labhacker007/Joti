@@ -240,7 +240,7 @@ class Permission(str, Enum):
 
 
 ROLE_PERMISSIONS = {
-    # ADMIN: Full access - manage sources, users, global watchlist
+    # ADMIN: Full access
     UserRole.ADMIN: [p.value for p in Permission],  # All permissions
 
     # ANALYST: Threat intel analyst - read/analyze/extract/report, manage watchlist, but not admin
@@ -252,19 +252,35 @@ ROLE_PERMISSIONS = {
         Permission.MANAGE_PERSONAL_WATCHLIST.value,
         Permission.MANAGE_GLOBAL_WATCHLIST.value,
         Permission.MANAGE_USER_FEEDS.value,
-        Permission.REPORTS_VIEW.value,
-        Permission.REPORTS_CREATE.value,
-        Permission.REPORTS_EDIT.value,
-        Permission.REPORTS_EXPORT.value,
-        Permission.REPORTS_GENERATE.value,
-        Permission.HUNTS_VIEW.value,
-        Permission.HUNTS_VIEW_RESULTS.value,
-        Permission.IOC_VIEW.value,
-        Permission.IOC_SEARCH.value,
-        Permission.IOC_ENRICH.value,
-        Permission.IOC_EXPORT.value,
-        Permission.DASHBOARD_VIEW.value,
-        Permission.CHATBOT_USE.value,
+        Permission.MANAGE_SOURCES.value,
+    ],
+
+    # ENGINEER: Technical - connectors, sources, hunts, intel, RBAC editing
+    UserRole.ENGINEER: [
+        Permission.READ_ARTICLES.value,
+        Permission.EXPORT_ARTICLES.value,
+        Permission.MANAGE_SOURCES.value,
+        Permission.MANAGE_PERSONAL_WATCHLIST.value,
+        Permission.MANAGE_GLOBAL_WATCHLIST.value,
+        Permission.MANAGE_USER_FEEDS.value,
+        Permission.MANAGE_USERS.value,
+        Permission.VIEW_AUDIT_LOGS.value,
+    ],
+
+    # MANAGER: Team lead - reports, metrics, team oversight
+    UserRole.MANAGER: [
+        Permission.READ_ARTICLES.value,
+        Permission.EXPORT_ARTICLES.value,
+        Permission.MANAGE_PERSONAL_WATCHLIST.value,
+        Permission.MANAGE_USER_FEEDS.value,
+        Permission.VIEW_AUDIT_LOGS.value,
+    ],
+
+    # EXECUTIVE: C-Suite/CISO - read-only dashboards and reports
+    UserRole.EXECUTIVE: [
+        Permission.READ_ARTICLES.value,
+        Permission.EXPORT_ARTICLES.value,
+        Permission.VIEW_AUDIT_LOGS.value,
     ],
 
     # VIEWER: Standard user - view feeds, manage personal feeds/watchlist

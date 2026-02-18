@@ -1,7 +1,5 @@
-export const dynamic = 'force-dynamic';
-
-import Admin from '@/views/Admin';
+import { redirect } from 'next/navigation';
 
 export default function AdminPage() {
-  return <Admin />;
+  redirect('/admin/sources');
 }

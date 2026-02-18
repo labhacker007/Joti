@@ -230,7 +230,7 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
             AppPermission.DASHBOARD_VIEW_CHARTS.value,
             AppPermission.DASHBOARD_EXPORT.value,
         ],
-        default_roles=["ADMIN", "TI", "TH", "IR", "VIEWER"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "MANAGER", "EXECUTIVE", "VIEWER"]
     ),
     "feed": FunctionalArea(
         key="feed",
@@ -246,7 +246,7 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
             AppPermission.FEED_ADD_SOURCE.value,
             AppPermission.FEED_REMOVE_SOURCE.value,
         ],
-        default_roles=["ADMIN", "TI", "TH", "IR", "VIEWER"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "MANAGER", "EXECUTIVE", "VIEWER"]
     ),
     "articles": FunctionalArea(
         key="articles",
@@ -272,7 +272,7 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
             AppPermission.ARTICLES_EDIT_COMMENT.value,
             AppPermission.ARTICLES_DELETE_COMMENT.value,
         ],
-        default_roles=["ADMIN", "TI", "TH", "IR"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER"]
     ),
     "intelligence": FunctionalArea(
         key="intelligence",
@@ -296,7 +296,7 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
             AppPermission.IOC_SEARCH.value,
             AppPermission.IOC_VIEW_TIMELINE.value,
         ],
-        default_roles=["ADMIN", "TI", "TH", "IR"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER"]
     ),
     "hunts": FunctionalArea(
         key="hunts",
@@ -314,7 +314,7 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
             AppPermission.HUNTS_SCHEDULE.value,
             AppPermission.HUNTS_CLONE.value,
         ],
-        default_roles=["ADMIN", "TH"]
+        default_roles=["ADMIN", "ENGINEER"]
     ),
     "reports": FunctionalArea(
         key="reports",
@@ -332,7 +332,7 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
             AppPermission.REPORTS_VIEW_DRAFT.value,
             AppPermission.REPORTS_APPROVE.value,
         ],
-        default_roles=["ADMIN", "TI", "MANAGER", "EXECUTIVE"]
+        default_roles=["ADMIN", "ANALYST", "MANAGER", "EXECUTIVE"]
     ),
     "connectors": FunctionalArea(
         key="connectors",
@@ -364,7 +364,7 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
             AppPermission.SOURCES_TEST.value,
             AppPermission.SOURCES_INGEST.value,
         ],
-        default_roles=["ADMIN", "TI"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER"]
     ),
     "watchlist": FunctionalArea(
         key="watchlist",
@@ -378,7 +378,7 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
             AppPermission.WATCHLIST_IMPORT.value,
             AppPermission.WATCHLIST_EXPORT.value,
         ],
-        default_roles=["ADMIN", "TI"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER"]
     ),
     "chatbot": FunctionalArea(
         key="chatbot",
@@ -390,7 +390,7 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
             AppPermission.CHATBOT_CLEAR_HISTORY.value,
             AppPermission.CHATBOT_PROVIDE_FEEDBACK.value,
         ],
-        default_roles=["ADMIN", "TI", "TH", "IR", "VIEWER"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "MANAGER", "EXECUTIVE", "VIEWER"]
     ),
     "audit": FunctionalArea(
         key="audit",
@@ -442,10 +442,12 @@ FUNCTIONAL_AREAS: Dict[str, FunctionalArea] = {
 
 
 # Default role permissions (comprehensive)
+# Keys MUST match UserRole enum values
 DEFAULT_ROLE_PERMISSIONS = {
     "ADMIN": [p.value for p in AppPermission],  # All permissions
-    
-    "TI": [
+
+    # ANALYST: Threat intel analyst — full article/intel/reporting, limited admin
+    "ANALYST": [
         # Dashboard
         AppPermission.DASHBOARD_VIEW.value,
         AppPermission.DASHBOARD_VIEW_STATS.value,
@@ -513,27 +515,49 @@ DEFAULT_ROLE_PERMISSIONS = {
         AppPermission.CHATBOT_VIEW_HISTORY.value,
     ],
     
-    "TH": [
+    # ENGINEER: Technical — manages connectors/sources + hunt/intel + RBAC editing
+    "ENGINEER": [
         # Dashboard
         AppPermission.DASHBOARD_VIEW.value,
         AppPermission.DASHBOARD_VIEW_STATS.value,
         AppPermission.DASHBOARD_VIEW_CHARTS.value,
-        # Feed
+        AppPermission.DASHBOARD_EXPORT.value,
+        # Feed - Full
         AppPermission.FEED_VIEW.value,
         AppPermission.FEED_SEARCH.value,
         AppPermission.FEED_FILTER.value,
+        AppPermission.FEED_STAR.value,
         AppPermission.FEED_READ.value,
-        # Articles - View only
+        AppPermission.FEED_MANAGE_SOURCES.value,
+        AppPermission.FEED_ADD_SOURCE.value,
+        AppPermission.FEED_REMOVE_SOURCE.value,
+        # Articles - Full control
         AppPermission.ARTICLES_VIEW.value,
         AppPermission.ARTICLES_VIEW_DETAILS.value,
+        AppPermission.ARTICLES_CREATE.value,
+        AppPermission.ARTICLES_EDIT.value,
+        AppPermission.ARTICLES_TRIAGE.value,
+        AppPermission.ARTICLES_CHANGE_STATUS.value,
+        AppPermission.ARTICLES_ADD_TAGS.value,
+        AppPermission.ARTICLES_EXPORT.value,
         AppPermission.ARTICLES_VIEW_CONTENT.value,
         AppPermission.ARTICLES_VIEW_INTELLIGENCE.value,
         AppPermission.ARTICLES_VIEW_HUNTS.value,
-        # Intelligence - View only
+        AppPermission.ARTICLES_VIEW_COMMENTS.value,
+        AppPermission.ARTICLES_ADD_COMMENT.value,
+        # Intelligence - Full control
         AppPermission.INTELLIGENCE_VIEW.value,
+        AppPermission.INTELLIGENCE_CREATE.value,
+        AppPermission.INTELLIGENCE_EDIT.value,
+        AppPermission.INTELLIGENCE_EXTRACT.value,
         AppPermission.INTELLIGENCE_EXPORT.value,
+        AppPermission.INTELLIGENCE_ENRICH.value,
         AppPermission.IOC_VIEW.value,
+        AppPermission.IOC_CREATE.value,
+        AppPermission.IOC_EDIT.value,
+        AppPermission.IOC_EXPORT.value,
         AppPermission.IOC_SEARCH.value,
+        AppPermission.IOC_VIEW_TIMELINE.value,
         # Hunts - Full control
         AppPermission.HUNTS_VIEW.value,
         AppPermission.HUNTS_CREATE.value,
@@ -545,42 +569,46 @@ DEFAULT_ROLE_PERMISSIONS = {
         AppPermission.HUNTS_EXPORT_RESULTS.value,
         AppPermission.HUNTS_SCHEDULE.value,
         AppPermission.HUNTS_CLONE.value,
-        # Reports - View only
-        AppPermission.REPORTS_VIEW.value,
-        AppPermission.REPORTS_EXPORT.value,
-        # Chatbot
-        AppPermission.CHATBOT_USE.value,
-    ],
-    
-    "IR": [
-        # Dashboard
-        AppPermission.DASHBOARD_VIEW.value,
-        AppPermission.DASHBOARD_VIEW_STATS.value,
-        # Feed
-        AppPermission.FEED_VIEW.value,
-        AppPermission.FEED_SEARCH.value,
-        AppPermission.FEED_READ.value,
-        # Articles
-        AppPermission.ARTICLES_VIEW.value,
-        AppPermission.ARTICLES_VIEW_DETAILS.value,
-        AppPermission.ARTICLES_TRIAGE.value,
-        AppPermission.ARTICLES_VIEW_CONTENT.value,
-        AppPermission.ARTICLES_VIEW_INTELLIGENCE.value,
-        AppPermission.ARTICLES_VIEW_COMMENTS.value,
-        AppPermission.ARTICLES_ADD_COMMENT.value,
-        # Intelligence - View only
-        AppPermission.INTELLIGENCE_VIEW.value,
-        AppPermission.IOC_VIEW.value,
-        AppPermission.IOC_SEARCH.value,
-        # Hunts - Execute only
-        AppPermission.HUNTS_VIEW.value,
-        AppPermission.HUNTS_EXECUTE.value,
-        AppPermission.HUNTS_VIEW_RESULTS.value,
         # Reports
         AppPermission.REPORTS_VIEW.value,
-        AppPermission.REPORTS_SHARE.value,
+        AppPermission.REPORTS_CREATE.value,
+        AppPermission.REPORTS_EXPORT.value,
+        # Connectors - Full control
+        AppPermission.CONNECTORS_VIEW.value,
+        AppPermission.CONNECTORS_CREATE.value,
+        AppPermission.CONNECTORS_EDIT.value,
+        AppPermission.CONNECTORS_DELETE.value,
+        AppPermission.CONNECTORS_TEST.value,
+        AppPermission.CONNECTORS_ENABLE.value,
+        AppPermission.CONNECTORS_DISABLE.value,
+        AppPermission.CONNECTORS_VIEW_LOGS.value,
+        # Sources - Full control
+        AppPermission.SOURCES_VIEW.value,
+        AppPermission.SOURCES_CREATE.value,
+        AppPermission.SOURCES_EDIT.value,
+        AppPermission.SOURCES_DELETE.value,
+        AppPermission.SOURCES_ENABLE.value,
+        AppPermission.SOURCES_DISABLE.value,
+        AppPermission.SOURCES_TEST.value,
+        AppPermission.SOURCES_INGEST.value,
+        # Watchlist - Full
+        AppPermission.WATCHLIST_VIEW.value,
+        AppPermission.WATCHLIST_CREATE.value,
+        AppPermission.WATCHLIST_EDIT.value,
+        AppPermission.WATCHLIST_DELETE.value,
+        # Admin - GenAI and Guardrails
+        AppPermission.ADMIN_GENAI_VIEW.value,
+        AppPermission.ADMIN_GENAI_EDIT.value,
+        AppPermission.ADMIN_GENAI_TEST.value,
+        AppPermission.ADMIN_GUARDRAILS_VIEW.value,
+        AppPermission.ADMIN_GUARDRAILS_EDIT.value,
+        # RBAC editing
+        AppPermission.ADMIN_RBAC_VIEW.value,
+        AppPermission.ADMIN_RBAC_EDIT_ROLES.value,
+        AppPermission.ADMIN_RBAC_EDIT_PERMISSIONS.value,
         # Chatbot
         AppPermission.CHATBOT_USE.value,
+        AppPermission.CHATBOT_VIEW_HISTORY.value,
     ],
     
     "VIEWER": [

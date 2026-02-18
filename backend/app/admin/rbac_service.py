@@ -24,34 +24,29 @@ def get_all_valid_permissions() -> Set[str]:
 
 class RBACService:
     """Service for managing role-based access control."""
-    
+
     @staticmethod
     def get_all_permissions() -> List[Dict[str, str]]:
-        """Get all available permissions."""
-        return [
-            {
-                "key": p.value,
-                "name": p.value,
-                "description": p.value.replace(":", " ").replace("_", " ").title(),
-                "category": p.value.split(":")[0].title()
-            }
-            for p in Permission
-        ]
-    
+        """Get all available permissions from the comprehensive AppPermission enum."""
+        from app.auth.comprehensive_permissions import get_all_permissions as get_comprehensive_permissions
+        return get_comprehensive_permissions()
+
     @staticmethod
     def get_all_roles() -> List[Dict[str, str]]:
         """Get all available roles."""
+        role_descriptions = {
+            "ADMIN": "Administrator - Full system access",
+            "ANALYST": "Threat Intel Analyst - Analysis, extraction, reporting",
+            "ENGINEER": "Security Engineer - Connectors, sources, hunts, technical",
+            "MANAGER": "Team Manager - Reports, metrics, team oversight",
+            "EXECUTIVE": "Executive/CISO - Read-only dashboards and reports",
+            "VIEWER": "Viewer - Read-only feed access",
+        }
         return [
             {
                 "key": role.value,
                 "name": role.value,
-                "description": {
-                    "ADMIN": "Administrator - Full system access",
-                    "TI": "Threat Intelligence - Analyze and create reports",
-                    "TH": "Threat Hunter - Execute hunts and queries",
-                    "IR": "Incident Response - Respond to threats",
-                    "VIEWER": "Viewer - Read-only access"
-                }.get(role.value, role.value)
+                "description": role_descriptions.get(role.value, role.value)
             }
             for role in UserRole
         ]

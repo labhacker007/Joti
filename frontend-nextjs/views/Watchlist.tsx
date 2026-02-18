@@ -19,7 +19,13 @@ import { watchlistAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
 import { cn } from '@/lib/utils';
 
-const CATEGORIES = ['TTP', 'Threat Actor', 'Attack Type', 'Vulnerability', 'Malware', 'Custom'];
+const CATEGORIES = [
+  'TTP', 'Threat Actor', 'Attack Type', 'Vulnerability', 'Malware',
+  'APT Group', 'Campaign', 'CVE', 'Exploit', 'Ransomware',
+  'C2 Infrastructure', 'Phishing', 'Data Exfiltration', 'Insider Threat',
+  'Supply Chain', 'Zero Day', 'Compliance', 'Executive Risk',
+  'Industry Sector', 'Custom',
+];
 
 const CATEGORY_COLORS: Record<string, string> = {
   'TTP': 'bg-red-500/10 text-red-600 border-red-500/30',
@@ -27,6 +33,20 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Attack Type': 'bg-orange-500/10 text-orange-600 border-orange-500/30',
   'Vulnerability': 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30',
   'Malware': 'bg-pink-500/10 text-pink-600 border-pink-500/30',
+  'APT Group': 'bg-violet-500/10 text-violet-600 border-violet-500/30',
+  'Campaign': 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30',
+  'CVE': 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+  'Exploit': 'bg-rose-500/10 text-rose-600 border-rose-500/30',
+  'Ransomware': 'bg-red-600/10 text-red-700 border-red-600/30',
+  'C2 Infrastructure': 'bg-slate-500/10 text-slate-600 border-slate-500/30',
+  'Phishing': 'bg-cyan-500/10 text-cyan-600 border-cyan-500/30',
+  'Data Exfiltration': 'bg-teal-500/10 text-teal-600 border-teal-500/30',
+  'Insider Threat': 'bg-lime-500/10 text-lime-600 border-lime-500/30',
+  'Supply Chain': 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
+  'Zero Day': 'bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/30',
+  'Compliance': 'bg-sky-500/10 text-sky-600 border-sky-500/30',
+  'Executive Risk': 'bg-stone-500/10 text-stone-600 border-stone-500/30',
+  'Industry Sector': 'bg-zinc-500/10 text-zinc-600 border-zinc-500/30',
   'Custom': 'bg-blue-500/10 text-blue-600 border-blue-500/30',
 };
 
@@ -36,6 +56,12 @@ interface WatchlistItem {
   category?: string;
   is_active: boolean;
   created_at?: string;
+}
+
+interface PersonalKeyword {
+  id: string;
+  keyword: string;
+  is_active: boolean;
 }
 
 export default function Watchlist() {
@@ -49,6 +75,11 @@ export default function Watchlist() {
   const [refreshing, setRefreshing] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'global' | 'personal'>('global');
+  const [personalKeywords, setPersonalKeywords] = useState<PersonalKeyword[]>([]);
+  const [personalLoading, setPersonalLoading] = useState(false);
+  const [newPersonalKeyword, setNewPersonalKeyword] = useState('');
+  const [addingPersonal, setAddingPersonal] = useState(false);
 
   useEffect(() => {
     loadWatchlist();
@@ -166,8 +197,75 @@ export default function Watchlist() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleAdd();
+    if (e.key === 'Enter') {
+      if (activeTab === 'personal') handleAddPersonal();
+      else handleAdd();
+    }
   };
+
+  const loadPersonalKeywords = async () => {
+    try {
+      setPersonalLoading(true);
+      const response = await watchlistAPI.getMyKeywords() as any;
+      const keywords = Array.isArray(response) ? response : (response.data || []);
+      setPersonalKeywords(
+        keywords.map((k: any) => ({
+          id: k.id.toString(),
+          keyword: k.keyword,
+          is_active: k.is_active,
+        }))
+      );
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    } finally {
+      setPersonalLoading(false);
+    }
+  };
+
+  const handleAddPersonal = async () => {
+    if (!newPersonalKeyword.trim()) return;
+    setAddingPersonal(true);
+    setError('');
+    try {
+      await watchlistAPI.addMyKeyword(newPersonalKeyword.trim());
+      setSuccess('Personal keyword added');
+      setNewPersonalKeyword('');
+      await loadPersonalKeywords();
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    } finally {
+      setAddingPersonal(false);
+    }
+  };
+
+  const handleDeletePersonal = async (id: string) => {
+    if (!confirm('Remove this personal keyword?')) return;
+    try {
+      await watchlistAPI.deleteMyKeyword(id);
+      setSuccess('Personal keyword removed');
+      await loadPersonalKeywords();
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleTogglePersonal = async (id: string, currentActive: boolean) => {
+    try {
+      await watchlistAPI.toggleMyKeyword(id, !currentActive);
+      setPersonalKeywords((prev) =>
+        prev.map((k) => (k.id === id ? { ...k, is_active: !currentActive } : k))
+      );
+      setSuccess(`Personal keyword ${!currentActive ? 'activated' : 'deactivated'}`);
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'personal' && personalKeywords.length === 0) {
+      loadPersonalKeywords();
+    }
+  }, [activeTab]);
 
   const toggleGroup = (group: string) => {
     setCollapsedGroups((prev) => {
@@ -339,6 +437,114 @@ export default function Watchlist() {
         </div>
       )}
 
+      {/* Tabs: Global vs Personal */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setActiveTab('global')}
+          className={cn(
+            'px-4 py-2 rounded-md text-sm font-medium transition',
+            activeTab === 'global'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+          )}
+        >
+          Global Keywords ({items.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('personal')}
+          className={cn(
+            'px-4 py-2 rounded-md text-sm font-medium transition',
+            activeTab === 'personal'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+          )}
+        >
+          My Keywords ({personalKeywords.length})
+        </button>
+      </div>
+
+      {/* Personal Keywords Tab */}
+      {activeTab === 'personal' && (
+        <div className="space-y-4">
+          <div className="bg-card border border-border rounded-lg p-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newPersonalKeyword}
+                onChange={(e) => setNewPersonalKeyword(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Add a personal keyword to monitor..."
+                className="flex-1 px-4 py-2 bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              />
+              <button
+                onClick={handleAddPersonal}
+                disabled={addingPersonal || !newPersonalKeyword.trim()}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                {addingPersonal ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Personal keywords are private to you and not visible to other users.
+            </p>
+          </div>
+
+          {personalLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading your keywords...</div>
+          ) : personalKeywords.length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-border rounded-lg text-muted-foreground">
+              No personal keywords added yet
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {personalKeywords.map((kw) => (
+                <div
+                  key={kw.id}
+                  className={cn(
+                    'bg-card border rounded-lg p-3 flex items-center justify-between',
+                    kw.is_active ? 'border-border' : 'border-border/50 opacity-60'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Flame className={cn('w-4 h-4', kw.is_active ? 'text-orange-500' : 'text-gray-400')} />
+                    <span className="text-sm font-medium text-foreground">{kw.keyword}</span>
+                    <span className={cn(
+                      'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                      kw.is_active ? 'bg-green-500/10 text-green-700' : 'bg-gray-500/10 text-gray-600'
+                    )}>
+                      {kw.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleTogglePersonal(kw.id, kw.is_active)}
+                      className={cn(
+                        'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                        kw.is_active ? 'bg-primary' : 'bg-gray-300'
+                      )}
+                    >
+                      <span className={cn(
+                        'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform',
+                        kw.is_active ? 'translate-x-4.5' : 'translate-x-0.5'
+                      )} />
+                    </button>
+                    <button
+                      onClick={() => handleDeletePersonal(kw.id)}
+                      className="p-1.5 text-muted-foreground hover:text-red-600 rounded-md hover:bg-red-500/10"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Global Keywords Section (only show when global tab active) */}
+      {activeTab === 'global' && <>
       {/* Add Keyword Input */}
       <div className="bg-card border border-border rounded-lg p-4 mb-6">
         <div className="flex gap-2">
@@ -423,6 +629,7 @@ export default function Watchlist() {
           })}
         </div>
       )}
+      </>}
     </div>
   );
 }

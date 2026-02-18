@@ -69,12 +69,15 @@ def article_to_response(article: Article, user_id: Optional[int] = None, db: Opt
     if db and user_id:
         response_data["is_read"] = get_article_read_status(db, article.id, user_id)
         response_data["hunt_status"] = get_hunt_status_for_article(db, article.id)
-        bookmark = db.query(ArticleBookmark).filter(
-            ArticleBookmark.user_id == user_id,
-            ArticleBookmark.content_id == article.id,
-            ArticleBookmark.is_bookmarked == True
-        ).first()
-        response_data["is_bookmarked"] = bookmark is not None
+        try:
+            bookmark = db.query(ArticleBookmark).filter(
+                ArticleBookmark.user_id == user_id,
+                ArticleBookmark.content_id == article.id,
+                ArticleBookmark.is_bookmarked == True
+            ).first()
+            response_data["is_bookmarked"] = bookmark is not None
+        except Exception:
+            response_data["is_bookmarked"] = False
     
     # Load extracted intelligence if requested (for detail view)
     if db and include_intel:
@@ -228,6 +231,15 @@ def list_articles(
         from app.models import ArticleReadStatus
 
         query = db.query(Article).options(joinedload(Article.feed_source))
+
+        # Exclude user-scoped articles (uploads and personal feeds) from global feed
+        # These are only visible via the My Feeds page
+        query = query.outerjoin(FeedSource, Article.source_id == FeedSource.id).filter(
+            or_(
+                FeedSource.id == None,  # Articles without a source
+                ~FeedSource.name.like("upload:%") & ~FeedSource.name.like("User:%"),
+            )
+        )
 
         # Apply time range filter
         if time_range and time_range != "all":
@@ -701,36 +713,32 @@ def update_status(
                 # Save extracted intelligence to database
                 total_saved = 0
                 for ioc in extracted["iocs"]:
+                    value = ioc.get("value")
+                    if not value:
+                        continue
                     intel = ExtractedIntelligence(
                         article_id=article_id,
-                        intelligence_type=ioc["intelligence_type"],
-                        value=ioc["value"],
+                        intelligence_type=ExtractedIntelligenceType.IOC,
+                        value=value,
                         confidence=ioc.get("confidence", 75),
-                        context=f"Type: {ioc['type']}, Hash Type: {ioc.get('hash_type', 'N/A')}"
+                        evidence=ioc.get("evidence"),
+                        meta={"type": ioc.get("type"), "source": "regex"}
                     )
                     db.add(intel)
                     total_saved += 1
-                
-                # Note: IOAs removed - only tracking IOCs and TTPs
-                
+
                 for ttp in extracted["ttps"]:
+                    mitre_id = ttp.get("mitre_id")
+                    if not mitre_id:
+                        continue
                     intel = ExtractedIntelligence(
                         article_id=article_id,
-                        intelligence_type=ttp["intelligence_type"],
-                        value=f"{ttp['mitre_id']}: {ttp['name']}",
+                        intelligence_type=ExtractedIntelligenceType.TTP,
+                        value=ttp.get("name") or mitre_id,
+                        mitre_id=mitre_id,
                         confidence=ttp.get("confidence", 80),
-                        context=f"MITRE ATT&CK Technique"
-                    )
-                    db.add(intel)
-                    total_saved += 1
-                
-                for atlas in extracted["atlas"]:
-                    intel = ExtractedIntelligence(
-                        article_id=article_id,
-                        intelligence_type=atlas["intelligence_type"],
-                        value=f"{atlas['mitre_id']}: {atlas['name']}",
-                        confidence=atlas.get("confidence", 70),
-                        context=f"MITRE ATLAS (AI/ML) Technique"
+                        evidence=ttp.get("evidence"),
+                        meta={"source": "regex"}
                     )
                     db.add(intel)
                     total_saved += 1

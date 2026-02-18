@@ -13,7 +13,14 @@ import {
   Rss,
   Zap,
   Bell,
+  ChevronDown,
+  ChevronUp,
+  Shield,
+  Brain,
+  Upload,
+  Loader,
 } from 'lucide-react';
+import FileUploadDropzone from '@/components/FileUploadDropzone';
 import { userFeedsAPI } from '@/api/client';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +35,31 @@ interface UserFeed {
   article_count?: number;
   last_ingested_at?: string;
   description?: string;
+}
+
+interface FeedArticle {
+  id: number;
+  title: string;
+  url: string;
+  summary?: string;
+  executive_summary?: string;
+  technical_summary?: string;
+  ioc_count: number;
+  ttp_count: number;
+  status: string;
+  published_at?: string;
+  created_at?: string;
+}
+
+interface UploadResult {
+  status: 'success' | 'error' | 'duplicate';
+  filename: string;
+  message: string;
+  articleTitle?: string;
+  executiveSummary?: string;
+  iocCount?: number;
+  ttpCount?: number;
+  extractionMethod?: string;
 }
 
 interface AddFeedForm {
@@ -49,6 +81,12 @@ export default function MyFeeds() {
   const [validationMessage, setValidationMessage] = useState('');
   const [editingFeedId, setEditingFeedId] = useState<string | null>(null);
   const [ingesting, setIngesting] = useState<string | null>(null);
+  const [expandedFeedId, setExpandedFeedId] = useState<string | null>(null);
+  const [feedArticles, setFeedArticles] = useState<Record<string, FeedArticle[]>>({});
+  const [loadingArticles, setLoadingArticles] = useState<string | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [form, setForm] = useState<AddFeedForm>({
     name: '',
     url: '',
@@ -189,14 +227,71 @@ export default function MyFeeds() {
     try {
       setIngesting(feedId);
       await userFeedsAPI.triggerIngest(feedId);
-      setSuccessMessage('Feed ingestion started');
+      setSuccessMessage('Feed ingested successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
+      // Clear cached articles so next expand re-fetches with extraction data
+      setFeedArticles((prev) => {
+        const updated = { ...prev };
+        delete updated[feedId];
+        return updated;
+      });
       await fetchFeeds();
     } catch (err: any) {
       setError(err.message || 'Failed to ingest feed');
     } finally {
       setIngesting(null);
     }
+  };
+
+  const handleToggleArticles = async (feedId: string) => {
+    if (expandedFeedId === feedId) {
+      setExpandedFeedId(null);
+      return;
+    }
+    setExpandedFeedId(feedId);
+    if (feedArticles[feedId]) return;
+    try {
+      setLoadingArticles(feedId);
+      const response = (await userFeedsAPI.getFeedArticles(feedId, 1, 10)) as any;
+      const data = response.data || response;
+      setFeedArticles((prev) => ({
+        ...prev,
+        [feedId]: data.articles || [],
+      }));
+    } catch (err: any) {
+      console.error('Failed to load articles:', err);
+    } finally {
+      setLoadingArticles(null);
+    }
+  };
+
+  const handleFilesSelected = async (files: File[]) => {
+    setUploading(true);
+    const results: UploadResult[] = [];
+    for (const file of files) {
+      try {
+        const response = (await userFeedsAPI.uploadDocument(file, {
+          title: file.name,
+        })) as any;
+        const data = response.data || response;
+        results.push({
+          status: data.status === 'duplicate' ? 'duplicate' : 'success',
+          filename: file.name,
+          message: data.message || 'Document ingested successfully',
+          articleTitle: data.article_title,
+          executiveSummary: data.executive_summary,
+          iocCount: data.ioc_count || 0,
+          ttpCount: data.ttp_count || 0,
+          extractionMethod: data.extraction_method,
+        });
+      } catch (err: any) {
+        const detail =
+          err.response?.data?.detail || err.message || 'Failed to process document';
+        results.push({ status: 'error', filename: file.name, message: detail });
+      }
+    }
+    setUploadResults((prev) => [...results, ...prev]);
+    setUploading(false);
   };
 
   const feedTypeLabels: Record<string, string> = {
@@ -236,16 +331,29 @@ export default function MyFeeds() {
           </h1>
           <p className="text-muted-foreground mt-1">Add and manage your personal feed sources</p>
         </div>
-        <button
-          onClick={() => {
-            setShowAddForm(!showAddForm);
-            if (editingFeedId) handleCancelEdit();
-          }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-        >
-          <Plus className="w-4 h-4" />
-          Add Feed
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setShowUpload(!showUpload);
+              if (showAddForm) setShowAddForm(false);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Document
+          </button>
+          <button
+            onClick={() => {
+              setShowAddForm(!showAddForm);
+              if (showUpload) setShowUpload(false);
+              if (editingFeedId) handleCancelEdit();
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            <Plus className="w-4 h-4" />
+            Add Feed
+          </button>
+        </div>
       </div>
 
       {/* Stats Row */}
@@ -284,6 +392,71 @@ export default function MyFeeds() {
         <div className="p-4 bg-green-500/10 text-green-700 rounded-md flex items-start gap-3">
           <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
           <div>{successMessage}</div>
+        </div>
+      )}
+
+      {showUpload && (
+        <div className="p-6 border border-border rounded-lg bg-card space-y-4">
+          <h2 className="text-xl font-semibold text-foreground">Upload Document</h2>
+          <p className="text-sm text-muted-foreground">
+            Upload PDFs, Word docs, Excel sheets, or text files. GenAI will extract IOCs, TTPs, and generate summaries.
+          </p>
+          <FileUploadDropzone
+            onFilesSelected={handleFilesSelected}
+            accept=".pdf,.docx,.doc,.xlsx,.csv,.html,.htm,.txt"
+            maxSize={50 * 1024 * 1024}
+            maxFiles={5}
+            disabled={uploading}
+          />
+          {uploading && (
+            <div className="p-3 bg-blue-500/10 text-blue-700 rounded-md flex items-center gap-2">
+              <Loader className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Processing documents...</span>
+            </div>
+          )}
+          {uploadResults.length > 0 && (
+            <div className="space-y-2">
+              {uploadResults.map((result, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'p-3 rounded-md border text-sm',
+                    result.status === 'success'
+                      ? 'bg-green-500/5 border-green-500/30'
+                      : result.status === 'duplicate'
+                        ? 'bg-amber-500/5 border-amber-500/30'
+                        : 'bg-red-500/5 border-red-500/30'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-foreground">
+                      {result.articleTitle || result.filename}
+                    </span>
+                    <div className="flex gap-2">
+                      {(result.iocCount ?? 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-700">
+                          {result.iocCount} IOCs
+                        </span>
+                      )}
+                      {(result.ttpCount ?? 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-500/10 text-orange-700">
+                          {result.ttpCount} TTPs
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className={`text-xs mt-1 ${
+                    result.status === 'success' ? 'text-green-600' : result.status === 'duplicate' ? 'text-amber-600' : 'text-red-600'
+                  }`}>
+                    {result.message}
+                  </p>
+                  {result.executiveSummary && (
+                    <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{result.executiveSummary}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -484,6 +657,18 @@ export default function MyFeeds() {
 
                 <div className="flex gap-2 ml-4">
                   <button
+                    onClick={() => handleToggleArticles(feed.id)}
+                    className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary"
+                    title={expandedFeedId === feed.id ? 'Hide articles' : 'View articles'}
+                  >
+                    {expandedFeedId === feed.id ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  <button
                     onClick={() => handleIngestFeed(feed.id)}
                     disabled={ingesting === feed.id}
                     className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary disabled:opacity-50"
@@ -519,6 +704,64 @@ export default function MyFeeds() {
                   </button>
                 </div>
               </div>
+
+              {/* Expandable Articles Section */}
+              {expandedFeedId === feed.id && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <h4 className="text-sm font-semibold text-foreground mb-3">Articles & Findings</h4>
+                  {loadingArticles === feed.id ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Loading articles...
+                    </div>
+                  ) : !feedArticles[feed.id]?.length ? (
+                    <p className="text-sm text-muted-foreground py-4">
+                      No articles yet. Click the refresh icon to ingest articles.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {feedArticles[feed.id].map((article) => (
+                        <div key={article.id} className="p-3 rounded-md bg-secondary/50 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <a
+                              href={article.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium text-foreground hover:text-primary"
+                            >
+                              {article.title}
+                            </a>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {article.ioc_count > 0 && (
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-700 flex items-center gap-1">
+                                  <Shield className="w-3 h-3" />
+                                  {article.ioc_count} IOCs
+                                </span>
+                              )}
+                              {article.ttp_count > 0 && (
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-500/10 text-orange-700 flex items-center gap-1">
+                                  <Brain className="w-3 h-3" />
+                                  {article.ttp_count} TTPs
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {article.executive_summary && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {article.executive_summary}
+                            </p>
+                          )}
+                          {article.published_at && (
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(article.published_at).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))
         )}

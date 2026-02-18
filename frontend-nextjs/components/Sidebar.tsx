@@ -16,10 +16,11 @@ import {
   Bot,
   Lock,
   Activity,
-  LayoutDashboard,
   LogOut,
   UserCircle,
   BarChart3,
+  BookmarkCheck,
+  Eye,
 } from 'lucide-react';
 import { useAuthStore } from '@/store';
 import { usersAPI } from '@/api/client';
@@ -36,11 +37,11 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Feeds', path: '/feeds', icon: Rss },
-  { label: 'Document Upload', path: '/document-upload', icon: Upload },
+  { label: 'My Feeds', path: '/my-feeds', icon: BookmarkCheck },
+  { label: 'Watchlist', path: '/watchlist', icon: Eye },
 ];
 
 const adminItems: NavItem[] = [
-  { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
   { label: 'Sources', path: '/admin/sources', icon: Rss },
   { label: 'Users', path: '/admin/users', icon: Users },
   { label: 'RBAC', path: '/admin/rbac', icon: Lock },

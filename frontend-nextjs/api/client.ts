@@ -502,6 +502,19 @@ export const watchlistAPI = {
   refresh: async () => {
     return post('/watchlist/refresh', {});
   },
+  // User-scoped personal watchlist
+  getMyKeywords: async () => {
+    return get('/watchlist/mine');
+  },
+  addMyKeyword: async (keyword: string) => {
+    return post('/watchlist/mine', { keyword });
+  },
+  toggleMyKeyword: async (id: string, isActive: boolean) => {
+    return patch(`/watchlist/mine/${id}`, { is_active: isActive });
+  },
+  deleteMyKeyword: async (id: string) => {
+    return del(`/watchlist/mine/${id}`);
+  },
 };
 
 // ============================================
