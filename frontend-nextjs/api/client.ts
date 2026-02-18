@@ -105,7 +105,13 @@ const createApiClient = (): AxiosInstance => {
   return client;
 };
 
-const apiClient = createApiClient();
+let _apiClient: AxiosInstance | null = null;
+const getApiClient = (): AxiosInstance => {
+  if (!_apiClient) {
+    _apiClient = createApiClient();
+  }
+  return _apiClient;
+};
 
 /**
  * Error handler to extract meaningful messages from API errors
@@ -142,7 +148,7 @@ export const get = async <T>(
   url: string,
   config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> => {
-  const response = await apiClient.get<ApiResponse<T>>(url, config);
+  const response = await getApiClient().get<ApiResponse<T>>(url, config);
   return response.data;
 };
 
@@ -154,7 +160,7 @@ export const post = async <T>(
   data?: any,
   config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> => {
-  const response = await apiClient.post<ApiResponse<T>>(url, data, config);
+  const response = await getApiClient().post<ApiResponse<T>>(url, data, config);
   return response.data;
 };
 
@@ -166,7 +172,7 @@ export const put = async <T>(
   data?: any,
   config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> => {
-  const response = await apiClient.put<ApiResponse<T>>(url, data, config);
+  const response = await getApiClient().put<ApiResponse<T>>(url, data, config);
   return response.data;
 };
 
@@ -177,7 +183,7 @@ export const del = async <T>(
   url: string,
   config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> => {
-  const response = await apiClient.delete<ApiResponse<T>>(url, config);
+  const response = await getApiClient().delete<ApiResponse<T>>(url, config);
   return response.data;
 };
 
@@ -189,7 +195,7 @@ export const patch = async <T>(
   data?: any,
   config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> => {
-  const response = await apiClient.patch<ApiResponse<T>>(url, data, config);
+  const response = await getApiClient().patch<ApiResponse<T>>(url, data, config);
   return response.data;
 };
 
