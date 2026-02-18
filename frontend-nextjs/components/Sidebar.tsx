@@ -193,16 +193,13 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
         <div className="border-t border-border p-2 space-y-1">
           {/* Theme Switcher */}
           <div
-            className={`flex items-center ${collapsed ? 'justify-center' : 'px-3 py-2'}`}
+            className={`flex items-center ${collapsed ? 'justify-center' : 'px-3 py-1'}`}
           >
             <ThemeSwitcher
               selectedTheme={theme as any}
               onThemeChange={(newTheme) => setTheme(newTheme as ThemeName)}
-              className={collapsed ? '!p-2' : '!p-2'}
+              compact={collapsed}
             />
-            {!collapsed && (
-              <span className="ml-3 text-sm text-muted-foreground">Theme</span>
-            )}
           </div>
 
           {/* Profile Link */}

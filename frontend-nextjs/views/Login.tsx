@@ -158,65 +158,71 @@ export default function Login() {
       {dt.overlay === 'radar' && <RadarSweepOverlay key={`overlay-${theme}`} color={dt.colors.primary} />}
       {dt.overlay === 'sunbeam' && <SunbeamOverlay key={`overlay-${theme}`} color={dt.colors.primary} />}
 
-      {/* Theme Switcher */}
+      {/* Theme Switcher - Top Right */}
       <div className="fixed top-4 right-4 z-50">
         <ThemeSwitcher selectedTheme={theme as ThemeType} onThemeChange={handleThemeChange} />
       </div>
 
-      {/* Main Split Layout */}
-      <div className="relative z-10 min-h-screen flex flex-col lg:flex-row">
+      {/* Main Layout */}
+      <div className="relative z-10 min-h-screen flex">
 
-        {/* Left Panel: News Feed */}
-        <div className="hidden lg:flex lg:w-[55%] xl:w-[58%] flex-col justify-center px-8 xl:px-14 py-10">
-          <div className="max-w-2xl">
+        {/* Left Panel: Branding + Top 5 News */}
+        <div className="hidden lg:flex lg:flex-1 flex-col justify-center px-10 xl:px-16 py-10">
+          <div className="max-w-xl">
             {/* Branding */}
-            <div className="mb-8">
-              <div className="flex items-center gap-3 mb-2">
-                <Shield className="w-8 h-8" style={{ color: dt.colors.primary }} />
-                <h1 className="text-4xl xl:text-5xl font-bold tracking-tight text-foreground">
-                  Joti
-                </h1>
+            <div className="mb-10">
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: `${dt.colors.primary}15` }}
+                >
+                  <Shield className="w-7 h-7" style={{ color: dt.colors.primary }} />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold tracking-tight text-foreground">
+                    Joti
+                  </h1>
+                  <p className="text-sm font-light tracking-wide text-muted-foreground">
+                    Threat Intelligence Platform
+                  </p>
+                </div>
               </div>
-              <p className="text-lg font-light tracking-wide text-muted-foreground">
-                Threat Intelligence News Aggregator
-              </p>
             </div>
 
             {/* Top 5 Cyber News */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-5">
                 <TrendingUp className="w-4 h-4" style={{ color: dt.colors.primary }} />
                 <span
-                  className="text-xs font-bold uppercase tracking-widest"
+                  className="text-xs font-bold uppercase tracking-[0.2em]"
                   style={{ color: dt.colors.primary }}
                 >
-                  Top Cybersecurity News
+                  Top Stories — Last 48h
                 </span>
               </div>
 
               {trending.length > 0 ? (
-                trending.map((story, idx) => (
-                  <div
-                    key={story.id}
-                    className="group p-4 rounded-xl backdrop-blur-md border border-border/50 bg-card/30 hover:bg-card/50 hover:border-border transition-all duration-300"
-                  >
-                    <div className="flex items-start gap-3">
+                <div className="space-y-3">
+                  {trending.map((story, idx) => (
+                    <div
+                      key={story.id}
+                      className="group flex items-start gap-3 p-3.5 rounded-xl backdrop-blur-md border border-border/40 bg-card/20 hover:bg-card/40 hover:border-border/60 transition-all duration-300"
+                    >
                       <span
-                        className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
+                        className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold mt-0.5"
                         style={{
-                          backgroundColor: `${dt.colors.primary}20`,
+                          backgroundColor: `${dt.colors.primary}15`,
                           color: dt.colors.primary,
                         }}
                       >
                         {idx + 1}
                       </span>
-
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold leading-snug mb-1.5 text-foreground line-clamp-2">
+                        <h3 className="text-sm font-semibold leading-snug mb-1 text-foreground line-clamp-2">
                           {story.title}
                         </h3>
                         {story.summary && (
-                          <p className="text-xs leading-relaxed mb-2 text-muted-foreground line-clamp-2">
+                          <p className="text-xs leading-relaxed mb-1.5 text-muted-foreground line-clamp-2">
                             {story.summary}
                           </p>
                         )}
@@ -244,7 +250,7 @@ export default function Login() {
                               href={story.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[11px] flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                              className="text-[11px] flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                               style={{ color: dt.colors.primary }}
                             >
                               Read more <ExternalLink className="w-2.5 h-2.5" />
@@ -253,43 +259,74 @@ export default function Login() {
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
-                <div className="p-6 rounded-xl backdrop-blur-md border border-border/50 bg-card/30 text-center">
-                  <Newspaper className="w-10 h-10 mx-auto mb-3 opacity-30" style={{ color: dt.colors.primary }} />
-                  <p className="text-sm font-medium mb-1 text-foreground">
-                    No trending news yet
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    News will appear here once feeds are configured and articles are ingested.
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 p-3.5 rounded-xl backdrop-blur-md border border-border/30 bg-card/10"
+                    >
+                      <span
+                        className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold opacity-30"
+                        style={{
+                          backgroundColor: `${dt.colors.primary}10`,
+                          color: dt.colors.primary,
+                        }}
+                      >
+                        {i}
+                      </span>
+                      <div className="flex-1 space-y-2 py-1">
+                        <div className="h-3 rounded bg-muted-foreground/10 w-4/5" />
+                        <div className="h-2 rounded bg-muted-foreground/5 w-3/5" />
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs text-center text-muted-foreground/50 mt-4">
+                    News will appear here once feeds are ingested
                   </p>
                 </div>
               )}
             </div>
 
-            <p className="text-xs mt-6 text-muted-foreground">
+            <p className="text-[11px] mt-8 text-muted-foreground/60">
               Built for SOC teams, threat researchers, and security analysts
             </p>
           </div>
         </div>
 
-        {/* Right Panel: Login Form */}
-        <div className="flex-1 flex items-center justify-center px-6 py-10 lg:px-10 xl:px-16">
-          <div className="w-full max-w-sm">
+        {/* Right Panel: Login Dialog with Glass Effect */}
+        <div className="w-full lg:w-[420px] xl:w-[440px] flex items-center justify-center relative">
+          {/* Glass backdrop for right panel */}
+          <div
+            className="absolute inset-0 backdrop-blur-xl"
+            style={{
+              backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.5)',
+            }}
+          />
+          <div
+            className="absolute inset-y-0 left-0 w-px"
+            style={{
+              background: isDark
+                ? `linear-gradient(to bottom, transparent, ${dt.colors.primary}30, transparent)`
+                : `linear-gradient(to bottom, transparent, ${dt.colors.primary}20, transparent)`,
+            }}
+          />
+
+          <div className="relative z-10 w-full px-8 sm:px-10 py-10">
+            {/* Mobile Branding */}
+            <div className="flex items-center gap-2 mb-8 lg:hidden">
+              <Shield className="w-7 h-7" style={{ color: dt.colors.primary }} />
+              <h1 className="text-2xl font-bold text-foreground">Joti</h1>
+            </div>
+
             {/* Login Card */}
-            <div className="p-8 rounded-2xl backdrop-blur-xl border border-border bg-card/80 shadow-2xl">
-              {/* Header */}
+            <div className="w-full max-w-sm mx-auto">
               <div className="mb-6">
-                <div className="flex items-center gap-2 mb-1 lg:hidden">
-                  <Shield className="w-6 h-6" style={{ color: dt.colors.primary }} />
-                  <h1 className="text-2xl font-bold text-foreground">Joti</h1>
-                </div>
-                <h2 className="text-xl font-semibold text-foreground hidden lg:block">
-                  Welcome back
-                </h2>
+                <h2 className="text-2xl font-bold text-foreground">Sign in</h2>
                 <p className="text-sm mt-1 text-muted-foreground">
-                  Sign in to your account
+                  Access your threat intelligence dashboard
                 </p>
               </div>
 
@@ -306,22 +343,22 @@ export default function Login() {
               {/* Login Form */}
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-foreground">
-                    Email Address
+                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground uppercase tracking-wider">
+                    Email
                   </label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-lg bg-secondary border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 text-sm"
-                    placeholder="admin@example.com"
+                    placeholder="admin@localhost"
                     required
                     autoComplete="email"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-foreground">
+                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground uppercase tracking-wider">
                     Password
                   </label>
                   <div className="relative">
@@ -348,26 +385,46 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2.5 text-sm font-semibold rounded-lg text-white transition-all duration-200 disabled:opacity-50 hover:opacity-90"
+                  className="w-full py-2.5 text-sm font-semibold rounded-lg text-white transition-all duration-200 disabled:opacity-50 hover:opacity-90 mt-2"
                   style={{
                     background: `linear-gradient(135deg, ${dt.colors.primary}, ${dt.colors.secondary})`,
                   }}
                 >
-                  {loading ? 'Signing in...' : 'Sign In'}
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Signing in...
+                    </span>
+                  ) : (
+                    'Sign In'
+                  )}
                 </button>
               </form>
 
-              {/* Demo Credentials */}
-              <div className="mt-5 pt-4 border-t border-border">
-                <p className="text-center text-xs text-muted-foreground">
-                  Demo: <span className="font-mono">admin@localhost</span> / <span className="font-mono">Admin@1234567</span>
+              {/* Credentials hint */}
+              <div className="mt-6 pt-4 border-t border-border/50">
+                <p className="text-center text-[11px] text-muted-foreground/70">
+                  Default credentials
                 </p>
+                <div className="mt-2 p-3 rounded-lg bg-secondary/50 border border-border/30">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Email</span>
+                    <code className="font-mono text-foreground/80">admin@localhost</code>
+                  </div>
+                  <div className="flex items-center justify-between text-xs mt-1.5">
+                    <span className="text-muted-foreground">Password</span>
+                    <code className="font-mono text-foreground/80">Admin@1234567</code>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Mobile: Show compact trending below login */}
+            {/* Mobile: Compact trending */}
             {trending.length > 0 && (
-              <div className="mt-6 lg:hidden">
+              <div className="mt-8 lg:hidden max-w-sm mx-auto">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-3.5 h-3.5" style={{ color: dt.colors.primary }} />
                   <span
@@ -381,7 +438,7 @@ export default function Login() {
                   {trending.slice(0, 3).map((story, idx) => (
                     <div
                       key={story.id}
-                      className="p-3 rounded-lg backdrop-blur-md border border-border/50 bg-card/30"
+                      className="p-3 rounded-lg border border-border/40 bg-card/20"
                     >
                       <div className="flex items-start gap-2">
                         <span
