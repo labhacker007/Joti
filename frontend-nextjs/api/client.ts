@@ -34,9 +34,11 @@ const createApiClient = (): AxiosInstance => {
   // Request interceptor - attach auth token
   client.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
       return config;
     },
@@ -55,11 +57,13 @@ const createApiClient = (): AxiosInstance => {
       if (error.response?.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;
 
-        const refreshToken = localStorage.getItem('refreshToken');
+        const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
         if (!refreshToken) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          window.location.href = '/login';
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            window.location.href = '/login';
+          }
           return Promise.reject(error);
         }
 
@@ -72,7 +76,7 @@ const createApiClient = (): AxiosInstance => {
                   refresh_token: refreshToken,
                 });
                 const newToken = refreshResponse.data.access_token;
-                localStorage.setItem('accessToken', newToken);
+                if (typeof window !== 'undefined') localStorage.setItem('accessToken', newToken);
                 return newToken;
               } finally {
                 refreshPromise = null;
@@ -85,9 +89,11 @@ const createApiClient = (): AxiosInstance => {
           return client(originalRequest);
         } catch (refreshError) {
           refreshPromise = null;
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          window.location.href = '/login';
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            window.location.href = '/login';
+          }
           return Promise.reject(refreshError);
         }
       }
