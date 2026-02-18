@@ -18,6 +18,16 @@ from app.audit.manager import AuditManager
 router = APIRouter(prefix="/auth/saml", tags=["saml"])
 
 
+def _get_validated_frontend_url() -> str:
+    """Return the first CORS origin as frontend URL, validated to prevent open redirect."""
+    from urllib.parse import urlparse as _urlparse
+    url = settings.CORS_ORIGINS.split(",")[0].strip()
+    parsed = _urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("Invalid frontend URL derived from CORS_ORIGINS")
+    return url
+
+
 def get_saml_settings() -> Dict[str, Any]:
     """Build SAML configuration from environment settings."""
     if not settings.SAML_ENABLED:
@@ -42,8 +52,8 @@ def get_saml_settings() -> Dict[str, Any]:
             }
         ],
         "allow_unsolicited": False,
-        "authn_requests_signed": False,
-        "logout_requests_signed": False,
+        "authn_requests_signed": True,
+        "logout_requests_signed": True,
         "want_assertions_signed": True,
         "want_response_signed": True,
     }
@@ -58,8 +68,8 @@ def get_saml_settings() -> Dict[str, Any]:
                 {"url": settings.SAML_METADATA_URL}
             ] if settings.SAML_METADATA_URL else []
         },
-        "debug": settings.DEBUG,
-        "allow_unknown_attributes": True,
+        "debug": False,  # Never enable SAML debug — leaks sensitive assertion data
+        "allow_unknown_attributes": False,  # Reject unknown attributes to prevent assertion injection
     }
 
 
@@ -189,10 +199,9 @@ async def saml_login(request: Request):
         # Build SAML config
         saml_config = Saml2Config()
         saml_config.load(get_saml_settings())
-        saml_config.allow_unknown_attributes = True
-        
+
         client = Saml2Client(config=saml_config)
-        
+
         # Create authentication request
         reqid, info = client.prepare_for_authenticate()
         
@@ -247,10 +256,9 @@ async def saml_acs(request: Request, db: Session = Depends(get_db)):
         # Build SAML config
         saml_config = Saml2Config()
         saml_config.load(get_saml_settings())
-        saml_config.allow_unknown_attributes = True
-        
+
         client = Saml2Client(config=saml_config)
-        
+
         # Parse and validate response
         authn_response = client.parse_authn_request_response(
             saml_response,
@@ -292,7 +300,7 @@ async def saml_acs(request: Request, db: Session = Depends(get_db)):
         # Redirect to frontend with tokens
         # SECURITY: Put tokens in the URL fragment (not query params) to avoid leaking
         # them via server logs, referrers, proxies, and browser history sync.
-        frontend_url = settings.CORS_ORIGINS.split(",")[0].strip()
+        frontend_url = _get_validated_frontend_url()
         fragment = urlencode(
             {
                 "access_token": access_token,
@@ -359,7 +367,7 @@ async def saml_logout(request: Request):
         )
     
     # For now, just redirect to frontend login with logout flag
-    frontend_url = settings.CORS_ORIGINS.split(",")[0].strip()
+    frontend_url = _get_validated_frontend_url()
     return RedirectResponse(url=f"{frontend_url}/login?logout=true", status_code=302)
 
 

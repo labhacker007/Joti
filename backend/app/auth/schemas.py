@@ -86,6 +86,7 @@ class TokenRefreshRequest(BaseModel):
 
 class TokenRefreshResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None  # New refresh token (rotation)
 
 
 class EnableOTPRequest(BaseModel):

@@ -24,6 +24,26 @@ from app.auth.oauth import oauth
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _get_validated_frontend_url() -> str:
+    """Return validated frontend URL for OAuth/SAML redirects (prevents open redirect).
+
+    Uses FRONTEND_URL setting if set, otherwise the first CORS origin.
+    Validates scheme and netloc to ensure it's a real HTTP(S) URL.
+    """
+    from urllib.parse import urlparse as _urlparse
+    url = settings.FRONTEND_URL or settings.CORS_ORIGINS.split(",")[0].strip()
+    parsed = _urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("Invalid frontend URL — set FRONTEND_URL or check CORS_ORIGINS")
+    # Ensure the URL matches an allowed CORS origin (prevents open redirect)
+    allowed_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",")]
+    if url not in allowed_origins:
+        logger.warning("frontend_url_not_in_cors", frontend_url=url, cors_origins=allowed_origins)
+        # Fall back to first CORS origin
+        url = allowed_origins[0]
+    return url
+
+
 @router.post("/register", response_model=UserResponse)
 def register(user_create: UserCreate, db: Session = Depends(get_db)):
     """Register a new user (local auth only)."""
@@ -236,13 +256,15 @@ def refresh_token(refresh_request: TokenRefreshRequest, db: Session = Depends(ge
                 detail="User account is deactivated"
             )
 
-        # Blacklist the old refresh token to prevent replay attacks
+        # Blacklist the old refresh token to prevent replay attacks (rotation)
         old_jti = payload.get("jti")
         if old_jti:
             blacklist_token(old_jti, payload.get("exp", 0))
 
+        # Rotate: issue both new access and new refresh tokens
         access_token = create_access_token({"sub": user_id})
-        return TokenRefreshResponse(access_token=access_token)
+        new_refresh_token = create_refresh_token({"sub": user_id})
+        return TokenRefreshResponse(access_token=access_token, refresh_token=new_refresh_token)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -304,13 +326,17 @@ def change_password(
     current_user.hashed_password = hash_password(new_password)
     db.commit()
 
+    # Invalidate all existing sessions for this user (tokens issued before now)
+    from app.auth.security import blacklist_all_user_tokens
+    blacklist_all_user_tokens(current_user.id)
+
     logger.info("password_changed", user_id=current_user.id)
 
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
         event_type="PASSWORD_CHANGE",
-        action="Password changed",
+        action="Password changed — all sessions invalidated",
         resource_type="user",
         resource_id=current_user.id
     )
@@ -418,7 +444,7 @@ async def oauth_callback(
 
         # Redirect to frontend with tokens in URL fragment (not query params)
         # to avoid leaking them via server logs, referrers, proxies, and browser history sync.
-        frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+        frontend_url = _get_validated_frontend_url()
         from urllib.parse import urlencode as _urlencode
         fragment = _urlencode({
             "access_token": access_token,

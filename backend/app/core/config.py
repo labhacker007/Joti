@@ -90,6 +90,9 @@ class Settings(BaseSettings):
             else:
                 raise ValueError("DATABASE_URL is required in production")
     
+    # Frontend URL (used for OAuth/SAML redirect targets — must match a CORS origin)
+    FRONTEND_URL: Optional[str] = None
+
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
     
