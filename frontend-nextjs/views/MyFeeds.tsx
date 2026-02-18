@@ -23,6 +23,7 @@ import {
 import FileUploadDropzone from '@/components/FileUploadDropzone';
 import { userFeedsAPI } from '@/api/client';
 import { cn } from '@/lib/utils';
+import { isSafeExternalUrl } from '@/utils/url';
 
 interface UserFeed {
   id: string;
@@ -685,15 +686,17 @@ export default function MyFeeds() {
                     <Edit2 className="w-4 h-4" />
                   </button>
 
-                  <a
-                    href={feed.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary"
-                    title="Open feed URL"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
+                  {isSafeExternalUrl(feed.url) && (
+                    <a
+                      href={feed.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary"
+                      title="Open feed URL"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
 
                   <button
                     onClick={() => handleDeleteFeed(feed.id)}
@@ -723,14 +726,20 @@ export default function MyFeeds() {
                       {feedArticles[feed.id].map((article) => (
                         <div key={article.id} className="p-3 rounded-md bg-secondary/50 space-y-1">
                           <div className="flex items-start justify-between gap-2">
-                            <a
-                              href={article.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-medium text-foreground hover:text-primary"
-                            >
-                              {article.title}
-                            </a>
+                            {isSafeExternalUrl(article.url) ? (
+                              <a
+                                href={article.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-medium text-foreground hover:text-primary"
+                              >
+                                {article.title}
+                              </a>
+                            ) : (
+                              <span className="text-sm font-medium text-foreground">
+                                {article.title}
+                              </span>
+                            )}
                             <div className="flex items-center gap-2 flex-shrink-0">
                               {article.ioc_count > 0 && (
                                 <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-700 flex items-center gap-1">

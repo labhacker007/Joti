@@ -72,10 +72,12 @@ interface TrendingStory {
 }
 
 function decodeHtmlEntities(text: string): string {
-  const doc = typeof document !== 'undefined'
-    ? new DOMParser().parseFromString(text, 'text/html')
-    : null;
-  return doc?.body.textContent || text;
+  const entities: Record<string, string> = {
+    '&amp;': '&', '&lt;': '<', '&gt;': '>',
+    '&quot;': '"', '&#39;': "'", '&apos;': "'",
+    '&#x27;': "'", '&#x2F;': '/', '&nbsp;': ' ',
+  };
+  return text.replace(/&(?:#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match) => entities[match] || match);
 }
 
 function timeAgo(dateStr: string): string {

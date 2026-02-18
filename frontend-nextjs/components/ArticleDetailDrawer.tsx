@@ -18,7 +18,7 @@ import {
   FileDown,
   Search,
 } from 'lucide-react';
-import { articlesAPI } from '@/api/client';
+import { articlesAPI, get } from '@/api/client';
 import { formatRelativeTime, cn } from '@/lib/utils';
 import { isSafeExternalUrl } from '@/utils/url';
 
@@ -158,16 +158,11 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
     if (!article) return;
     setExporting(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/articles/reports/${article.id}/pdf`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-          },
-        }
+      const response = await get<any>(
+        `/articles/reports/${article.id}/pdf`,
+        { responseType: 'blob' }
       );
-      if (!response.ok) throw new Error('Export failed');
-      const blob = await response.blob();
+      const blob = new Blob([response as any], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -419,7 +414,9 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
                         </h4>
                         <div className="flex flex-wrap gap-1.5">
                           {ttps.map((ttp) => {
-                            const mitreUrl = ttp.mitre_url || (ttp.mitre_id ? `https://attack.mitre.org/techniques/${ttp.mitre_id.replace('.', '/')}/` : null);
+                            const mitreUrl = (ttp.mitre_url && isSafeExternalUrl(ttp.mitre_url))
+                              ? ttp.mitre_url
+                              : (ttp.mitre_id ? `https://attack.mitre.org/techniques/${ttp.mitre_id.replace('.', '/')}/` : null);
                             const Tag = mitreUrl ? 'a' : 'span';
                             return (
                               <Tag

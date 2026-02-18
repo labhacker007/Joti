@@ -5,6 +5,7 @@ import { Plus, Trash2, RefreshCw, ExternalLink, CheckCircle, AlertCircle, Edit2,
 import { sourcesAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
 import { cn } from '@/lib/utils';
+import { isSafeExternalUrl } from '@/utils/url';
 
 interface Source {
   id: string;
@@ -442,15 +443,17 @@ export default function SourcesManagement() {
                     <Edit2 className="w-4 h-4" />
                   </button>
 
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary"
-                    title="Open source in new tab"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
+                  {isSafeExternalUrl(source.url) && (
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary"
+                      title="Open source in new tab"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
 
                   <button
                     onClick={() => handleDeleteSource(source.id)}
