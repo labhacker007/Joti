@@ -15,7 +15,7 @@ from app.core.database import get_db
 from app.core.logging import logger
 from app.audit.manager import AuditManager
 from app.auth.dependencies import get_current_user
-from app.models import User, UserFeed, Category
+from app.models import User, UserFeed, Category, AuditEventType
 
 router = APIRouter(prefix="/users/feeds", tags=["user-feeds"])
 
@@ -275,7 +275,7 @@ async def create_user_feed(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="FEED_MANAGEMENT",
+        event_type=AuditEventType.FEED_MANAGEMENT,
         action=f"Feed created: {feed.name}",
         resource_type="user_feed",
         resource_id=feed.id,
@@ -393,7 +393,7 @@ async def delete_user_feed(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="FEED_MANAGEMENT",
+        event_type=AuditEventType.FEED_MANAGEMENT,
         action=f"Feed deleted: {feed_name}",
         resource_type="user_feed",
         resource_id=feed_id
@@ -426,7 +426,7 @@ async def toggle_user_feed(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="FEED_MANAGEMENT",
+        event_type=AuditEventType.FEED_MANAGEMENT,
         action=f"Feed {'activated' if feed.is_active else 'deactivated'}: {feed.name}",
         resource_type="user_feed",
         resource_id=feed.id,

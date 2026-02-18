@@ -15,7 +15,7 @@ from app.auth.security import (
     DUMMY_PASSWORD_HASH,
 )
 from app.auth.dependencies import get_current_user
-from app.models import User, UserRole, DefaultFeedSource, UserFeed
+from app.models import User, UserRole, DefaultFeedSource, UserFeed, AuditEventType
 from app.audit.manager import AuditManager
 from app.core.logging import logger
 from authlib.integrations.starlette_client import OAuthError
@@ -123,7 +123,7 @@ def register(user_create: UserCreate, db: Session = Depends(get_db)):
     AuditManager.log_event(
         db=db,
         user_id=user.id,
-        event_type="REGISTRATION",
+        event_type=AuditEventType.REGISTRATION,
         action="User registered",
         resource_type="user",
         resource_id=user.id,
@@ -330,7 +330,7 @@ def change_password(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="PASSWORD_CHANGE",
+        event_type=AuditEventType.PASSWORD_CHANGE,
         action="Password changed — all sessions invalidated",
         resource_type="user",
         resource_id=current_user.id
@@ -483,7 +483,7 @@ def logout(
                 blacklist_token(jti, exp)
         except Exception:
             pass
-    AuditManager.log_event(db=db, user_id=current_user.id, event_type="LOGOUT", action="User logged out", resource_type="auth")
+    AuditManager.log_event(db=db, user_id=current_user.id, event_type=AuditEventType.LOGOUT, action="User logged out", resource_type="auth")
     logger.info("user_logout", user_id=current_user.id, username=current_user.username)
     return {"message": "Logged out successfully"}
 
@@ -623,7 +623,7 @@ def verify_otp_setup(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="ADMIN_ACTION",
+        event_type=AuditEventType.ADMIN_ACTION,
         action="OTP/2FA enabled",
         resource_type="user_security"
     )
@@ -669,7 +669,7 @@ def disable_otp(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="ADMIN_ACTION",
+        event_type=AuditEventType.ADMIN_ACTION,
         action="OTP/2FA disabled",
         resource_type="user_security"
     )

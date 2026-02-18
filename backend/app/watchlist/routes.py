@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.auth.dependencies import require_permission
 from app.auth.rbac import Permission
-from app.models import WatchListKeyword, UserWatchListKeyword, User, Article
+from app.models import WatchListKeyword, UserWatchListKeyword, User, Article, AuditEventType
 from app.auth.dependencies import get_current_user
 from app.core.logging import logger
 from app.audit.manager import AuditManager
@@ -127,7 +127,7 @@ def create_keyword(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="WATCHLIST_CHANGE",
+        event_type=AuditEventType.WATCHLIST_CHANGE,
         action=f"Keyword added: {keyword.keyword}",
         resource_type="watchlist_keyword",
         resource_id=keyword.id,
@@ -170,7 +170,7 @@ def update_keyword(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="WATCHLIST_CHANGE",
+        event_type=AuditEventType.WATCHLIST_CHANGE,
         action=f"Keyword updated: {keyword.keyword}",
         resource_type="watchlist_keyword",
         resource_id=keyword.id,
@@ -207,7 +207,7 @@ def delete_keyword(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="WATCHLIST_CHANGE",
+        event_type=AuditEventType.WATCHLIST_CHANGE,
         action=f"Keyword deleted: {deleted_keyword}",
         resource_type="watchlist_keyword",
         resource_id=keyword_id,
@@ -314,7 +314,7 @@ def create_my_keyword(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="WATCHLIST_CHANGE",
+        event_type=AuditEventType.WATCHLIST_CHANGE,
         action=f"Personal keyword added: {keyword.keyword}",
         resource_type="user_watchlist_keyword",
         resource_id=keyword.id,
@@ -345,7 +345,7 @@ def delete_my_keyword(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="WATCHLIST_CHANGE",
+        event_type=AuditEventType.WATCHLIST_CHANGE,
         action=f"Personal keyword deleted: {deleted_keyword}",
         resource_type="user_watchlist_keyword",
         resource_id=keyword_id,
