@@ -6,7 +6,6 @@ import {
   Bookmark,
   BookmarkCheck,
   Globe,
-  Calendar,
   Eye,
   Star,
   LayoutGrid,
@@ -14,14 +13,20 @@ import {
   Rss,
   FileText,
   CheckCheck,
-  Clock,
   Filter,
+  Plus,
+  Upload,
+  X,
+  Loader,
+  Shield,
+  Brain,
 } from 'lucide-react';
 import { articlesAPI, userFeedsAPI } from '@/api/client';
 import { formatRelativeTime, cn } from '@/lib/utils';
 import { Pagination } from '@/components/Pagination';
 import { isSafeExternalUrl } from '@/utils/url';
 import ArticleDetailDrawer from '@/components/ArticleDetailDrawer';
+import FileUploadDropzone from '@/components/FileUploadDropzone';
 
 interface Article {
   id: string;
@@ -46,6 +51,16 @@ interface Counts {
   total: number;
   unread: number;
   watchlist_matches: number;
+}
+
+interface UploadResult {
+  status: 'success' | 'error' | 'duplicate';
+  filename: string;
+  message: string;
+  articleTitle?: string;
+  executiveSummary?: string;
+  iocCount?: number;
+  ttpCount?: number;
 }
 
 const TIME_RANGES = [
@@ -105,11 +120,18 @@ export default function Feeds() {
   const [counts, setCounts] = useState<Counts>({ total: 0, unread: 0, watchlist_matches: 0 });
   const [viewMode, setViewMode] = useState<'list' | 'card'>('list');
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+
+  // Add Feed state
   const [showAddFeed, setShowAddFeed] = useState(false);
   const [newFeedUrl, setNewFeedUrl] = useState('');
   const [newFeedName, setNewFeedName] = useState('');
   const [newFeedType, setNewFeedType] = useState('rss');
   const [addingFeed, setAddingFeed] = useState(false);
+
+  // Upload state
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
 
   const pageSize = 15;
 
@@ -216,11 +238,42 @@ export default function Feeds() {
       setNewFeedUrl('');
       setNewFeedName('');
       setNewFeedType('rss');
-    } catch (err) {
-      console.error('Add feed error:', err);
+      // Trigger ingest after adding
+      fetchArticles();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err.message || 'Failed to add feed');
     } finally {
       setAddingFeed(false);
     }
+  };
+
+  const handleFilesSelected = async (files: File[]) => {
+    setUploading(true);
+    const results: UploadResult[] = [];
+    for (const file of files) {
+      try {
+        const response = (await userFeedsAPI.uploadDocument(file, {
+          title: file.name,
+        })) as any;
+        const data = response.data || response;
+        results.push({
+          status: data.status === 'duplicate' ? 'duplicate' : 'success',
+          filename: file.name,
+          message: data.message || 'Document ingested successfully',
+          articleTitle: data.article_title,
+          executiveSummary: data.executive_summary,
+          iocCount: data.ioc_count || 0,
+          ttpCount: data.ttp_count || 0,
+        });
+      } catch (err: any) {
+        const detail =
+          err.response?.data?.detail || err.message || 'Failed to process document';
+        results.push({ status: 'error', filename: file.name, message: detail });
+      }
+    }
+    setUploadResults((prev) => [...results, ...prev]);
+    setUploading(false);
+    fetchArticles();
   };
 
   const markAllAsRead = async () => {
@@ -259,19 +312,10 @@ export default function Feeds() {
       {/* Header Row */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Rss className="w-7 h-7" />
-              Feeds
-            </h1>
-            <button
-              onClick={() => setShowAddFeed(true)}
-              className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-              title="Add custom feed"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            </button>
-          </div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Rss className="w-7 h-7" />
+            Feeds
+          </h1>
           <p className="text-xs text-muted-foreground/70 mt-1 italic max-w-lg truncate">
             &ldquo;{randomQuote.text}&rdquo; &mdash; {randomQuote.author}
           </p>
@@ -308,6 +352,26 @@ export default function Feeds() {
             ))}
           </div>
 
+          {/* Add Feed */}
+          <button
+            onClick={() => { setShowAddFeed(true); setShowUpload(false); }}
+            className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 flex items-center gap-1.5"
+            title="Add custom feed"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Feed
+          </button>
+
+          {/* Upload Document */}
+          <button
+            onClick={() => { setShowUpload(true); setShowAddFeed(false); }}
+            className="px-3 py-1.5 bg-secondary text-secondary-foreground rounded-lg text-xs font-medium hover:bg-secondary/80 flex items-center gap-1.5"
+            title="Upload document for analysis"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Upload
+          </button>
+
           {/* View Toggle */}
           <div className="flex bg-muted rounded-lg p-0.5">
             <button
@@ -333,6 +397,133 @@ export default function Feeds() {
           </div>
         </div>
       </div>
+
+      {/* Add Feed Inline Panel */}
+      {showAddFeed && (
+        <div className="bg-card border border-border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-foreground">Add Custom Feed</h3>
+            <button onClick={() => setShowAddFeed(false)} className="p-1 hover:bg-muted rounded">
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              {FEED_TYPES.map((ft) => (
+                <button
+                  key={ft.value}
+                  onClick={() => setNewFeedType(ft.value)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors text-center',
+                    newFeedType === ft.value
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted text-foreground border-border hover:border-primary/50'
+                  )}
+                >
+                  {ft.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={newFeedUrl}
+                onChange={(e) => setNewFeedUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAddFeed(); }}
+                placeholder={newFeedType === 'website' ? 'https://example.com' : 'https://example.com/rss'}
+                className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <input
+                type="text"
+                value={newFeedName}
+                onChange={(e) => setNewFeedName(e.target.value)}
+                placeholder="Feed name (optional)"
+                className="w-48 px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <button
+                onClick={handleAddFeed}
+                disabled={addingFeed || !newFeedUrl.trim()}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+              >
+                {addingFeed ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Document Inline Panel */}
+      {showUpload && (
+        <div className="bg-card border border-border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-foreground">Upload Document</h3>
+            <button onClick={() => { setShowUpload(false); setUploadResults([]); }} className="p-1 hover:bg-muted rounded">
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Upload PDFs, Word docs, Excel sheets, or text files. GenAI will extract IOCs, TTPs, and generate summaries.
+          </p>
+          <FileUploadDropzone
+            onFilesSelected={handleFilesSelected}
+            accept=".pdf,.docx,.doc,.xlsx,.csv,.html,.htm,.txt"
+            maxSize={50 * 1024 * 1024}
+            maxFiles={5}
+            disabled={uploading}
+          />
+          {uploading && (
+            <div className="mt-3 p-3 bg-blue-500/10 text-blue-700 rounded-md flex items-center gap-2 text-sm">
+              <Loader className="w-4 h-4 animate-spin" />
+              Processing documents...
+            </div>
+          )}
+          {uploadResults.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {uploadResults.map((result, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'p-3 rounded-md border text-sm',
+                    result.status === 'success'
+                      ? 'bg-green-500/5 border-green-500/30'
+                      : result.status === 'duplicate'
+                        ? 'bg-amber-500/5 border-amber-500/30'
+                        : 'bg-red-500/5 border-red-500/30'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-foreground">
+                      {result.articleTitle || result.filename}
+                    </span>
+                    <div className="flex gap-2">
+                      {(result.iocCount ?? 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-700 flex items-center gap-1">
+                          <Shield className="w-3 h-3" />
+                          {result.iocCount} IOCs
+                        </span>
+                      )}
+                      {(result.ttpCount ?? 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-500/10 text-orange-700 flex items-center gap-1">
+                          <Brain className="w-3 h-3" />
+                          {result.ttpCount} TTPs
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className={`text-xs mt-1 ${
+                    result.status === 'success' ? 'text-green-600' : result.status === 'duplicate' ? 'text-amber-600' : 'text-red-600'
+                  }`}>
+                    {result.message}
+                  </p>
+                  {result.executiveSummary && (
+                    <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{result.executiveSummary}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filter Chips */}
       <div className="flex items-center gap-2">
@@ -459,7 +650,6 @@ export default function Feeds() {
                     {article.executive_summary || article.summary}
                   </p>
 
-                  {/* Tags + Footer combined */}
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     {article.threat_category && (
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30">
@@ -497,7 +687,7 @@ export default function Feeds() {
                       })()}
                       <span>{article.source_name}</span>
                     </div>
-                    <span className="text-muted-foreground/50">·</span>
+                    <span className="text-muted-foreground/50">&middot;</span>
                     <span>{formatRelativeTime(article.published_at)}</span>
                     {article.url && isSafeExternalUrl(article.url) && (
                       <a
@@ -530,7 +720,6 @@ export default function Feeds() {
                 )}
                 onClick={() => openArticleDetail(article.id)}
               >
-                {/* Image */}
                 {article.image_url ? (
                   <div className="relative aspect-video w-full overflow-hidden bg-muted">
                     <img
@@ -561,7 +750,6 @@ export default function Feeds() {
                   </div>
                 )}
 
-                {/* Content */}
                 <div className="p-3 flex-1 flex flex-col">
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <h3
@@ -589,7 +777,6 @@ export default function Feeds() {
                     {article.executive_summary || article.summary}
                   </p>
 
-                  {/* Tags */}
                   <div className="flex flex-wrap gap-1 mb-2">
                     {article.is_high_priority && (
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-red-600 border border-red-500/30">
@@ -606,11 +793,10 @@ export default function Feeds() {
                     )}
                   </div>
 
-                  {/* Footer */}
                   <div className="mt-auto flex items-center gap-2 text-[11px] text-muted-foreground">
                     <Globe className="w-3 h-3" />
                     <span className="truncate">{article.source_name}</span>
-                    <span className="text-muted-foreground/50">·</span>
+                    <span className="text-muted-foreground/50">&middot;</span>
                     <span>{formatRelativeTime(article.published_at)}</span>
                   </div>
                 </div>
@@ -642,72 +828,6 @@ export default function Feeds() {
         onClose={() => setSelectedArticleId(null)}
         onBookmarkToggle={toggleBookmark}
       />
-
-      {/* Add Feed Modal */}
-      {showAddFeed && (
-        <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowAddFeed(false)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-card border border-border rounded-xl shadow-2xl z-50 p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Add Custom Feed</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm text-muted-foreground mb-1">Feed Type</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {FEED_TYPES.map((ft) => (
-                    <button
-                      key={ft.value}
-                      onClick={() => setNewFeedType(ft.value)}
-                      className={cn(
-                        'px-3 py-2 rounded-lg text-xs font-medium border transition-colors text-center',
-                        newFeedType === ft.value
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-muted text-foreground border-border hover:border-primary/50'
-                      )}
-                    >
-                      {ft.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm text-muted-foreground mb-1">Feed URL</label>
-                <input
-                  type="url"
-                  value={newFeedUrl}
-                  onChange={(e) => setNewFeedUrl(e.target.value)}
-                  placeholder={newFeedType === 'website' ? 'https://example.com' : 'https://example.com/rss'}
-                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-muted-foreground mb-1">Feed Name (optional)</label>
-                <input
-                  type="text"
-                  value={newFeedName}
-                  onChange={(e) => setNewFeedName(e.target.value)}
-                  placeholder="My Custom Feed"
-                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={handleAddFeed}
-                  disabled={addingFeed || !newFeedUrl.trim()}
-                  className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {addingFeed ? 'Adding...' : 'Add Feed'}
-                </button>
-                <button
-                  onClick={() => setShowAddFeed(false)}
-                  className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

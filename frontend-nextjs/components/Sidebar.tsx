@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Rss,
   Settings,
-  Upload,
   ChevronLeft,
   ChevronRight,
   Users,
@@ -19,7 +18,6 @@ import {
   LogOut,
   UserCircle,
   BarChart3,
-  BookmarkCheck,
   Eye,
 } from 'lucide-react';
 import { useAuthStore } from '@/store';
@@ -37,7 +35,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Feeds', path: '/feeds', icon: Rss },
-  { label: 'My Feeds', path: '/my-feeds', icon: BookmarkCheck },
   { label: 'Watchlist', path: '/watchlist', icon: Eye },
 ];
 

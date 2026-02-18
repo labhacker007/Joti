@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Plus,
   Trash2,
-  Bell,
   AlertCircle,
   CheckCircle,
   Eye,
@@ -12,8 +11,8 @@ import {
   Flame,
   ChevronDown,
   ChevronRight,
-  Tag,
   Pencil,
+  Search,
 } from 'lucide-react';
 import { watchlistAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
@@ -80,6 +79,7 @@ export default function Watchlist() {
   const [personalLoading, setPersonalLoading] = useState(false);
   const [newPersonalKeyword, setNewPersonalKeyword] = useState('');
   const [addingPersonal, setAddingPersonal] = useState(false);
+  const [searchFilter, setSearchFilter] = useState('');
 
   useEffect(() => {
     loadWatchlist();
@@ -186,7 +186,7 @@ export default function Watchlist() {
       const response = await watchlistAPI.refresh() as any;
       const data = response.data || response;
       setSuccess(
-        `Watchlist refreshed: ${data.articles_updated || 0} articles updated, ${data.high_priority_articles || 0} high priority`
+        `Refreshed: ${data.articles_updated || 0} articles updated, ${data.high_priority_articles || 0} high priority`
       );
       await loadWatchlist();
     } catch (err: any) {
@@ -276,17 +276,19 @@ export default function Watchlist() {
     });
   };
 
-  const activeCount = items.filter((k) => k.is_active).length;
+  // Filter items by search
+  const filteredItems = searchFilter
+    ? items.filter((i) => i.keyword.toLowerCase().includes(searchFilter.toLowerCase()))
+    : items;
 
   // Group items by category
-  const grouped = items.reduce<Record<string, WatchlistItem[]>>((acc, item) => {
+  const grouped = filteredItems.reduce<Record<string, WatchlistItem[]>>((acc, item) => {
     const cat = item.category || 'Ungrouped';
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(item);
     return acc;
   }, {});
 
-  // Sort groups: defined categories first, then Ungrouped last
   const groupOrder = [...CATEGORIES, 'Ungrouped'];
   const sortedGroups = Object.keys(grouped).sort((a, b) => {
     const ai = groupOrder.indexOf(a);
@@ -294,272 +296,164 @@ export default function Watchlist() {
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
   });
 
-  const renderKeywordItem = (item: WatchlistItem) => {
+  const filteredPersonal = searchFilter
+    ? personalKeywords.filter((k) => k.keyword.toLowerCase().includes(searchFilter.toLowerCase()))
+    : personalKeywords;
+
+  const renderKeywordRow = (item: WatchlistItem) => {
     const isEditingCat = editingCategory === item.id;
 
     return (
       <div
         key={item.id}
         className={cn(
-          'bg-card border rounded-lg p-3 transition-all flex items-center justify-between',
-          item.is_active
-            ? 'border-border hover:border-primary/50'
-            : 'border-border/50 opacity-60'
+          'flex items-center gap-3 px-3 py-2.5 rounded-md transition-all group hover:bg-muted/50',
+          !item.is_active && 'opacity-50'
         )}
       >
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <Flame
-            className={cn('w-4 h-4 flex-shrink-0', item.is_active ? 'text-orange-500' : 'text-gray-400')}
-          />
-          <span className="text-foreground font-medium text-sm truncate">{item.keyword}</span>
-          {item.is_active ? (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/10 text-green-700 flex-shrink-0">
-              Active
-            </span>
-          ) : (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-500/10 text-gray-600 flex-shrink-0">
-              Inactive
-            </span>
+        <button
+          onClick={() => handleToggle(item.id, item.is_active)}
+          className={cn(
+            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0',
+            item.is_active ? 'bg-primary' : 'bg-muted-foreground/30'
           )}
-
-          {/* Inline category editor */}
-          {isEditingCat ? (
-            <select
-              autoFocus
-              value={item.category || ''}
-              onChange={(e) => handleCategoryChange(item.id, e.target.value)}
-              onBlur={() => setEditingCategory(null)}
-              className="px-2 py-0.5 bg-background border border-input rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary flex-shrink-0"
-            >
-              <option value="">Ungrouped</option>
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          ) : (
-            <button
-              onClick={() => setEditingCategory(item.id)}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
-              title="Change category"
-            >
-              <Pencil className="w-3 h-3" />
-              <span>{item.category || 'Set category'}</span>
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-          <button
-            onClick={() => handleToggle(item.id, item.is_active)}
+        >
+          <span
             className={cn(
-              'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-              item.is_active ? 'bg-primary' : 'bg-gray-300'
+              'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm',
+              item.is_active ? 'translate-x-4.5' : 'translate-x-0.5'
             )}
-            title={item.is_active ? 'Deactivate' : 'Activate'}
+          />
+        </button>
+
+        <span className="text-sm text-foreground font-medium truncate flex-1 min-w-0">
+          {item.keyword}
+        </span>
+
+        {/* Inline category editor */}
+        {isEditingCat ? (
+          <select
+            autoFocus
+            value={item.category || ''}
+            onChange={(e) => handleCategoryChange(item.id, e.target.value)}
+            onBlur={() => setEditingCategory(null)}
+            className="px-2 py-0.5 bg-background border border-input rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary flex-shrink-0"
           >
-            <span
-              className={cn(
-                'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform',
-                item.is_active ? 'translate-x-4.5' : 'translate-x-0.5'
-              )}
-            />
-          </button>
+            <option value="">Ungrouped</option>
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        ) : (
           <button
-            onClick={() => handleDelete(item.id)}
-            className="p-1.5 text-muted-foreground hover:text-red-600 rounded-md hover:bg-red-500/10"
-            title="Remove keyword"
+            onClick={() => setEditingCategory(item.id)}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+            title="Change category"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Pencil className="w-3 h-3" />
           </button>
-        </div>
+        )}
+
+        <button
+          onClick={() => handleDelete(item.id)}
+          className="p-1 text-muted-foreground hover:text-red-600 rounded hover:bg-red-500/10 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Remove keyword"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
     );
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="space-y-4 pb-8">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Eye className="w-8 h-8" />
-            Watchlist Keywords
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Monitor keywords across threat intelligence feeds
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Eye className="w-6 h-6 text-foreground" />
+          <h1 className="text-2xl font-bold text-foreground">Watchlist</h1>
+          <span className="text-sm text-muted-foreground">
+            {items.filter((k) => k.is_active).length} active of {items.length}
+          </span>
         </div>
-        <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30 flex items-center gap-1">
-          <Bell className="w-4 h-4" />
-          {activeCount} Active
-        </span>
-      </div>
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Active Keywords</p>
-          <p className="text-2xl font-bold text-blue-600 flex items-center gap-2">
-            <Bell className="w-5 h-5" />
-            {activeCount}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Categories</p>
-          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Tag className="w-5 h-5" />
-            {sortedGroups.length}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4 flex items-center justify-center">
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
-            Refresh Matches
-          </button>
-        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          title="Refresh watchlist matches"
+        >
+          <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
+        </button>
       </div>
 
       {/* Alerts */}
       {error && (
-        <div className="mb-4 p-4 bg-red-500/10 text-red-700 rounded-md flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div>{error}</div>
+        <div className="p-3 bg-red-500/10 text-red-700 rounded-lg flex items-start gap-2 text-sm">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
       {success && (
-        <div className="mb-4 p-4 bg-green-500/10 text-green-700 rounded-md flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div>{success}</div>
+        <div className="p-3 bg-green-500/10 text-green-700 rounded-lg flex items-start gap-2 text-sm">
+          <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{success}</span>
         </div>
       )}
 
-      {/* Tabs: Global vs Personal */}
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setActiveTab('global')}
-          className={cn(
-            'px-4 py-2 rounded-md text-sm font-medium transition',
-            activeTab === 'global'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-          )}
-        >
-          Global Keywords ({items.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('personal')}
-          className={cn(
-            'px-4 py-2 rounded-md text-sm font-medium transition',
-            activeTab === 'personal'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-          )}
-        >
-          My Keywords ({personalKeywords.length})
-        </button>
+      {/* Search + Tabs Row */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Filter keywords..."
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            className="w-full pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+
+        <div className="flex bg-muted rounded-lg p-0.5">
+          <button
+            onClick={() => setActiveTab('global')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+              activeTab === 'global'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Global ({items.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('personal')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+              activeTab === 'personal'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Personal ({personalKeywords.length})
+          </button>
+        </div>
       </div>
 
-      {/* Personal Keywords Tab */}
-      {activeTab === 'personal' && (
-        <div className="space-y-4">
-          <div className="bg-card border border-border rounded-lg p-4">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newPersonalKeyword}
-                onChange={(e) => setNewPersonalKeyword(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Add a personal keyword to monitor..."
-                className="flex-1 px-4 py-2 bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-              />
-              <button
-                onClick={handleAddPersonal}
-                disabled={addingPersonal || !newPersonalKeyword.trim()}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                {addingPersonal ? 'Adding...' : 'Add'}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Personal keywords are private to you and not visible to other users.
-            </p>
-          </div>
-
-          {personalLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading your keywords...</div>
-          ) : personalKeywords.length === 0 ? (
-            <div className="text-center py-8 border border-dashed border-border rounded-lg text-muted-foreground">
-              No personal keywords added yet
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {personalKeywords.map((kw) => (
-                <div
-                  key={kw.id}
-                  className={cn(
-                    'bg-card border rounded-lg p-3 flex items-center justify-between',
-                    kw.is_active ? 'border-border' : 'border-border/50 opacity-60'
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <Flame className={cn('w-4 h-4', kw.is_active ? 'text-orange-500' : 'text-gray-400')} />
-                    <span className="text-sm font-medium text-foreground">{kw.keyword}</span>
-                    <span className={cn(
-                      'px-1.5 py-0.5 rounded text-[10px] font-medium',
-                      kw.is_active ? 'bg-green-500/10 text-green-700' : 'bg-gray-500/10 text-gray-600'
-                    )}>
-                      {kw.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleTogglePersonal(kw.id, kw.is_active)}
-                      className={cn(
-                        'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                        kw.is_active ? 'bg-primary' : 'bg-gray-300'
-                      )}
-                    >
-                      <span className={cn(
-                        'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform',
-                        kw.is_active ? 'translate-x-4.5' : 'translate-x-0.5'
-                      )} />
-                    </button>
-                    <button
-                      onClick={() => handleDeletePersonal(kw.id)}
-                      className="p-1.5 text-muted-foreground hover:text-red-600 rounded-md hover:bg-red-500/10"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Global Keywords Section (only show when global tab active) */}
-      {activeTab === 'global' && <>
-      {/* Add Keyword Input */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+      {/* Add Keyword Input — compact inline bar */}
+      {activeTab === 'global' ? (
         <div className="flex gap-2">
           <input
             type="text"
             value={newKeyword}
             onChange={(e) => setNewKeyword(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Enter keyword to monitor (e.g., ransomware, APT29, zero-day)"
-            className="flex-1 px-4 py-2 bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+            placeholder="Add keyword (e.g., APT29, ransomware, zero-day)"
+            className="flex-1 px-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
           <select
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
-            className="px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="px-2 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="">Category</option>
             {CATEGORIES.map((cat) => (
@@ -569,67 +463,141 @@ export default function Watchlist() {
           <button
             onClick={handleAdd}
             disabled={adding || !newKeyword.trim()}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 text-sm"
+            className="px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
-            {adding ? 'Adding...' : 'Add'}
+            Add
           </button>
         </div>
-      </div>
-
-      {/* Keywords List - Grouped by Category */}
-      {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading watchlist...</div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-12 border border-dashed border-border rounded-lg">
-          <Bell className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground">No watchlist keywords yet</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Add keywords above to get notified when matching articles are found
-          </p>
-        </div>
       ) : (
-        <div className="space-y-4">
-          {sortedGroups.map((group) => {
-            const groupItems = grouped[group];
-            const isCollapsed = collapsedGroups.has(group);
-            const activeInGroup = groupItems.filter((i) => i.is_active).length;
-            const colorClass = CATEGORY_COLORS[group] || 'bg-gray-500/10 text-gray-600 border-gray-500/30';
-
-            return (
-              <div key={group} className="border border-border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleGroup(group)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {isCollapsed ? (
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                    )}
-                    <span className={cn('px-2 py-0.5 rounded text-xs font-medium border', colorClass)}>
-                      {group}
-                    </span>
-                    <span className="text-sm font-medium text-foreground">
-                      {groupItems.length} keyword{groupItems.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {activeInGroup} active
-                  </span>
-                </button>
-                {!isCollapsed && (
-                  <div className="border-t border-border p-3 space-y-2">
-                    {groupItems.map(renderKeywordItem)}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newPersonalKeyword}
+            onChange={(e) => setNewPersonalKeyword(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Add a personal keyword to monitor..."
+            className="flex-1 px-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+          <button
+            onClick={handleAddPersonal}
+            disabled={addingPersonal || !newPersonalKeyword.trim()}
+            className="px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            Add
+          </button>
         </div>
       )}
-      </>}
+
+      {/* Personal Keywords Tab */}
+      {activeTab === 'personal' && (
+        <>
+          {personalLoading ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">Loading your keywords...</div>
+          ) : filteredPersonal.length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-border rounded-lg text-muted-foreground text-sm">
+              {searchFilter ? 'No matching personal keywords' : 'No personal keywords added yet'}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-lg divide-y divide-border">
+              {filteredPersonal.map((kw) => (
+                <div
+                  key={kw.id}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 group hover:bg-muted/50 transition-colors',
+                    !kw.is_active && 'opacity-50'
+                  )}
+                >
+                  <button
+                    onClick={() => handleTogglePersonal(kw.id, kw.is_active)}
+                    className={cn(
+                      'relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0',
+                      kw.is_active ? 'bg-primary' : 'bg-muted-foreground/30'
+                    )}
+                  >
+                    <span className={cn(
+                      'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm',
+                      kw.is_active ? 'translate-x-4.5' : 'translate-x-0.5'
+                    )} />
+                  </button>
+                  <span className="text-sm font-medium text-foreground flex-1 truncate">{kw.keyword}</span>
+                  <button
+                    onClick={() => handleDeletePersonal(kw.id)}
+                    className="p-1 text-muted-foreground hover:text-red-600 rounded hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Personal keywords are private to you and not visible to other users.
+          </p>
+        </>
+      )}
+
+      {/* Global Keywords — Grouped */}
+      {activeTab === 'global' && (
+        <>
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">Loading watchlist...</div>
+          ) : filteredItems.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-border rounded-lg">
+              <Eye className="w-10 h-10 text-muted-foreground/20 mx-auto mb-2" />
+              <p className="text-muted-foreground text-sm">
+                {searchFilter ? 'No matching keywords' : 'No watchlist keywords yet'}
+              </p>
+              {!searchFilter && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add keywords above to get notified when matching articles are found
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sortedGroups.map((group) => {
+                const groupItems = grouped[group];
+                const isCollapsed = collapsedGroups.has(group);
+                const activeInGroup = groupItems.filter((i) => i.is_active).length;
+                const colorClass = CATEGORY_COLORS[group] || 'bg-gray-500/10 text-gray-600 border-gray-500/30';
+
+                return (
+                  <div key={group} className="bg-card border border-border rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => toggleGroup(group)}
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        {isCollapsed ? (
+                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                        )}
+                        <span className={cn('px-2 py-0.5 rounded text-[11px] font-medium border', colorClass)}>
+                          {group}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {groupItems.length} keyword{groupItems.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">
+                        {activeInGroup}/{groupItems.length} active
+                      </span>
+                    </button>
+                    {!isCollapsed && (
+                      <div className="border-t border-border">
+                        {groupItems.map(renderKeywordRow)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
