@@ -77,7 +77,21 @@
       "Bash(cat:*)",
       "Bash(git rm:*)",
       "Bash(git worktree remove:*)",
-      "Bash(git worktree:*)"
+      "Bash(git worktree:*)",
+      "Bash(head:*)",
+      "Bash(while read dir)",
+      "Bash(do)",
+      "Bash(if [ -f \"$dir/page.tsx\" ])",
+      "Bash(then)",
+      "Bash(else)",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(python3 -c \"import sys,json; paths=json.load\\(sys.stdin\\)[''paths'']; [print\\(p\\) for p in sorted\\(paths.keys\\(\\)\\) if ''analytics'' in p or ''retention'' in p or ''export'' in p or ''upload'' in p]\")",
+      "Bash(python:*)",
+      "Bash(npx tsc:*)",
+      "Bash(DOCKER_BUILDKIT=1 docker compose build:*)",
+      "Bash(while read f)",
+      "Bash(do sed -i \"s|@/pages/|@/views/|g\" \"$f\")"
     ]
   }
 }

@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Frontend (not needed for backend build context)
+frontend-nextjs/node_modules
+frontend-nextjs/.next
+
+# IDE & OS
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.coverage
+htmlcov
+backend/.venv
+backend/venv
+backend/orion_dev.db
+
+# Docker
+docker-compose*.yml
+Makefile
+
+# Env files (build uses docker env vars)
+.env
+.env.*
+!.env.example
+
+# Docs
+*.md
+LICENSE

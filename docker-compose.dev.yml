@@ -1,32 +1,28 @@
-# Development Docker Compose - Simple setup for testing
-
-version: '3.8'
+# Development overrides — hot reload for backend and frontend.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#   or:  make dev
 
 services:
   backend:
     build:
-      context: ./backend
-    container_name: joti-backend-dev
-    environment:
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
-      - CORS_ORIGINS=http://localhost:3000
-    ports:
-      - "8000:8000"
+      context: .
+      dockerfile: infra/Dockerfile.backend
     volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      - ./backend/app:/app/app
+      - ./config:/app/config
+    environment:
+      DEBUG: "true"
+      ENV: dev
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   frontend:
-    image: node:20-alpine
-    container_name: joti-frontend-dev
-    working_dir: /app
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
+    build:
+      context: ./frontend-nextjs
+      dockerfile: Dockerfile.dev
     volumes:
       - ./frontend-nextjs:/app
       - /app/node_modules
-    command: sh -c "npm install && npm run dev"
+      - /app/.next
+    environment:
+      NODE_ENV: development
+    command: ["npm", "run", "dev"]

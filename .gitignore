@@ -1,15 +1,12 @@
-# Orion - Comprehensive .gitignore
+# Joti Platform - .gitignore
 
-# ============================================================================
-# Environment & Secrets
-# ============================================================================
+# ── Environment & Secrets ────────────────────────────────────────────────────
 .env
 .env.local
 .env.*.local
 .env.production
 .env.development
 .env.docker
-.env.myfeeds
 *.pem
 *.key
 *.crt
@@ -17,430 +14,97 @@
 *.pfx
 secrets/
 credentials/
-
-# ============================================================================
-# Python
-# ============================================================================
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.pytest_cache/
-.hypothesis/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# Virtual environments
-venv/
-ENV/
-env/
-.venv
-.venv*/
-backend/.venv*/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# ============================================================================
-# Node.js / React
-# ============================================================================
-# Dependencies
-node_modules/
-jspm_packages/
-
-# Production build
-build/
-dist/
-
-# Testing
-coverage/
-
-# Misc
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache
-.cache
-.parcel-cache
-
-# Next.js
-.next/
-out/
-
-# Nuxt.js
-.nuxt/
-dist/
-
-# Gatsby
-.cache/
-public/
-
-# ============================================================================
-# IDEs and Editors
-# ============================================================================
-# VSCode
-.vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-*.code-workspace
-
-# Cursor
-.cursor/
-
-# PyCharm
-.idea/
-*.iml
-*.iws
-*.ipr
-
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-
-# Vim
-*.swp
-*.swo
-*~
-.netrwhist
-
-# Emacs
-*~
-\#*\#
-/.emacs.desktop
-/.emacs.desktop.lock
-*.elc
-auto-save-list
-tramp
-
-# Eclipse
-.project
-.classpath
-.settings/
-.metadata/
-
-# ============================================================================
-# Operating Systems
-# ============================================================================
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
-
-# Windows
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-*.stackdump
-[Dd]esktop.ini
-$RECYCLE.BIN/
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-*.lnk
-
-# Linux
-*~
-.fuse_hidden*
-.directory
-.Trash-*
-.nfs*
-
-# ============================================================================
-# Docker
-# ============================================================================
-# Docker volumes (if mounted locally)
-docker-compose.override.yml
-.dockerignore
-
-# ============================================================================
-# Databases
-# ============================================================================
-*.db
-*.sqlite
-*.sqlite3
-*.db-shm
-*.db-wal
-postgres_data/
-pgdata/
-*.sql.gz
-*.dump
-
-# ============================================================================
-# Logs
-# ============================================================================
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-pnpm-debug.log*
-pip-log.txt
-
-# ============================================================================
-# Temporary files
-# ============================================================================
-tmp/
-temp/
-*.tmp
-*.bak
-*.swp
-*.swo
-*~.nib
-*.pid
-*.seed
-*.pid.lock
-
-# ============================================================================
-# Application specific
-# ============================================================================
-# Alembic (database migrations - keep versions, ignore temp files)
-backend/migrations/versions/*.pyc
-backend/migrations/__pycache__/
-
-# Uploaded files / user content
-uploads/
-media/
-static/uploads/
-
-# Generated reports
-reports/*.pdf
-reports/*.docx
-reports/*.csv
-
-# Cache directories
-.cache/
-.parcel-cache/
-.sass-cache/
-
-# Backup files
-*.backup
-*.old
-*.orig
-
-# ============================================================================
-# Security & Sensitive Data
-# ============================================================================
-# API Keys and tokens
 *_token.txt
 *_key.txt
 *_secret.txt
 api_keys.json
 credentials.json
 
-# SSL/TLS certificates
-*.pem
-*.key
-*.crt
-*.cer
-*.der
-*.p7b
-*.p7c
-*.p12
-*.pfx
-
-# SSH keys
-id_rsa
-id_dsa
-id_ecdsa
-id_ed25519
-*.pub
-
-# GPG keys
-*.gpg
-*.asc
-
-# ============================================================================
-# CI/CD
-# ============================================================================
-.gitlab-ci-local/
-.github/workflows/secrets/
-
-# ============================================================================
-# Documentation build artifacts
-# ============================================================================
-docs/_build/
-docs/.doctrees/
-site/
-
-# ============================================================================
-# Package managers
-# ============================================================================
-# Pipenv
-Pipfile.lock
-
-# Poetry
-poetry.lock
-
-# PDM
-.pdm.toml
-__pypackages__/
-
-# ============================================================================
-# Monitoring & Profiling
-# ============================================================================
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+venv/
+.venv/
+.venv*/
+backend/.venv*/
+backend/venv/
+.mypy_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
 *.prof
-*.lprof
-.profiling/
 
-# ============================================================================
-# Terraform (if used for infrastructure)
-# ============================================================================
-*.tfstate
-*.tfstate.*
-.terraform/
-.terraform.lock.hcl
+# ── Node.js ──────────────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
 
-# ============================================================================
-# Kubernetes secrets (if any)
-# ============================================================================
-k8s/secrets/
-*.secret.yaml
+# ── Databases ────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+postgres_data/
+*.sql.gz
+*.dump
 
-# ============================================================================
-# Orion-specific
-# ============================================================================
-# Feed source cache
-backend/cache/feeds/
+# ── IDE & OS ─────────────────────────────────────────────────────────────────
+.DS_Store
+._*
+Thumbs.db
+[Dd]esktop.ini
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
 
-# Threat intelligence data (if cached locally)
-backend/data/ti_cache/
+# ── Docker ───────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+docker-compose.local.yml
 
-# Hunt results (if stored locally)
-backend/data/hunt_results/
+# ── Logs & Temp ──────────────────────────────────────────────────────────────
+logs/
+*.log
+tmp/
+temp/
+*.tmp
+*.bak
+*.pid
+*.pid.lock
 
-# GenAI prompt cache
-backend/cache/prompts/
+# ── Build artifacts ──────────────────────────────────────────────────────────
+build/
+dist/
+coverage/
 
-# Audit logs (if stored as files)
-backend/logs/audit/
+# ── Alembic temp ─────────────────────────────────────────────────────────────
+backend/migrations/versions/*.pyc
+backend/migrations/__pycache__/
 
-# Exported reports (keep templates, ignore generated)
+# ── Application-specific ─────────────────────────────────────────────────────
+uploads/
+media/
+reports/*.pdf
+reports/*.docx
+reports/*.csv
+backend/cache/
+backend/data/
+backend/logs/
 backend/exports/*.pdf
 backend/exports/*.docx
 backend/exports/*.csv
-
-# Test fixtures with sensitive data
-backend/tests/fixtures/sensitive/
-
-# Local development overrides
-docker-compose.local.yml
 config.local.json
-
-# Dev secret keys
-data/.dev_secret_key
-
-# User-specific IDE settings
-.vscode/settings.json
-.idea/workspace.xml
-
-# Temporary analysis files
 *.analysis.json
 *.hunt_cache.json
-
-# Local scratch docs
-COLOR_PALETTE_REFERENCE.md
-COMPONENT_MOCKUPS.md
-UX_REDESIGN_PLAN.md
-PARSHU_DESIGN_RESEARCH_PROPOSAL.md

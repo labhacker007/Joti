@@ -1,0 +1,15 @@
+**/.git
+**/.gitignore
+**/.env
+**/.env.local
+**/node_modules
+**/venv
+**/dist
+**/build
+**/__pycache__
+**/.DS_Store
+**/README.md
+**/LICENSE
+**/.pytest_cache
+**/.coverage
+**/docs
