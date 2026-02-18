@@ -36,13 +36,15 @@ export default function ProtectedLayout({
           onToggle={handleToggle}
         />
         <main
-          className={`flex-1 min-w-0 transition-all duration-300 ${
+          className={`flex-1 min-w-0 transition-all duration-300 bg-background ${
             mounted
               ? collapsed ? 'ml-16' : 'ml-64'
               : 'ml-64'
           }`}
         >
-          {children}
+          <div className="p-6">
+            {children}
+          </div>
         </main>
       </div>
     </ProtectedRoute>

@@ -8,6 +8,7 @@ import { Spinner } from './ui/spinner';
 
 // Map route paths to page keys - defined outside component to avoid re-creation
 const PATH_TO_PAGE_KEY: Record<string, string> = {
+  '/feeds': 'feed',
   '/dashboard': 'dashboard',
   '/news': 'feed',
   '/sources': 'sources',

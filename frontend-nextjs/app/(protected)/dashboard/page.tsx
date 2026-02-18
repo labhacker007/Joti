@@ -3,14 +3,10 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
-
-export default function HomePage() {
+export default function DashboardRedirect() {
   const router = useRouter();
-
   useEffect(() => {
     router.replace('/feeds');
   }, [router]);
-
   return null;
 }

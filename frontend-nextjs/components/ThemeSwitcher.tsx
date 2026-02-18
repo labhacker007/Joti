@@ -89,7 +89,7 @@ export function ThemeSwitcher({
   return (
     <button
       onClick={handleCycleTheme}
-      className={`relative group p-3 rounded-lg backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 transition-all duration-200 ${className}`}
+      className={`relative group p-3 rounded-lg backdrop-blur-md bg-secondary/80 hover:bg-secondary border border-border hover:border-border/80 transition-all duration-200 ${className}`}
       title={`Click to cycle themes (Current: ${currentConfig.name})`}
     >
       <div className="relative flex items-center justify-center">

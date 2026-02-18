@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "../styles/styles/kimi-theme.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { TimezoneProvider } from "@/contexts/TimezoneContext";
 import { AuthInitializer } from "@/components/AuthInitializer";
