@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'standalone',
 
+  // Prevent axios from being bundled into server chunks (uses window.location internally)
+  serverExternalPackages: ['axios'],
+
   // Disable x-powered-by header to reduce fingerprinting
   poweredByHeader: false,
 
