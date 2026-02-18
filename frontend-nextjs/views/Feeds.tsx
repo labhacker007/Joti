@@ -283,7 +283,7 @@ export default function Feeds() {
             <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder=""
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               className="w-44 pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -342,7 +342,7 @@ export default function Feeds() {
           className={cn(
             'px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5',
             activeFilter === 'all'
-              ? 'bg-primary text-primary-foreground'
+              ? 'bg-slate-700 text-white'
               : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-accent'
           )}
         >

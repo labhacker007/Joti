@@ -833,6 +833,9 @@ export const genaiAPI = {
   setupOllama: async (data: any) => {
     return post('/admin/genai/ollama/setup', data);
   },
+  deleteOllamaModel: async (modelName: string) => {
+    return del(`/admin/genai/ollama/model/${encodeURIComponent(modelName)}`);
+  },
   // Admin model preferences
   setModelPreferences: async (data: { primary_model: string; secondary_model?: string }) => {
     return post('/admin/genai/models/preferences', data);

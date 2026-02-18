@@ -13,7 +13,7 @@ interface SearchBarProps {
 
 export default function SearchBar({
   onSearch,
-  placeholder = 'Search articles, keywords, IOCs...',
+  placeholder = '',
   showAdvanced = true,
   onAdvancedClick,
 }: SearchBarProps) {

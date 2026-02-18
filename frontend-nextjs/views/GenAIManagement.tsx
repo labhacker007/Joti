@@ -20,6 +20,10 @@ import {
   EyeOff,
   Play,
   TestTube,
+  Download,
+  Trash2,
+  HardDrive,
+  Loader2,
 } from 'lucide-react';
 import { genaiAPI, connectorsAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
@@ -68,6 +72,15 @@ interface ProviderConfig {
   isLocal?: boolean;
 }
 
+interface OllamaLibraryModel {
+  name: string;
+  size: string;
+  description: string;
+  category: string;
+  installed: boolean;
+  installed_size?: string;
+}
+
 // Provider definitions
 const PROVIDER_DEFS: ProviderConfig[] = [
   {
@@ -113,12 +126,19 @@ export default function GenAIManagement() {
   const [functions, setFunctions] = useState<FunctionConfig[]>([]);
   const [savedKeys, setSavedKeys] = useState<Record<string, string>>({});
 
+  // Ollama library
+  const [ollamaLibrary, setOllamaLibrary] = useState<OllamaLibraryModel[]>([]);
+  const [ollamaConnected, setOllamaConnected] = useState(false);
+  const [pullingModels, setPullingModels] = useState<Set<string>>(new Set());
+  const [deletingModels, setDeletingModels] = useState<Set<string>>(new Set());
+  const [ollamaFilter, setOllamaFilter] = useState<'all' | 'installed' | 'available'>('all');
+
   // UI states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'providers' | 'models' | 'functions'>('providers');
+  const [activeTab, setActiveTab] = useState<'providers' | 'models' | 'functions' | 'ollama'>('providers');
 
   // Provider config states
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
@@ -147,11 +167,12 @@ export default function GenAIManagement() {
       setLoading(true);
       setError('');
 
-      const [providerRes, modelRes, funcRes, configRes] = await Promise.allSettled([
+      const [providerRes, modelRes, funcRes, configRes, ollamaRes] = await Promise.allSettled([
         genaiAPI.getProviderStatus(),
         genaiAPI.getAdminModels(),
         genaiAPI.getFunctionConfigs(),
         connectorsAPI.getConfigurations('genai'),
+        genaiAPI.getOllamaLibrary(),
       ]);
 
       if (providerRes.status === 'fulfilled') {
@@ -179,6 +200,12 @@ export default function GenAIManagement() {
           }
         });
         setSavedKeys(keys);
+      }
+
+      if (ollamaRes.status === 'fulfilled') {
+        const data = (ollamaRes.value as any)?.data || ollamaRes.value;
+        setOllamaLibrary(data?.models || []);
+        setOllamaConnected(data?.connected ?? false);
       }
     } catch (err: unknown) {
       setError(getErrorMessage(err));
@@ -302,6 +329,42 @@ export default function GenAIManagement() {
     }
   };
 
+  const handlePullModel = async (modelName: string) => {
+    try {
+      setError('');
+      setPullingModels((prev) => new Set(prev).add(modelName));
+      await genaiAPI.pullOllamaModel(modelName);
+      setSuccess(`Pulling "${modelName}" in background. This may take several minutes. Refresh to check status.`);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setPullingModels((prev) => {
+        const next = new Set(prev);
+        next.delete(modelName);
+        return next;
+      });
+    }
+  };
+
+  const handleDeleteOllamaModel = async (modelName: string) => {
+    if (!confirm(`Delete "${modelName}" from Ollama? This frees disk space but the model must be re-downloaded to use again.`)) return;
+    try {
+      setError('');
+      setDeletingModels((prev) => new Set(prev).add(modelName));
+      await genaiAPI.deleteOllamaModel(modelName);
+      setSuccess(`Model "${modelName}" deleted`);
+      await loadData();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDeletingModels((prev) => {
+        const next = new Set(prev);
+        next.delete(modelName);
+        return next;
+      });
+    }
+  };
+
   const getProviderStatus = (providerName: string) => {
     return providers.find(
       (p) => p.provider?.toLowerCase() === providerName.toLowerCase()
@@ -319,6 +382,7 @@ export default function GenAIManagement() {
     { key: 'providers' as const, label: 'Providers', icon: Key },
     { key: 'models' as const, label: 'Models', icon: Brain },
     { key: 'functions' as const, label: 'Function Mapping', icon: ArrowRightLeft },
+    { key: 'ollama' as const, label: 'Ollama Library', icon: HardDrive },
   ];
 
   if (loading) {
@@ -639,6 +703,126 @@ export default function GenAIManagement() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* ====== OLLAMA LIBRARY TAB ====== */}
+      {activeTab === 'ollama' && (
+        <div className="space-y-4">
+          {/* Connection status */}
+          <div className={cn(
+            'p-3 rounded-lg flex items-center gap-3 text-sm',
+            ollamaConnected
+              ? 'bg-green-500/10 text-green-700'
+              : 'bg-yellow-500/10 text-yellow-700'
+          )}>
+            {ollamaConnected ? (
+              <><CheckCircle className="w-4 h-4" /> Ollama is connected. {ollamaLibrary.filter(m => m.installed).length} model(s) downloaded.</>
+            ) : (
+              <><AlertCircle className="w-4 h-4" /> Ollama not reachable. Configure the URL in the Providers tab and ensure Ollama is running.</>
+            )}
+          </div>
+
+          {/* Filter */}
+          <div className="flex items-center gap-2">
+            {(['all', 'installed', 'available'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setOllamaFilter(f)}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize',
+                  ollamaFilter === f
+                    ? 'bg-slate-700 text-white'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {f} {f === 'installed' && `(${ollamaLibrary.filter(m => m.installed).length})`}
+                {f === 'all' && `(${ollamaLibrary.length})`}
+              </button>
+            ))}
+            <button
+              onClick={loadData}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary text-foreground rounded-md hover:bg-secondary/80"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Refresh
+            </button>
+          </div>
+
+          {/* Model list */}
+          <div className="space-y-1.5">
+            {ollamaLibrary
+              .filter((m) => {
+                if (ollamaFilter === 'installed') return m.installed;
+                if (ollamaFilter === 'available') return !m.installed;
+                return true;
+              })
+              .map((model) => {
+                const isPulling = pullingModels.has(model.name);
+                const isDeleting = deletingModels.has(model.name);
+                return (
+                  <div
+                    key={model.name}
+                    className={cn(
+                      'bg-card border rounded-lg p-3 flex items-center justify-between',
+                      model.installed ? 'border-green-500/30' : 'border-border'
+                    )}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <HardDrive className={cn('w-5 h-5 flex-shrink-0', model.installed ? 'text-green-500' : 'text-muted-foreground')} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground text-sm">{model.name}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
+                            {model.category}
+                          </span>
+                          {model.installed && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/10 text-green-600">
+                              Downloaded
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {model.description} &middot; {(model as any).actual_size || model.size}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                      {model.installed ? (
+                        <button
+                          onClick={() => handleDeleteOllamaModel(model.name)}
+                          disabled={isDeleting}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-red-500/10 text-red-600 hover:bg-red-500/20 disabled:opacity-50"
+                        >
+                          {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          {isDeleting ? 'Deleting...' : 'Delete'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handlePullModel(model.name)}
+                          disabled={isPulling || !ollamaConnected}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          {isPulling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                          {isPulling ? 'Pulling...' : 'Download'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+            {ollamaLibrary.length === 0 && (
+              <div className="text-center py-12 border border-dashed border-border rounded-lg">
+                <HardDrive className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground">No models in library</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Connect to Ollama in the Providers tab first
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
