@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import SourcesManagement from '@/pages/admin/SourcesManagement';
+import SourcesManagement from '@/views/admin/SourcesManagement';
 
 export default function SourcesPage() {
   return <SourcesManagement />;

@@ -255,7 +255,7 @@ export const usersAPI = {
    * Create new user (admin only)
    */
   createUser: async (userData: any) => {
-    return post('/users', userData);
+    return post('/users/', userData);
   },
 
   /**
@@ -342,6 +342,12 @@ export const articlesAPI = {
     if (filters?.watchlist_only) {
       params.append('watchlist_only', 'true');
     }
+    if (filters?.bookmarked_only) {
+      params.append('bookmarked_only', 'true');
+    }
+    if (filters?.time_range) {
+      params.append('time_range', filters.time_range);
+    }
     return get(`/articles/?${params}`);
   },
 
@@ -381,10 +387,24 @@ export const articlesAPI = {
   },
 
   /**
-   * Generate article summary
+   * Generate AI summary for article (executive + technical)
    */
-  generateSummary: async (id: string) => {
-    return post(`/articles/${id}/generate-summary`, {});
+  summarizeArticle: async (id: string, modelId?: string) => {
+    return post(`/articles/${id}/summarize`, modelId ? { model_id: modelId } : {});
+  },
+
+  /**
+   * Extract intelligence (IOCs, TTPs) from article
+   */
+  extractIntelligence: async (id: string) => {
+    return post(`/articles/${id}/extract-intelligence`, {});
+  },
+
+  /**
+   * Get article with full intelligence detail
+   */
+  getArticleDetail: async (id: string) => {
+    return get(`/articles/${id}?include_intel=true`);
   },
 
   /**
@@ -406,6 +426,13 @@ export const articlesAPI = {
    */
   bulkUpdate: async (articleIds: string[], updates: any) => {
     return post('/articles/bulk-update', { ids: articleIds, updates });
+  },
+
+  /**
+   * Get trending articles (public, no auth required)
+   */
+  getTrending: async () => {
+    return get('/articles/trending');
   },
 };
 
@@ -448,8 +475,8 @@ export const watchlistAPI = {
   getKeywords: async () => {
     return get('/watchlist/');
   },
-  addKeyword: async (keyword: string) => {
-    return post('/watchlist/', { keyword });
+  addKeyword: async (keyword: string, category?: string) => {
+    return post('/watchlist/', { keyword, ...(category ? { category } : {}) });
   },
   updateKeyword: async (id: string, data: any) => {
     return patch(`/watchlist/${id}`, data);
@@ -555,7 +582,7 @@ export const userFeedsAPI = {
     if (metadata?.title) formData.append('title', metadata.title);
     if (metadata?.description) formData.append('description', metadata.description);
 
-    return post('/sources/custom/ingest', formData, {
+    return post('/sources/custom/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -600,6 +627,41 @@ export const adminAPI = {
   },
   testGuardrail: async (id: string, input: string) => {
     return post('/admin/genai-guardrails/test', { input_text: input, guardrail_id: id });
+  },
+  getRetentionSettings: async () => {
+    return get('/admin/retention-settings');
+  },
+  updateRetentionSettings: async (data: {
+    article_retention_days?: number;
+    audit_retention_days?: number;
+    hunt_retention_days?: number;
+  }) => {
+    return put('/admin/retention-settings', data);
+  },
+  exportArticles: async (page = 1, pageSize = 100) => {
+    return get(`/admin/export/articles?page=${page}&page_size=${pageSize}`);
+  },
+  exportIOCs: async (page = 1, pageSize = 100) => {
+    return get(`/admin/export/iocs?page=${page}&page_size=${pageSize}`);
+  },
+  exportTTPs: async (page = 1, pageSize = 100) => {
+    return get(`/admin/export/ttps?page=${page}&page_size=${pageSize}`);
+  },
+  exportAuditLogs: async (page = 1, pageSize = 100) => {
+    return get(`/admin/export/audit-logs?page=${page}&page_size=${pageSize}`);
+  },
+  // GenAI Admin
+  getGenAIStatus: async () => {
+    return get('/admin/genai/status');
+  },
+  getGenAIModels: async () => {
+    return get('/admin/genai/models');
+  },
+  updateGenAIConfig: async (config: any) => {
+    return put('/admin/genai/config', config);
+  },
+  testGenAIProvider: async (provider: string) => {
+    return post('/admin/genai/test', { provider });
   },
 };
 
@@ -735,6 +797,147 @@ export const genaiAPI = {
   },
   testGenAI: async () => {
     return get('/articles/test-genai');
+  },
+  // Function-to-model mapping
+  getFunctionConfigs: async () => {
+    return get('/admin/genai/functions/');
+  },
+  updateFunctionConfig: async (functionName: string, data: any) => {
+    return patch(`/admin/genai/functions/${functionName}`, data);
+  },
+  createFunctionConfig: async (data: any) => {
+    return post('/admin/genai/functions/', data);
+  },
+  // Ollama
+  getOllamaStatus: async () => {
+    return get('/admin/ollama/status');
+  },
+  getOllamaLibrary: async () => {
+    return get('/admin/genai/ollama/library');
+  },
+  pullOllamaModel: async (modelName: string) => {
+    return post(`/admin/genai/ollama/pull-model?model_name=${encodeURIComponent(modelName)}`, {});
+  },
+  setupOllama: async (data: any) => {
+    return post('/admin/genai/ollama/setup', data);
+  },
+  // Admin model preferences
+  setModelPreferences: async (data: { primary_model: string; secondary_model?: string }) => {
+    return post('/admin/genai/models/preferences', data);
+  },
+  // Admin GenAI test
+  testProvider: async (provider: string, testType?: string) => {
+    return post('/admin/genai/test', { provider, test_type: testType || 'summary' });
+  },
+};
+
+// ============================================
+// ANALYTICS API
+// ============================================
+
+export const analyticsAPI = {
+  getMyAnalytics: async (timeRange = '30d') => {
+    return get(`/analytics/me?time_range=${timeRange}`);
+  },
+  getUserAnalytics: async (userId: number, timeRange = '30d') => {
+    return get(`/analytics/users/${userId}?time_range=${timeRange}`);
+  },
+  getAdminOverview: async (timeRange = '30d') => {
+    return get(`/analytics/admin/overview?time_range=${timeRange}`);
+  },
+  exportAnalytics: async (params: {
+    time_range?: string;
+    start_date?: string;
+    end_date?: string;
+    user_id?: number;
+  }) => {
+    const query = new URLSearchParams();
+    if (params.time_range) query.append('time_range', params.time_range);
+    if (params.start_date) query.append('start_date', params.start_date);
+    if (params.end_date) query.append('end_date', params.end_date);
+    if (params.user_id) query.append('user_id', params.user_id.toString());
+    return get(`/analytics/admin/export?${query}`);
+  },
+};
+
+// ============================================
+// GUARDRAILS API
+// ============================================
+
+export const guardrailsAPI = {
+  list: async (params?: { type?: string; is_active?: boolean }) => {
+    const query = new URLSearchParams();
+    if (params?.type) query.append('guardrail_type', params.type);
+    if (params?.is_active !== undefined) query.append('is_active', String(params.is_active));
+    const qs = query.toString();
+    return get(`/admin/genai-guardrails/${qs ? '?' + qs : ''}`);
+  },
+  get: async (id: number) => {
+    return get(`/admin/genai-guardrails/${id}`);
+  },
+  create: async (data: {
+    name: string;
+    description?: string;
+    type: string;
+    config: Record<string, any>;
+    action?: string;
+    max_retries?: number;
+    is_active?: boolean;
+  }) => {
+    return post('/admin/genai-guardrails/', data);
+  },
+  update: async (id: number, data: {
+    name?: string;
+    description?: string;
+    config?: Record<string, any>;
+    action?: string;
+    max_retries?: number;
+    is_active?: boolean;
+  }) => {
+    return patch(`/admin/genai-guardrails/${id}`, data);
+  },
+  delete: async (id: number) => {
+    return del(`/admin/genai-guardrails/${id}`);
+  },
+  getTypes: async () => {
+    return get('/admin/genai-guardrails/types');
+  },
+  test: async (data: { guardrail_type: string; config: Record<string, any>; test_input: string }) => {
+    return post('/admin/genai-guardrails/test', data);
+  },
+};
+
+// ============================================
+// SKILLS API
+// ============================================
+
+export const skillsAPI = {
+  list: async () => {
+    return get('/admin/genai-skills/');
+  },
+  get: async (id: string) => {
+    return get(`/admin/genai-skills/${id}`);
+  },
+  create: async (data: {
+    name: string;
+    description?: string;
+    persona?: string;
+    instructions: string;
+    is_active?: boolean;
+  }) => {
+    return post('/admin/genai-skills/', data);
+  },
+  update: async (id: string, data: {
+    name?: string;
+    description?: string;
+    persona?: string;
+    instructions?: string;
+    is_active?: boolean;
+  }) => {
+    return patch(`/admin/genai-skills/${id}`, data);
+  },
+  delete: async (id: string) => {
+    return del(`/admin/genai-skills/${id}`);
   },
 };
 

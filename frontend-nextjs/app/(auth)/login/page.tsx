@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import Login from '@/pages/Login';
+import Login from '@/views/Login';
 
 export default function LoginPage() {
   return <Login />;

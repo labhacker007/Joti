@@ -18,8 +18,6 @@ import {
   X,
   Bell,
   Palette,
-  ToggleRight,
-  ToggleLeft,
   Globe,
   Volume2,
   LogOut,
@@ -31,8 +29,11 @@ import {
   Download,
   Upload,
   Copy,
+  BarChart3,
 } from 'lucide-react';
-import { usersAPI, sourcesAPI, watchlistAPI } from '@/api/client';
+import { usersAPI, sourcesAPI, watchlistAPI, analyticsAPI } from '@/api/client';
+import ToggleSwitch from '@/components/ui/ToggleSwitch';
+import { useTheme, themeOptions, ThemeName } from '@/contexts/ThemeContext';
 import { formatDate, cn } from '@/lib/utils';
 import { getErrorMessage } from '@/api/client';
 
@@ -117,12 +118,13 @@ interface ActiveSession {
   is_current: boolean;
 }
 
-type TabType = 'profile' | 'sources' | 'watchlist' | 'security' | 'preferences';
+type TabType = 'profile' | 'sources' | 'watchlist' | 'analytics' | 'security' | 'preferences';
 
 const TABS: { id: TabType; label: string }[] = [
   { id: 'profile', label: 'Profile' },
   { id: 'sources', label: 'Custom Sources' },
   { id: 'watchlist', label: 'Watchlist' },
+  { id: 'analytics', label: 'Analytics' },
   { id: 'security', label: 'Security' },
   { id: 'preferences', label: 'Preferences' },
 ];
@@ -193,6 +195,9 @@ export default function UserProfile() {
     twoFactorRequired: false,
   });
   const [prefsLoading, setPrefsLoading] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const { theme: currentTheme, setTheme } = useTheme();
 
   // Security state
   const [loginHistory, setLoginHistory] = useState<LoginHistory[]>([
@@ -252,6 +257,8 @@ export default function UserProfile() {
       fetchSources();
     } else if (activeTab === 'watchlist') {
       fetchWatchlist();
+    } else if (activeTab === 'analytics') {
+      fetchAnalytics();
     } else if (activeTab === 'preferences') {
       loadPreferences();
     } else if (activeTab === 'security') {
@@ -632,6 +639,20 @@ export default function UserProfile() {
       setError(getErrorMessage(err));
       console.error('Security data error:', err);
       setSecurityLoading(false);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      setAnalyticsLoading(true);
+      setError('');
+      const response = (await analyticsAPI.getMyAnalytics()) as any;
+      setAnalyticsData(response.data);
+    } catch (err: any) {
+      // Analytics may not be available for all users
+      setAnalyticsData(null);
+    } finally {
+      setAnalyticsLoading(false);
     }
   };
 
@@ -1387,6 +1408,55 @@ export default function UserProfile() {
           </div>
         )}
 
+        {activeTab === 'analytics' && (
+          <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="w-6 h-6 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">Your Analytics</h2>
+            </div>
+
+            {analyticsLoading ? (
+              <div className="text-center py-8 text-muted-foreground">Loading analytics...</div>
+            ) : analyticsData ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Articles Read', value: analyticsData.articles_read ?? 0 },
+                    { label: 'Bookmarks', value: analyticsData.bookmarks ?? 0 },
+                    { label: 'Searches', value: analyticsData.searches ?? 0 },
+                    { label: 'Extractions', value: analyticsData.extractions ?? 0 },
+                  ].map((stat) => (
+                    <div key={stat.label} className="bg-muted rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {analyticsData.recent_activity && analyticsData.recent_activity.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-3">Recent Activity</h3>
+                    <div className="space-y-2">
+                      {analyticsData.recent_activity.slice(0, 10).map((activity: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-muted rounded-lg text-sm">
+                          <span className="text-foreground">{activity.action || activity.event_type}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {activity.timestamp ? formatDate(activity.timestamp) : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Analytics data is not available yet. Start using the platform to see your activity stats.
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'security' && (
           <div className="space-y-6">
             {/* Security Settings Card */}
@@ -1644,26 +1714,20 @@ export default function UserProfile() {
                       <h3 className="font-semibold text-foreground">Email Notifications</h3>
                       <p className="text-sm text-muted-foreground">Receive updates via email</p>
                     </div>
-                    <button
-                      onClick={() =>
+                    <ToggleSwitch
+                      checked={notificationPrefs.some((p) => p.type === 'email' && p.enabled)}
+                      onChange={(val) =>
                         setNotificationPrefs([
                           {
                             id: '1',
                             type: 'email',
                             category: 'security',
-                            enabled: !notificationPrefs.some((p) => p.type === 'email' && p.enabled),
+                            enabled: val,
                             frequency: 'instant',
                           },
                         ])
                       }
-                      className="text-primary hover:text-primary/80"
-                    >
-                      {notificationPrefs.some((p) => p.type === 'email' && p.enabled) ? (
-                        <ToggleRight className="w-6 h-6" />
-                      ) : (
-                        <ToggleLeft className="w-6 h-6" />
-                      )}
-                    </button>
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {['security', 'updates', 'digest', 'promotional'].map((cat) => (
@@ -1705,26 +1769,29 @@ export default function UserProfile() {
                 <h2 className="text-xl font-bold text-foreground">Display Preferences</h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Theme */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Theme</label>
-                  <select
-                    value={displayPrefs.theme}
-                    onChange={(e) =>
-                      setDisplayPrefs({
-                        ...displayPrefs,
-                        theme: e.target.value as 'light' | 'dark' | 'auto',
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="auto">Auto (System)</option>
-                  </select>
+              {/* Theme Grid */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-foreground mb-3">Theme</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(Object.entries(themeOptions) as [ThemeName, { emoji: string; label: string }][]).map(([key, opt]) => (
+                    <button
+                      key={key}
+                      onClick={() => setTheme(key)}
+                      className={cn(
+                        'flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all text-left',
+                        currentTheme === key
+                          ? 'border-primary bg-primary/10 text-foreground'
+                          : 'border-border bg-muted text-muted-foreground hover:border-primary/50 hover:bg-accent'
+                      )}
+                    >
+                      <span className="text-lg">{opt.emoji}</span>
+                      <span className="text-sm font-medium">{opt.label}</span>
+                    </button>
+                  ))}
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Language */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">Language</label>
@@ -1883,21 +1950,15 @@ export default function UserProfile() {
                         <h3 className="font-semibold text-foreground">{setting.label}</h3>
                         <p className="text-sm text-muted-foreground">{setting.description}</p>
                       </div>
-                      <button
-                        onClick={() =>
+                      <ToggleSwitch
+                        checked={!!privacySettings[setting.key as keyof PrivacySettings]}
+                        onChange={(val) =>
                           setPrivacySettings({
                             ...privacySettings,
-                            [setting.key]: !privacySettings[setting.key as keyof PrivacySettings],
+                            [setting.key]: val,
                           })
                         }
-                        className="text-primary hover:text-primary/80"
-                      >
-                        {privacySettings[setting.key as keyof PrivacySettings] ? (
-                          <ToggleRight className="w-6 h-6" />
-                        ) : (
-                          <ToggleLeft className="w-6 h-6" />
-                        )}
-                      </button>
+                      />
                     </div>
                   ))}
                 </div>

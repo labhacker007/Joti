@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import AuditLogs from '@/pages/AuditLogs';
+import AuditLogs from '@/views/AuditLogs';
 
 export default function AuditPage() {
   return <AuditLogs />;

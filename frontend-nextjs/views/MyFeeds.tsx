@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import {
   Plus,
   Trash2,
@@ -9,8 +10,9 @@ import {
   CheckCircle,
   AlertCircle,
   Edit2,
-  ToggleRight,
-  ToggleLeft,
+  Rss,
+  Zap,
+  Bell,
 } from 'lucide-react';
 import { userFeedsAPI } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -228,7 +230,10 @@ export default function MyFeeds() {
     <div className="container mx-auto p-6 max-w-6xl space-y-6 pb-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">My Custom Feeds</h1>
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+            <Rss className="w-8 h-8" />
+            My Custom Feeds
+          </h1>
           <p className="text-muted-foreground mt-1">Add and manage your personal feed sources</p>
         </div>
         <button
@@ -241,6 +246,31 @@ export default function MyFeeds() {
           <Plus className="w-4 h-4" />
           Add Feed
         </button>
+      </div>
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Total Feeds</p>
+          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Rss className="w-5 h-5 text-blue-600" />
+            {feeds.length}
+          </p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Auto-Ingest</p>
+          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Zap className="w-5 h-5 text-green-600" />
+            {feeds.filter((f) => f.auto_ingest).length}
+          </p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Notifications</p>
+          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Bell className="w-5 h-5 text-orange-600" />
+            {feeds.filter((f) => f.notify_on_new).length}
+          </p>
+        </div>
       </div>
 
       {error && (
@@ -435,22 +465,20 @@ export default function MyFeeds() {
                   </div>
 
                   <div className="flex gap-4 text-xs text-muted-foreground">
-                    <label className="flex items-center gap-1">
-                      {feed.auto_ingest ? (
-                        <ToggleRight className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <ToggleLeft className="w-4 h-4" />
-                      )}
-                      Auto-ingest
-                    </label>
-                    <label className="flex items-center gap-1">
-                      {feed.notify_on_new ? (
-                        <ToggleRight className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <ToggleLeft className="w-4 h-4" />
-                      )}
-                      Notifications
-                    </label>
+                    <ToggleSwitch
+                      checked={feed.auto_ingest}
+                      onChange={() => {}}
+                      size="sm"
+                      label="Auto-ingest"
+                      disabled
+                    />
+                    <ToggleSwitch
+                      checked={feed.notify_on_new}
+                      onChange={() => {}}
+                      size="sm"
+                      label="Notifications"
+                      disabled
+                    />
                   </div>
                 </div>
 

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import UserProfile from '@/pages/UserProfile';
+import UserProfile from '@/views/UserProfile';
 
 export default function ProfilePage() {
   return <UserProfile />;

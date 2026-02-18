@@ -1,25 +1,28 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader, FileText, Shield, Brain } from 'lucide-react';
 import FileUploadDropzone from '@/components/FileUploadDropzone';
 import { userFeedsAPI } from '@/api/client';
 
 interface UploadResult {
-  status: 'success' | 'error';
+  status: 'success' | 'error' | 'duplicate';
   filename: string;
   message: string;
-  articleCount?: number;
+  articleTitle?: string;
+  articleId?: number;
+  executiveSummary?: string;
+  iocCount?: number;
+  ttpCount?: number;
+  extractionMethod?: string;
 }
 
 export default function DocumentUpload() {
   const [uploading, setUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
-  const [error, setError] = useState('');
 
   const handleFilesSelected = async (files: File[]) => {
     setUploading(true);
-    setError('');
     const results: UploadResult[] = [];
 
     for (const file of files) {
@@ -28,17 +31,24 @@ export default function DocumentUpload() {
           title: file.name,
         }) as any;
 
+        const data = response.data || response;
         results.push({
-          status: 'success',
+          status: data.status === 'duplicate' ? 'duplicate' : 'success',
           filename: file.name,
-          message: `Successfully ingested ${response.data?.article_count || 0} articles`,
-          articleCount: response.data?.article_count,
+          message: data.message || 'Document ingested successfully',
+          articleTitle: data.article_title,
+          articleId: data.article_id,
+          executiveSummary: data.executive_summary,
+          iocCount: data.ioc_count || 0,
+          ttpCount: data.ttp_count || 0,
+          extractionMethod: data.extraction_method,
         });
       } catch (err: any) {
+        const detail = err.response?.data?.detail || err.message || 'Failed to process document';
         results.push({
           status: 'error',
           filename: file.name,
-          message: err.message || 'Failed to process document',
+          message: detail,
         });
       }
     }
@@ -52,7 +62,8 @@ export default function DocumentUpload() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Upload Documents</h1>
         <p className="text-muted-foreground mt-1">
-          Import articles from documents like PDFs, Word files, Excel sheets, and HTML files
+          Import threat intelligence from PDFs, Word files, Excel sheets, and more.
+          GenAI will automatically extract IOCs, TTPs, and generate summaries.
         </p>
       </div>
 
@@ -70,7 +81,7 @@ export default function DocumentUpload() {
             <Loader className="w-5 h-5 flex-shrink-0 mt-0.5 animate-spin" />
             <div>
               <p className="font-semibold">Processing documents...</p>
-              <p className="text-sm">This may take a moment depending on file size</p>
+              <p className="text-sm">Extracting text, running IOC/TTP analysis, and generating GenAI summaries</p>
             </div>
           </div>
         )}
@@ -86,22 +97,58 @@ export default function DocumentUpload() {
                     'p-4 rounded-lg border',
                     result.status === 'success'
                       ? 'bg-green-500/5 border-green-500/30'
-                      : 'bg-red-500/5 border-red-500/30'
+                      : result.status === 'duplicate'
+                        ? 'bg-amber-500/5 border-amber-500/30'
+                        : 'bg-red-500/5 border-red-500/30'
                   )}
                 >
                   <div className="flex items-start gap-3">
                     {result.status === 'success' ? (
                       <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    ) : result.status === 'duplicate' ? (
+                      <FileText className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     ) : (
                       <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-foreground break-all">
-                        {result.filename}
+                        {result.articleTitle || result.filename}
                       </p>
-                      <p className={`text-sm ${result.status === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                      <p className={`text-sm ${
+                        result.status === 'success' ? 'text-green-600'
+                          : result.status === 'duplicate' ? 'text-amber-600'
+                            : 'text-red-600'
+                      }`}>
                         {result.message}
                       </p>
+
+                      {(result.status === 'success' || result.status === 'duplicate') && (
+                        <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          {(result.iocCount ?? 0) > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Shield className="w-3 h-3" />
+                              {result.iocCount} IOCs
+                            </span>
+                          )}
+                          {(result.ttpCount ?? 0) > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Brain className="w-3 h-3" />
+                              {result.ttpCount} TTPs
+                            </span>
+                          )}
+                          {result.extractionMethod && (
+                            <span className="text-xs px-2 py-0.5 bg-secondary rounded">
+                              {result.extractionMethod}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {result.executiveSummary && (
+                        <p className="mt-2 text-sm text-muted-foreground italic">
+                          {result.executiveSummary}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -125,13 +172,13 @@ export default function DocumentUpload() {
         </div>
 
         <div className="p-4 bg-green-500/10 text-green-700 rounded-lg border border-green-200">
-          <h3 className="font-semibold mb-3">How It Works</h3>
+          <h3 className="font-semibold mb-3">What Happens After Upload</h3>
           <ol className="space-y-2 text-sm">
-            <li>1. Select or drag documents to upload</li>
-            <li>2. System extracts content and parses articles</li>
-            <li>3. Articles appear in your Feeds page</li>
-            <li>4. Apply filters and track reading progress</li>
-            <li>5. Organize with watchlist keywords</li>
+            <li>1. Text extracted from your document</li>
+            <li>2. GenAI analyzes for IOCs, TTPs, and threats</li>
+            <li>3. Executive & technical summaries generated</li>
+            <li>4. Article appears in your Feeds page</li>
+            <li>5. Watchlist keywords auto-matched</li>
           </ol>
         </div>
       </div>
@@ -146,7 +193,6 @@ export default function DocumentUpload() {
   );
 }
 
-// Helper function
 function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
