@@ -80,13 +80,13 @@ class User(Base):
 
     # Multiple roles support - JSON array of additional roles
     # e.g., ["TI", "TH"] means user has TI and TH in addition to primary role
-    additional_roles = Column(JSON, default=[])
+    additional_roles = Column(JSON, default=list)
 
     # Custom per-user permission overrides
     # Format: {"grant": ["view:hunts", "execute:hunts"], "deny": ["manage:users"]}
     # grant: permissions given even if role doesn't have them
     # deny: permissions revoked even if role has them
-    custom_permissions = Column(JSON, default={"grant": [], "deny": []})
+    custom_permissions = Column(JSON, default=lambda: {"grant": [], "deny": []})
 
     is_active = Column(Boolean, default=True)
 
@@ -135,7 +135,7 @@ class FeedSource(Base):
     feed_type = Column(String, default="rss")  # rss, atom, html
     is_active = Column(Boolean, default=True)
     high_fidelity = Column(Boolean, default=False, index=True)  # Auto-triage and hunt
-    headers = Column(JSON, default={})  # Auth headers, User-Agent, etc.
+    headers = Column(JSON, default=dict)  # Auth headers, User-Agent, etc.
     last_fetched = Column(DateTime, nullable=True)
     next_fetch = Column(DateTime, default=datetime.utcnow)
     fetch_error = Column(Text, nullable=True)
@@ -187,7 +187,7 @@ class Article(Base):
     
     # Watch list
     is_high_priority = Column(Boolean, default=False, index=True)
-    watchlist_match_keywords = Column(JSON, default=[])
+    watchlist_match_keywords = Column(JSON, default=list)
     
     # Hunt tracking
     hunt_generated_count = Column(Integer, default=0, nullable=False)
@@ -423,12 +423,12 @@ class Report(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
-    article_ids = Column(JSON, default=[])  # Array of article IDs
+    article_ids = Column(JSON, default=list)  # Array of article IDs
     content = Column(Text, nullable=True)
     executive_summary = Column(Text, nullable=True)  # Editable executive summary
     technical_summary = Column(Text, nullable=True)  # Editable technical summary
-    key_findings = Column(JSON, default=[])  # Editable list of key findings
-    recommendations = Column(JSON, default=[])  # Editable recommendations
+    key_findings = Column(JSON, default=list)  # Editable list of key findings
+    recommendations = Column(JSON, default=list)  # Editable recommendations
     report_type = Column(String, default="comprehensive")  # comprehensive, executive, technical
     status = Column(SQLEnum(ReportStatus), default=ReportStatus.DRAFT, nullable=False, index=True)
     generated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -438,7 +438,7 @@ class Report(Base):
     published_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Who published
     published_at = Column(DateTime, nullable=True)  # When published
     version = Column(Integer, default=1)  # Version tracking
-    shared_with_emails = Column(JSON, default=[])
+    shared_with_emails = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -456,7 +456,7 @@ class AuditLog(Base):
     resource_type = Column(String, nullable=True)  # article, hunt, connector, etc.
     resource_id = Column(Integer, nullable=True)
     action = Column(String, nullable=False)  # created, updated, deleted, etc.
-    details = Column(JSON, default={})  # Event-specific metadata
+    details = Column(JSON, default=dict)  # Event-specific metadata
     correlation_id = Column(String, nullable=True, index=True)  # For tracing
     ip_address = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -475,7 +475,7 @@ class ConnectorConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
     connector_type = Column(String, nullable=False, index=True)  # References platform_id
-    config = Column(JSON, default={})  # Encrypted in production
+    config = Column(JSON, default=dict)  # Encrypted in production
     is_active = Column(Boolean, default=True, index=True)
     last_tested_at = Column(DateTime, nullable=True)
     last_test_status = Column(String, nullable=True)  # success, failed
@@ -508,18 +508,18 @@ class ConnectorPlatform(Base):
     color = Column(String(20), nullable=True)  # Brand color hex code
     
     # Capabilities
-    capabilities = Column(JSON, default=[])  # ["hunt", "enrich", "notify", "ingest", "export"]
+    capabilities = Column(JSON, default=list)  # ["hunt", "enrich", "notify", "ingest", "export"]
     
     # Query language details (for hunt platforms)
     query_language = Column(String(50), nullable=True)  # KQL, SPL, XQL, SQL, GraphQL
-    query_syntax = Column(JSON, default={})  # Tables, fields, operators, keywords, examples
+    query_syntax = Column(JSON, default=dict)  # Tables, fields, operators, keywords, examples
     documentation_url = Column(String(500), nullable=True)
     
     # Configuration schema - defines what fields are needed
-    config_schema = Column(JSON, default={})  # JSON Schema for config fields
+    config_schema = Column(JSON, default=dict)  # JSON Schema for config fields
     
     # API definition for custom connectors
-    api_definition = Column(JSON, default={})  # Base URL, auth type, endpoints
+    api_definition = Column(JSON, default=dict)  # Base URL, auth type, endpoints
     
     # Status
     is_builtin = Column(Boolean, default=False)  # Built-in vs custom
@@ -564,24 +564,24 @@ class ConnectorTemplate(Base):
     endpoint_path = Column(String(500), nullable=False)  # Path with placeholders like {ioc_value}
     
     # Headers (can include auth tokens via placeholders)
-    headers = Column(JSON, default={})  # {"Authorization": "Bearer {{api_key}}"}
+    headers = Column(JSON, default=dict)  # {"Authorization": "Bearer {{api_key}}"}
     
     # Request body template (for POST/PUT)
-    request_template = Column(JSON, default={})  # Jinja2/mustache style templating
+    request_template = Column(JSON, default=dict)  # Jinja2/mustache style templating
     content_type = Column(String(50), default="application/json")
     
     # Query parameters template
-    query_params = Column(JSON, default={})  # {"query": "{{hunt_query}}", "limit": 100}
+    query_params = Column(JSON, default=dict)  # {"query": "{{hunt_query}}", "limit": 100}
     
     # Response parsing
-    response_parser = Column(JSON, default={})  # JSONPath expressions for extracting data
+    response_parser = Column(JSON, default=dict)  # JSONPath expressions for extracting data
     success_condition = Column(String(200), nullable=True)  # Expression to determine success
     
     # Input schema - what variables this template accepts
-    input_schema = Column(JSON, default={})  # Defines expected inputs
+    input_schema = Column(JSON, default=dict)  # Defines expected inputs
     
     # Output schema - what this template returns
-    output_schema = Column(JSON, default={})  # Defines output structure
+    output_schema = Column(JSON, default=dict)  # Defines output structure
     
     # Rate limiting
     rate_limit_requests = Column(Integer, nullable=True)  # Max requests per window

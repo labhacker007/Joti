@@ -205,7 +205,8 @@ def login(login_request: LoginRequest, request: Request, db: Session = Depends(g
             )
         
         from app.auth.security import verify_totp
-        if not verify_totp(user.otp_secret, login_request.otp_code):
+        from app.core.crypto import decrypt_otp_secret
+        if not verify_totp(decrypt_otp_secret(user.otp_secret), login_request.otp_code):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid OTP code"
@@ -569,9 +570,10 @@ def enable_otp_setup(
     qr_code_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
     qr_code_data_url = f"data:image/png;base64,{qr_code_base64}"
     
-    # Store secret temporarily (not enabled until verified)
+    # Store secret encrypted (not enabled until verified)
     # We'll store it but keep otp_enabled = False
-    current_user.otp_secret = secret
+    from app.core.crypto import encrypt_otp_secret
+    current_user.otp_secret = encrypt_otp_secret(secret)
     db.commit()
     
     logger.info("otp_setup_initiated", user_id=current_user.id, email=current_user.email)
@@ -604,9 +606,10 @@ def verify_otp_setup(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="OTP setup not initiated. Call /otp/enable first."
         )
-    
-    # Verify the code
-    if not verify_totp(current_user.otp_secret, request.code):
+
+    # Verify the code (decrypt secret from storage)
+    from app.core.crypto import decrypt_otp_secret
+    if not verify_totp(decrypt_otp_secret(current_user.otp_secret), request.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid OTP code. Please try again."

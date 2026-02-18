@@ -8,7 +8,7 @@ from app.auth.dependencies import get_current_user, require_permission
 from app.auth.rbac import Permission
 from app.auth.security import create_access_token
 from app.models import User, UserRole, AuditEventType
-from app.auth.schemas import UserResponse, UserUpdate, UserCreate
+from app.auth.schemas import UserResponse, UserUpdate, AdminUserCreate
 from app.audit.manager import AuditManager
 from app.core.logging import logger
 
@@ -356,7 +356,7 @@ def list_users(
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
-    user_data: UserCreate,
+    user_data: AdminUserCreate,
     current_user: User = Depends(require_permission(Permission.MANAGE_USERS.value)),
     db: Session = Depends(get_db)
 ):

@@ -4,13 +4,22 @@ from datetime import datetime
 
 
 class UserCreate(BaseModel):
+    """Public registration schema — no role fields (always VIEWER)."""
+    email: EmailStr
+    username: str
+    password: str
+    full_name: Optional[str] = None
+
+
+class AdminUserCreate(BaseModel):
+    """Admin user creation schema — allows setting role and permissions."""
     email: EmailStr
     username: str
     password: str
     full_name: Optional[str] = None
     role: Optional[str] = "VIEWER"
-    additional_roles: Optional[List[str]] = []
-    custom_permissions: Optional[Dict] = {"grant": [], "deny": []}
+    additional_roles: Optional[List[str]] = None
+    custom_permissions: Optional[Dict] = None
 
 
 class UserUpdate(BaseModel):

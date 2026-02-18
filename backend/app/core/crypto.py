@@ -15,12 +15,15 @@ class CryptoError(RuntimeError):
 
 
 def _derive_legacy_fernet_key_from_secret_key(secret_key: str) -> bytes:
-    # Derive a proper Fernet key from SECRET_KEY using PBKDF2 with a stable salt.
+    # Derive a proper Fernet key from SECRET_KEY using PBKDF2.
+    # Salt is derived from SECRET_KEY itself so it's unique per installation
+    # while remaining stable across restarts.
     import hashlib
+    salt = hashlib.sha256(b"joti:" + secret_key.encode()).digest()
     dk = hashlib.pbkdf2_hmac(
         "sha256",
         secret_key.encode(),
-        b"joti-config-encryption-salt",  # stable salt tied to application
+        salt,
         iterations=100_000,
         dklen=32,
     )
@@ -82,4 +85,28 @@ def encrypt_config_secret(value: str) -> str:
     if not value:
         return value
     return get_config_fernet().encrypt(value.encode()).decode()
+
+
+# --- OTP secret helpers (encrypt at rest, transparent decrypt) ---
+
+_OTP_ENC_PREFIX = "enc:"
+
+
+def encrypt_otp_secret(plaintext: str) -> str:
+    """Encrypt an OTP secret for storage. Returns prefixed ciphertext."""
+    if not plaintext:
+        return plaintext
+    ciphertext = get_config_fernet().encrypt(plaintext.encode()).decode()
+    return f"{_OTP_ENC_PREFIX}{ciphertext}"
+
+
+def decrypt_otp_secret(stored: str) -> Optional[str]:
+    """Decrypt an OTP secret. Handles legacy plaintext values transparently."""
+    if not stored:
+        return stored
+    if not stored.startswith(_OTP_ENC_PREFIX):
+        # Legacy plaintext — return as-is for backward compatibility
+        return stored
+    ciphertext = stored[len(_OTP_ENC_PREFIX):]
+    return decrypt_config_secret(ciphertext)
 

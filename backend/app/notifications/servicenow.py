@@ -3,6 +3,7 @@ import httpx
 from typing import Dict, Optional
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.ssrf import validate_outbound_url, ssrf_policy_from_settings
 
 
 class ServiceNowClient:
@@ -13,6 +14,11 @@ class ServiceNowClient:
         self.username = username or settings.SERVICENOW_USERNAME
         self.password = password or settings.SERVICENOW_PASSWORD
         self.api_base = f"{self.instance_url}/api/now"
+        self._ssrf_policy = ssrf_policy_from_settings()
+
+    def _validate_url(self, url: str) -> None:
+        """Validate URL against SSRF policy before making requests."""
+        validate_outbound_url(url, policy=self._ssrf_policy)
     
     async def create_security_incident(
         self,
@@ -61,7 +67,8 @@ class ServiceNowClient:
             
             # Create incident via REST API
             url = f"{self.api_base}/table/incident"
-            
+            self._validate_url(url)
+
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     url,
@@ -110,8 +117,9 @@ class ServiceNowClient:
         
         try:
             url = f"{self.api_base}/table/incident"
+            self._validate_url(url)
             params = {"sysparm_query": f"number={incident_number}"}
-            
+
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.patch(
                     url,
@@ -150,8 +158,9 @@ class ServiceNowClient:
         
         try:
             url = f"{self.api_base}/table/incident"
+            self._validate_url(url)
             params = {"sysparm_query": f"number={incident_number}", "sysparm_limit": 1}
-            
+
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
                     url,

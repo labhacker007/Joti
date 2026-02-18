@@ -1698,24 +1698,33 @@ IMPORTANT: Incorporate the above knowledge base information into your response. 
             target_platform=platform
         )
         
+        # Sanitize user-controlled values to prevent template injection.
+        # Escape { and } in values so str.format() treats them as literal text.
+        def _safe_val(v):
+            if isinstance(v, str):
+                return v.replace("{", "{{").replace("}", "}}")
+            return v
+
+        safe_kwargs = {k: _safe_val(v) for k, v in kwargs.items()}
+
         # Build system prompt
         system_kwargs = {
             "persona": persona,
             "guardrails": guardrails,
             "kb_context": kb_context,
-            **kwargs
+            **safe_kwargs
         }
-        
+
         try:
             system_prompt = template["system"].format(**system_kwargs)
         except KeyError as e:
             # Handle missing keys gracefully
             logger.warning("missing_template_key", key=str(e), function=config.function.value)
             system_prompt = template["system"]
-        
+
         # Build user prompt
         try:
-            user_prompt = template["user"].format(**kwargs)
+            user_prompt = template["user"].format(**safe_kwargs)
         except KeyError as e:
             logger.warning("missing_template_key", key=str(e), function=config.function.value)
             user_prompt = template["user"]
