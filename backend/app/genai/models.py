@@ -334,75 +334,8 @@ class GuardrailStatus(str, Enum):
     TESTING = "testing"
 
 
-class Guardrail(Base):
-    """
-    Editable guardrail configuration.
-    
-    Guardrails can be:
-    - Global: Applied to all GenAI functions
-    - Function-specific: Applied only to selected functions (e.g., hunt_query, summary, extraction)
-    
-    Validation types:
-    - regex: Pattern matching using regular expressions
-    - blocklist: Block specific words/phrases
-    - detector: Use built-in detector (pii, phi, credentials)
-    - custom: Custom validation logic via config
-    """
-    __tablename__ = "guardrails"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    
-    # Identification
-    guardrail_id = Column(String(50), unique=True, nullable=False, index=True)  # e.g., "PS001"
-    name = Column(String(200), nullable=False)
-    description = Column(Text, nullable=True)
-    
-    # Categorization
-    category = Column(String(50), nullable=False, index=True)  # prompt_safety, query_validation, etc.
-    severity = Column(String(20), nullable=False, index=True)  # critical, high, medium, low, info
-    
-    # Scope
-    scope = Column(String(20), nullable=False, default="global", index=True)  # global or function
-    
-    # Function-specific: JSON array of functions this guardrail applies to
-    # e.g., ["hunt_query", "executive_summary", "ioc_extraction"]
-    # If scope is "global", this is ignored
-    applicable_functions = Column(JSON, default=[])
-    
-    # Platform-specific: JSON array of platforms (null = all platforms)
-    # e.g., ["defender", "sentinel", "splunk"]
-    applicable_platforms = Column(JSON, default=[])
-    
-    # Configuration
-    config = Column(JSON, default={})  # Additional config like patterns, thresholds
-    custom_message = Column(Text, nullable=True)  # Custom violation message
-    suggestion = Column(Text, nullable=True)  # Suggestion when violated
-    
-    # Validation logic configuration
-    validation_type = Column(String(50), nullable=True)  # regex, blocklist, detector, custom
-    validation_pattern = Column(Text, nullable=True)  # Regex pattern or JSON config for validation
-    action_on_violation = Column(String(20), nullable=True, default="block")  # block, warn, log
-    
-    # Status
-    status = Column(String(20), nullable=False, default="active", index=True)
-    is_default = Column(Boolean, default=False)  # Is this a built-in default guardrail?
-    
-    # Audit
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    created_by = relationship("User", foreign_keys=[created_by_id])
-    updated_by = relationship("User", foreign_keys=[updated_by_id])
-    
-    __table_args__ = (
-        Index('idx_guardrail_category', 'category'),
-        Index('idx_guardrail_scope', 'scope'),
-        Index('idx_guardrail_status', 'status'),
-        Index('idx_guardrail_severity', 'severity'),
-    )
+# Re-use Guardrail from app.models to avoid duplicate table registration
+from app.models import Guardrail  # noqa: F401
 
 
 class GuardrailAuditLog(Base):

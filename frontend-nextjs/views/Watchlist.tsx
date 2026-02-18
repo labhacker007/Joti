@@ -114,9 +114,12 @@ export default function Watchlist() {
         setSuccess('Personal keyword added');
         await loadPersonalKeywords();
       } else {
+        const addedCategory = newCategory || 'Ungrouped';
         await watchlistAPI.addKeyword(newKeyword.trim(), newCategory || undefined);
         setSuccess('Keyword added to watchlist');
         await loadWatchlist();
+        // Auto-expand the category group where the keyword was placed
+        setExpandedCategory(addedCategory);
       }
       setNewKeyword(''); setNewCategory(''); setShowAddPanel(false);
     } catch (err: any) { setError(getErrorMessage(err)); }
@@ -208,12 +211,12 @@ export default function Watchlist() {
   return (
     <div className="space-y-4 pb-8">
       {/* ── Header Row ── */}
-      <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-foreground">Watchlist</h1>
-        <span className="text-xs text-muted-foreground">{activeCount}/{items.length} active</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-lg font-semibold text-foreground shrink-0">Watchlist</h1>
+        <span className="text-xs text-muted-foreground shrink-0">{activeCount}/{items.length} active</span>
 
         {/* Tabs */}
-        <div className="flex bg-muted rounded-md p-0.5 ml-2">
+        <div className="flex bg-muted rounded-md p-0.5 shrink-0">
           <button
             onClick={() => setActiveTab('global')}
             className={cn('px-2.5 py-1 text-[11px] font-medium rounded transition-colors',
@@ -235,7 +238,7 @@ export default function Watchlist() {
         <div className="flex-1" />
 
         {/* Search */}
-        <div className="relative w-48">
+        <div className="relative w-48 shrink-0">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <input
             type="text"
@@ -250,7 +253,7 @@ export default function Watchlist() {
         <button
           onClick={() => setShowAddPanel(!showAddPanel)}
           className={cn(
-            'p-1.5 rounded-md transition-colors',
+            'p-1.5 rounded-md transition-colors shrink-0',
             showAddPanel ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
           )}
           title="Add keyword"
@@ -262,7 +265,7 @@ export default function Watchlist() {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 shrink-0"
           title="Refresh matches"
         >
           <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />

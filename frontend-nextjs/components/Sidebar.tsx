@@ -115,7 +115,7 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
   return (
     <aside
       className={`fixed left-0 top-0 h-full bg-card border-r border-border transition-all duration-300 z-50 ${
-        collapsed ? 'w-16' : 'w-64'
+        collapsed ? 'w-16' : 'w-48'
       }`}
     >
       <div className="flex flex-col h-full">

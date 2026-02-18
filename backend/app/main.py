@@ -240,6 +240,10 @@ app.include_router(prompts_router, prefix="/api")
 from app.admin.guardrails import router as guardrails_router
 app.include_router(guardrails_router, prefix="/api")
 
+# GenAI Routes (provider status, models, config, quotas)
+from app.genai.routes import router as genai_router
+app.include_router(genai_router, prefix="/api")
+
 # Admin Skills Management
 from app.admin.skills import router as skills_router
 app.include_router(skills_router, prefix="/api")

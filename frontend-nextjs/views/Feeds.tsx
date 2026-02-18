@@ -310,8 +310,8 @@ export default function Feeds() {
   return (
     <div className="space-y-4 pb-8">
       {/* Header Row */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 shrink-0">
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Rss className="w-7 h-7" />
             Feeds
@@ -322,7 +322,7 @@ export default function Feeds() {
         </div>
 
         {/* Search + Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
             <input

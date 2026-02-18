@@ -11,9 +11,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'Geist Sans', 'sans-serif'],
-        display: ['Rajdhani', 'Geist Sans', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['DM Sans', 'Geist Sans', 'sans-serif'],
+        display: ['Space Grotesk', 'Geist Sans', 'sans-serif'],
+        mono: ['Space Mono', 'monospace'],
       },
       colors: {
         background: "hsl(var(--background))",

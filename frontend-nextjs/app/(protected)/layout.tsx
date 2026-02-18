@@ -38,8 +38,8 @@ export default function ProtectedLayout({
         <main
           className={`flex-1 min-w-0 transition-all duration-300 bg-background ${
             mounted
-              ? collapsed ? 'ml-16' : 'ml-64'
-              : 'ml-64'
+              ? collapsed ? 'ml-16' : 'ml-48'
+              : 'ml-48'
           }`}
         >
           <div className="p-6 max-w-screen-2xl mx-auto w-full">
