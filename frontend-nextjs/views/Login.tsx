@@ -7,6 +7,7 @@ import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import {
   Eye, EyeOff, Shield, TrendingUp,
   AlertTriangle, Clock, Newspaper,
+  Search, Map, Crosshair, Radio, Bot,
 } from 'lucide-react';
 import { ThemeSwitcher, type ThemeType } from '@/components/ThemeSwitcher';
 import {
@@ -25,6 +26,18 @@ interface ThemeDisplayConfig {
   background: 'threat-graph' | 'matrix' | 'orbs' | 'constellation';
   overlay?: 'intel-pipeline' | 'ember' | 'aurora' | 'radar' | 'sunbeam';
   panelBg: string;
+  rightPanelBg: string;
+  cardBg: string;
+  cardBorder: string;
+  cardShadow: string;
+  inputBg: string;
+  inputBorder: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  leftTextPrimary: string;
+  leftTextSecondary: string;
+  leftTextMuted: string;
   colors: { primary: string; secondary: string };
 }
 
@@ -32,34 +45,134 @@ const THEME_DISPLAY: Record<ThemeType, ThemeDisplayConfig> = {
   'command-center': {
     background: 'threat-graph', overlay: 'intel-pipeline',
     panelBg: 'bg-[#0a0e1a]',
+    rightPanelBg: '#0d1117',
+    cardBg: 'rgba(13, 17, 23, 0.95)',
+    cardBorder: 'rgba(0, 217, 255, 0.15)',
+    cardShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.5), 0 0 40px -8px rgba(0, 217, 255, 0.08)',
+    inputBg: 'rgba(0, 217, 255, 0.05)',
+    inputBorder: 'rgba(0, 217, 255, 0.15)',
+    textPrimary: '#e6edf3',
+    textSecondary: '#8b949e',
+    textMuted: '#484f58',
+    leftTextPrimary: 'rgba(255,255,255,0.9)',
+    leftTextSecondary: 'rgba(255,255,255,0.5)',
+    leftTextMuted: 'rgba(255,255,255,0.3)',
     colors: { primary: '#00d9ff', secondary: '#0066ff' },
   },
   daylight: {
     background: 'threat-graph', overlay: 'sunbeam',
-    panelBg: 'bg-slate-50',
+    panelBg: 'bg-[#1e3a5f]',
+    rightPanelBg: '#f8fafc',
+    cardBg: 'rgba(255, 255, 255, 0.98)',
+    cardBorder: 'rgba(59, 130, 246, 0.2)',
+    cardShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.12), 0 10px 30px -8px rgba(59, 130, 246, 0.08)',
+    inputBg: '#f1f5f9',
+    inputBorder: '#e2e8f0',
+    textPrimary: '#0f172a',
+    textSecondary: '#475569',
+    textMuted: '#94a3b8',
+    leftTextPrimary: 'rgba(255,255,255,0.95)',
+    leftTextSecondary: 'rgba(255,255,255,0.6)',
+    leftTextMuted: 'rgba(255,255,255,0.35)',
     colors: { primary: '#3b82f6', secondary: '#60a5fa' },
   },
   midnight: {
     background: 'orbs', overlay: 'ember',
     panelBg: 'bg-[#0d0d0d]',
+    rightPanelBg: '#111111',
+    cardBg: 'rgba(20, 20, 20, 0.95)',
+    cardBorder: 'rgba(255, 102, 0, 0.15)',
+    cardShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.6), 0 0 40px -8px rgba(255, 102, 0, 0.06)',
+    inputBg: 'rgba(255, 102, 0, 0.05)',
+    inputBorder: 'rgba(255, 102, 0, 0.15)',
+    textPrimary: '#e5e5e5',
+    textSecondary: '#8a8a8a',
+    textMuted: '#555555',
+    leftTextPrimary: 'rgba(255,255,255,0.9)',
+    leftTextSecondary: 'rgba(255,255,255,0.5)',
+    leftTextMuted: 'rgba(255,255,255,0.3)',
     colors: { primary: '#ff6600', secondary: '#ff9900' },
   },
   aurora: {
     background: 'orbs', overlay: 'aurora',
     panelBg: 'bg-[#0a0a1a]',
+    rightPanelBg: '#0e0e1e',
+    cardBg: 'rgba(14, 14, 30, 0.95)',
+    cardBorder: 'rgba(168, 85, 247, 0.15)',
+    cardShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.5), 0 0 40px -8px rgba(168, 85, 247, 0.08)',
+    inputBg: 'rgba(168, 85, 247, 0.05)',
+    inputBorder: 'rgba(168, 85, 247, 0.15)',
+    textPrimary: '#e2e0f0',
+    textSecondary: '#8b87a8',
+    textMuted: '#4a4660',
+    leftTextPrimary: 'rgba(255,255,255,0.9)',
+    leftTextSecondary: 'rgba(255,255,255,0.5)',
+    leftTextMuted: 'rgba(255,255,255,0.3)',
     colors: { primary: '#a855f7', secondary: '#3b82f6' },
   },
   'red-alert': {
     background: 'constellation', overlay: 'radar',
     panelBg: 'bg-[#0a0808]',
+    rightPanelBg: '#110a0a',
+    cardBg: 'rgba(17, 10, 10, 0.95)',
+    cardBorder: 'rgba(255, 0, 0, 0.15)',
+    cardShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.5), 0 0 40px -8px rgba(255, 0, 0, 0.06)',
+    inputBg: 'rgba(255, 0, 0, 0.05)',
+    inputBorder: 'rgba(255, 0, 0, 0.15)',
+    textPrimary: '#f0e0e0',
+    textSecondary: '#a08080',
+    textMuted: '#604040',
+    leftTextPrimary: 'rgba(255,255,255,0.9)',
+    leftTextSecondary: 'rgba(255,255,255,0.5)',
+    leftTextMuted: 'rgba(255,255,255,0.3)',
     colors: { primary: '#ff0000', secondary: '#ff6b6b' },
   },
   matrix: {
     background: 'matrix',
     panelBg: 'bg-[#050505]',
+    rightPanelBg: '#080808',
+    cardBg: 'rgba(10, 10, 10, 0.95)',
+    cardBorder: 'rgba(0, 255, 0, 0.12)',
+    cardShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.6), 0 0 40px -8px rgba(0, 255, 0, 0.05)',
+    inputBg: 'rgba(0, 255, 0, 0.04)',
+    inputBorder: 'rgba(0, 255, 0, 0.12)',
+    textPrimary: '#c0ffc0',
+    textSecondary: '#60a060',
+    textMuted: '#305030',
+    leftTextPrimary: 'rgba(255,255,255,0.9)',
+    leftTextSecondary: 'rgba(255,255,255,0.5)',
+    leftTextMuted: 'rgba(255,255,255,0.3)',
     colors: { primary: '#00ff00', secondary: '#00ff00' },
   },
 };
+
+const FALLBACK_HIGHLIGHTS = [
+  {
+    icon: Search,
+    title: 'IOC Extraction & Analysis',
+    description: 'Automatically extract IPs, domains, hashes, CVEs, and more from threat intelligence feeds in real time.',
+  },
+  {
+    icon: Map,
+    title: 'MITRE ATT&CK Mapping',
+    description: 'Map extracted intelligence to ATT&CK techniques and tactics for contextual threat understanding.',
+  },
+  {
+    icon: Crosshair,
+    title: 'Hunt Query Generation',
+    description: 'Generate ready-to-run queries for XSIAM (XQL), Defender (KQL), Splunk (SPL), and Wiz automatically.',
+  },
+  {
+    icon: Radio,
+    title: 'Multi-Source Feed Aggregation',
+    description: 'Aggregate RSS/Atom feeds from dozens of threat intelligence sources into a single unified dashboard.',
+  },
+  {
+    icon: Bot,
+    title: 'AI-Powered Summarization',
+    description: 'Leverage OpenAI, Claude, Gemini, or Ollama to generate concise article summaries and threat analysis.',
+  },
+];
 
 interface TrendingStory {
   id: number;
@@ -115,17 +228,19 @@ export default function Login() {
     }).catch(() => {});
   }, []);
 
+  const itemCount = top5.length > 0 ? top5.length : FALLBACK_HIGHLIGHTS.length;
+
   useEffect(() => {
-    if (top5.length <= 1) return;
+    if (itemCount <= 1) return;
     const interval = setInterval(() => {
       setIsTransitioning(true);
       setTimeout(() => {
-        setActiveStory((prev) => (prev + 1) % top5.length);
+        setActiveStory((prev) => (prev + 1) % itemCount);
         setIsTransitioning(false);
       }, 300);
     }, 5000);
     return () => clearInterval(interval);
-  }, [top5.length]);
+  }, [itemCount]);
 
   const handleThemeChange = (newTheme: ThemeType) => {
     setTheme(newTheme as ThemeName);
@@ -162,6 +277,8 @@ export default function Login() {
 
   const dt = THEME_DISPLAY[theme as ThemeType] || THEME_DISPLAY['midnight'];
   const currentStory = top5[activeStory];
+  const highlight = FALLBACK_HIGHLIGHTS[activeStory % FALLBACK_HIGHLIGHTS.length];
+  const HighlightIcon = highlight.icon;
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
@@ -198,23 +315,29 @@ export default function Login() {
                 <Shield className="w-7 h-7" style={{ color: dt.colors.primary }} />
               </div>
               <div className="text-left">
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
+                <h1
+                  className="text-3xl md:text-4xl font-bold tracking-tight"
+                  style={{ color: dt.leftTextPrimary }}
+                >
                   Joti
                 </h1>
-                <p className="text-xs tracking-widest uppercase text-white/50">
+                <p
+                  className="text-xs tracking-widest uppercase"
+                  style={{ color: dt.leftTextSecondary }}
+                >
                   Threat Intelligence
                 </p>
               </div>
             </div>
           </div>
 
-          {/* News Ticker */}
+          {/* News Ticker / Feature Showcase */}
           <div className="w-full max-w-sm">
             <div
               className="rounded-xl border backdrop-blur-xl overflow-hidden"
               style={{
-                borderColor: `${dt.colors.primary}20`,
-                backgroundColor: 'rgba(0,0,0,0.3)',
+                borderColor: `${dt.colors.primary}25`,
+                backgroundColor: 'rgba(0,0,0,0.35)',
               }}
             >
               {/* Ticker header */}
@@ -227,36 +350,36 @@ export default function Login() {
                   className="text-[10px] font-bold uppercase tracking-[0.15em]"
                   style={{ color: dt.colors.primary }}
                 >
-                  Trending Now
+                  {top5.length > 0 ? 'Trending Now' : 'Platform Highlights'}
                 </span>
-                {top5.length > 1 && (
-                  <span className="ml-auto text-[10px] text-white/40 tabular-nums">
-                    {activeStory + 1}/{top5.length}
-                  </span>
-                )}
+                <span className="ml-auto text-[10px] tabular-nums" style={{ color: dt.leftTextMuted }}>
+                  {top5.length > 0
+                    ? `${activeStory + 1}/${top5.length}`
+                    : `${activeStory + 1}/${FALLBACK_HIGHLIGHTS.length}`}
+                </span>
               </div>
 
-              {/* Active story */}
-              <div className="px-4 py-3.5 min-h-[90px] flex flex-col justify-center">
-                {currentStory ? (
+              {/* Active story / feature */}
+              <div className="px-4 py-4 min-h-[110px] flex flex-col justify-center">
+                {top5.length > 0 && currentStory ? (
                   <div className={`transition-all duration-300 ${isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`}>
-                    <h3 className="text-sm font-semibold leading-snug text-white/90">
+                    <h3 className="text-sm font-semibold leading-snug" style={{ color: dt.leftTextPrimary }}>
                       {decodeHtmlEntities(currentStory.title)}
                     </h3>
                     {currentStory.summary && (
-                      <p className="text-xs leading-relaxed mt-1.5 text-white/50 line-clamp-2">
+                      <p className="text-xs leading-relaxed mt-1.5 line-clamp-2" style={{ color: dt.leftTextSecondary }}>
                         {decodeHtmlEntities(currentStory.summary)}
                       </p>
                     )}
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
                       {currentStory.source_name && (
-                        <span className="text-[10px] flex items-center gap-1 text-white/40">
+                        <span className="text-[10px] flex items-center gap-1" style={{ color: dt.leftTextMuted }}>
                           <Newspaper className="w-3 h-3" />
                           {currentStory.source_name}
                         </span>
                       )}
                       {currentStory.published_at && (
-                        <span className="text-[10px] flex items-center gap-1 text-white/40">
+                        <span className="text-[10px] flex items-center gap-1" style={{ color: dt.leftTextMuted }}>
                           <Clock className="w-3 h-3" />
                           {timeAgo(currentStory.published_at)}
                         </span>
@@ -270,39 +393,55 @@ export default function Login() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <div className="h-3 rounded bg-white/10 w-4/5" />
-                    <div className="h-2.5 rounded bg-white/5 w-3/5" />
+                  <div className={`transition-all duration-300 ${isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`}>
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: `${dt.colors.primary}20`, border: `1px solid ${dt.colors.primary}25` }}
+                      >
+                        <HighlightIcon className="w-4 h-4" style={{ color: dt.colors.primary }} />
+                      </div>
+                      <h3 className="text-sm font-semibold leading-snug" style={{ color: dt.leftTextPrimary }}>
+                        {highlight.title}
+                      </h3>
+                    </div>
+                    <p className="text-xs leading-relaxed" style={{ color: dt.leftTextSecondary }}>
+                      {highlight.description}
+                    </p>
                   </div>
                 )}
               </div>
 
               {/* Dot indicators */}
-              {top5.length > 1 && (
-                <div className="px-4 pb-3 flex gap-1.5 justify-center">
-                  {top5.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setIsTransitioning(true);
-                        setTimeout(() => { setActiveStory(idx); setIsTransitioning(false); }, 200);
-                      }}
-                      className="p-0.5"
-                    >
-                      <div
-                        className="h-1 rounded-full transition-all duration-300"
-                        style={{
-                          width: idx === activeStory ? 20 : 6,
-                          backgroundColor: idx === activeStory ? dt.colors.primary : `${dt.colors.primary}30`,
+              {(() => {
+                const count = top5.length > 0 ? top5.length : FALLBACK_HIGHLIGHTS.length;
+                if (count <= 1) return null;
+                return (
+                  <div className="px-4 pb-3 flex gap-1.5 justify-center">
+                    {Array.from({ length: count }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setIsTransitioning(true);
+                          setTimeout(() => { setActiveStory(idx); setIsTransitioning(false); }, 200);
                         }}
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
+                        className="p-0.5"
+                      >
+                        <div
+                          className="h-1 rounded-full transition-all duration-300"
+                          style={{
+                            width: idx === activeStory ? 20 : 6,
+                            backgroundColor: idx === activeStory ? dt.colors.primary : `${dt.colors.primary}30`,
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
-            <p className="text-[10px] mt-4 text-white/25 text-center">
+            <p className="text-[10px] mt-4 text-center" style={{ color: dt.leftTextMuted }}>
               Built for SOC teams, threat researchers & security analysts
             </p>
           </div>
@@ -314,20 +453,45 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ═══ RIGHT HALF — Clean login form ═══ */}
-      <div className="flex-1 flex items-center justify-center bg-background min-h-[calc(100vh-280px)] md:min-h-screen px-6 py-12 md:py-0">
-        <div className="w-full max-w-sm">
+      {/* ═══ RIGHT HALF — 3D elevated login card ═══ */}
+      <div
+        className="flex-1 flex items-center justify-center min-h-[calc(100vh-280px)] md:min-h-screen px-6 py-12 md:py-0"
+        style={{ backgroundColor: dt.rightPanelBg }}
+      >
+        <div
+          className="w-full max-w-sm rounded-2xl p-8 relative"
+          style={{
+            backgroundColor: dt.cardBg,
+            border: `1px solid ${dt.cardBorder}`,
+            boxShadow: dt.cardShadow,
+          }}
+        >
+          {/* Accent line at top of card */}
+          <div
+            className="absolute top-0 left-8 right-8 h-[2px] rounded-full"
+            style={{ background: `linear-gradient(90deg, transparent, ${dt.colors.primary}, transparent)` }}
+          />
+
           {/* Heading */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-foreground">Welcome back</h2>
-            <p className="text-sm mt-1.5 text-muted-foreground">
+          <div className="mb-7">
+            <h2 className="text-2xl font-bold" style={{ color: dt.textPrimary }}>
+              Welcome back
+            </h2>
+            <p className="text-sm mt-1.5" style={{ color: dt.textSecondary }}>
               Sign in to your threat intelligence dashboard
             </p>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="mb-5 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-sm">
+            <div
+              className="mb-5 p-3 rounded-lg text-sm"
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                color: '#ef4444',
+              }}
+            >
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>{error}</span>
@@ -338,14 +502,28 @@ export default function Login() {
           {/* Form */}
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-foreground">
+              <label className="block text-sm font-medium mb-1.5" style={{ color: dt.textPrimary }}>
                 Email
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition text-sm"
+                className="w-full px-3.5 py-2.5 rounded-lg text-sm transition-all duration-200 outline-none"
+                style={{
+                  backgroundColor: dt.inputBg,
+                  border: `1px solid ${dt.inputBorder}`,
+                  color: dt.textPrimary,
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08)',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = dt.colors.primary;
+                  e.target.style.boxShadow = `0 0 0 3px ${dt.colors.primary}20, inset 0 1px 3px rgba(0,0,0,0.08)`;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = dt.inputBorder;
+                  e.target.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.08)';
+                }}
                 placeholder="admin@localhost"
                 required
                 autoComplete="email"
@@ -353,7 +531,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-foreground">
+              <label className="block text-sm font-medium mb-1.5" style={{ color: dt.textPrimary }}>
                 Password
               </label>
               <div className="relative">
@@ -361,7 +539,21 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-background border border-border text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition text-sm pr-10"
+                  className="w-full px-3.5 py-2.5 rounded-lg text-sm transition-all duration-200 outline-none pr-10"
+                  style={{
+                    backgroundColor: dt.inputBg,
+                    border: `1px solid ${dt.inputBorder}`,
+                    color: dt.textPrimary,
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08)',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = dt.colors.primary;
+                    e.target.style.boxShadow = `0 0 0 3px ${dt.colors.primary}20, inset 0 1px 3px rgba(0,0,0,0.08)`;
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = dt.inputBorder;
+                    e.target.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.08)';
+                  }}
                   placeholder="Enter your password"
                   required
                   autoComplete="current-password"
@@ -369,7 +561,8 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: dt.textMuted }}
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -380,9 +573,10 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 text-sm font-semibold rounded-lg text-white transition-all duration-200 disabled:opacity-50 hover:brightness-110 active:brightness-95"
+              className="w-full py-2.5 text-sm font-semibold rounded-lg text-white transition-all duration-200 disabled:opacity-50 hover:brightness-110 active:brightness-95 active:scale-[0.98]"
               style={{
                 background: `linear-gradient(135deg, ${dt.colors.primary}, ${dt.colors.secondary})`,
+                boxShadow: `0 4px 14px -2px ${dt.colors.primary}40`,
               }}
             >
               {loading ? (
@@ -399,27 +593,8 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Dev credentials */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-8 pt-5 border-t border-border/50">
-              <p className="text-center text-[11px] text-muted-foreground/60 mb-2">
-                Development credentials
-              </p>
-              <div className="p-3 rounded-lg bg-muted/50 border border-border/40 space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Email</span>
-                  <code className="font-mono text-foreground/70">admin@localhost</code>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Password</span>
-                  <code className="font-mono text-foreground/70">Admin@1234567</code>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Footer */}
-          <p className="mt-8 text-center text-[11px] text-muted-foreground/40">
+          <p className="mt-7 text-center text-[11px]" style={{ color: dt.textMuted }}>
             Joti &middot; Threat Intelligence Platform
           </p>
         </div>

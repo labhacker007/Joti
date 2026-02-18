@@ -1,3 +1,5 @@
 node_modules
 .next
 .git
+lib/api
+lib/utils
