@@ -6,6 +6,7 @@ from app.auth.dependencies import require_permission
 from app.auth.rbac import Permission
 from app.models import WatchListKeyword, User, Article
 from app.core.logging import logger
+from app.audit.manager import AuditManager
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
@@ -48,17 +49,23 @@ def reapply_watchlist_to_articles(db: Session):
     return updated_count
 
 
+WATCHLIST_CATEGORIES = ["TTP", "Threat Actor", "Attack Type", "Vulnerability", "Malware", "Custom"]
+
+
 class WatchlistKeywordCreate(BaseModel):
     keyword: str
+    category: Optional[str] = None
 
 
 class WatchlistKeywordUpdate(BaseModel):
     is_active: Optional[bool] = None
+    category: Optional[str] = None
 
 
 class WatchlistKeywordResponse(BaseModel):
     id: int
     keyword: str
+    category: Optional[str] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -97,6 +104,7 @@ def create_keyword(
     
     keyword = WatchListKeyword(
         keyword=payload.keyword.strip(),
+        category=payload.category,
         is_active=True
     )
     
@@ -108,7 +116,17 @@ def create_keyword(
     updated_count = reapply_watchlist_to_articles(db)
     
     logger.info("watchlist_keyword_added", keyword=keyword.keyword, user_id=current_user.id, articles_updated=updated_count)
-    
+
+    AuditManager.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="WATCHLIST_CHANGE",
+        action=f"Keyword added: {keyword.keyword}",
+        resource_type="watchlist_keyword",
+        resource_id=keyword.id,
+        details={"keyword": keyword.keyword, "category": keyword.category, "articles_updated": updated_count}
+    )
+
     return WatchlistKeywordResponse.model_validate(keyword)
 
 
@@ -131,7 +149,9 @@ def update_keyword(
     
     if update.is_active is not None:
         keyword.is_active = update.is_active
-    
+    if update.category is not None:
+        keyword.category = update.category
+
     db.commit()
     db.refresh(keyword)
     
@@ -139,7 +159,17 @@ def update_keyword(
     updated_count = reapply_watchlist_to_articles(db)
     
     logger.info("watchlist_keyword_updated", keyword_id=keyword_id, is_active=keyword.is_active, articles_updated=updated_count)
-    
+
+    AuditManager.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="WATCHLIST_CHANGE",
+        action=f"Keyword updated: {keyword.keyword}",
+        resource_type="watchlist_keyword",
+        resource_id=keyword.id,
+        details={"is_active": keyword.is_active, "articles_updated": updated_count}
+    )
+
     return WatchlistKeywordResponse.model_validate(keyword)
 
 
@@ -166,7 +196,17 @@ def delete_keyword(
     updated_count = reapply_watchlist_to_articles(db)
     
     logger.info("watchlist_keyword_deleted", keyword_id=keyword_id, user_id=current_user.id, articles_updated=updated_count)
-    
+
+    AuditManager.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="WATCHLIST_CHANGE",
+        action=f"Keyword deleted: {deleted_keyword}",
+        resource_type="watchlist_keyword",
+        resource_id=keyword_id,
+        details={"keyword": deleted_keyword, "articles_updated": updated_count}
+    )
+
     return {"message": f"Keyword '{deleted_keyword}' removed from watchlist", "articles_updated": updated_count}
 
 
@@ -194,3 +234,17 @@ def refresh_watchlist_matches(
         "active_keywords": active_keywords,
         "high_priority_articles": high_priority
     }
+
+
+@router.get("/categories")
+def list_categories(
+    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    db: Session = Depends(get_db)
+):
+    """List predefined and in-use categories for watchlist keywords."""
+    in_use = db.query(WatchListKeyword.category).filter(
+        WatchListKeyword.category != None
+    ).distinct().all()
+    in_use_cats = {r[0] for r in in_use if r[0]}
+    all_cats = set(WATCHLIST_CATEGORIES) | in_use_cats
+    return sorted(all_cats)

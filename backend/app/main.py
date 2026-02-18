@@ -66,29 +66,27 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error("schema_migrations_failed", error=str(e))
     
-    # Auto-seed database if empty (development only)
-    if settings.DEBUG and settings.ENV != "prod":
-        try:
-            from app.core.database import SessionLocal
-            from app.models import User
-            db = SessionLocal()
-            user_count = db.query(User).count()
-            db.close()
-            if user_count == 0:
-                logger.info("database_empty_seeding")
-                import os
-                # Change to project root to find config/seed-sources.json
-                original_cwd = os.getcwd()
-                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                os.chdir(project_root)
-                try:
-                    from app.seeds import seed_database
-                    seed_database()
-                    logger.info("database_seeded_successfully")
-                finally:
-                    os.chdir(original_cwd)
-        except Exception as e:
-            logger.error("auto_seed_failed", error=str(e))
+    # Auto-seed database if empty (runs on first launch in any mode)
+    try:
+        from app.core.database import SessionLocal
+        from app.models import User
+        db = SessionLocal()
+        user_count = db.query(User).count()
+        db.close()
+        if user_count == 0:
+            logger.info("database_empty_seeding")
+            import os
+            original_cwd = os.getcwd()
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            os.chdir(project_root)
+            try:
+                from app.seeds import seed_database
+                seed_database()
+                logger.info("database_seeded_successfully")
+            finally:
+                os.chdir(original_cwd)
+    except Exception as e:
+        logger.error("auto_seed_failed", error=str(e))
 
     yield
     
@@ -240,9 +238,17 @@ app.include_router(prompts_router, prefix="/api")
 from app.admin.guardrails import router as guardrails_router
 app.include_router(guardrails_router, prefix="/api")
 
+# Admin Skills Management
+from app.admin.skills import router as skills_router
+app.include_router(skills_router, prefix="/api")
+
 # Source Refresh Settings
 from app.integrations.refresh_settings import router as refresh_settings_router
 app.include_router(refresh_settings_router, prefix="/api")
+
+# Analytics (User & Admin)
+from app.articles.analytics import router as analytics_router
+app.include_router(analytics_router, prefix="/api")
 
 
 @app.get("/health")

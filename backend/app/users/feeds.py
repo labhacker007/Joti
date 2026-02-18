@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.logging import logger
+from app.audit.manager import AuditManager
 from app.auth.dependencies import get_current_user
 from app.models import User, UserFeed, Category
 
@@ -271,6 +272,16 @@ async def create_user_feed(
     db.commit()
     db.refresh(feed)
 
+    AuditManager.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="FEED_MANAGEMENT",
+        action=f"Feed created: {feed.name}",
+        resource_type="user_feed",
+        resource_id=feed.id,
+        details={"name": feed.name, "url": feed.url, "feed_type": feed.feed_type}
+    )
+
     # Populate category_info if applicable
     feed_dict = UserFeedResponse.model_validate(feed).model_dump()
     if feed.category_id:
@@ -368,15 +379,25 @@ async def delete_user_feed(
         UserFeed.id == feed_id,
         UserFeed.user_id == current_user.id
     ).first()
-    
+
     if not feed:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Feed not found"
         )
-    
+
+    feed_name = feed.name
     db.delete(feed)
     db.commit()
+
+    AuditManager.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="FEED_MANAGEMENT",
+        action=f"Feed deleted: {feed_name}",
+        resource_type="user_feed",
+        resource_id=feed_id
+    )
 
 
 @router.post("/{feed_id}/toggle", response_model=UserFeedResponse)
@@ -401,7 +422,17 @@ async def toggle_user_feed(
     feed.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(feed)
-    
+
+    AuditManager.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="FEED_MANAGEMENT",
+        action=f"Feed {'activated' if feed.is_active else 'deactivated'}: {feed.name}",
+        resource_type="user_feed",
+        resource_id=feed.id,
+        details={"is_active": feed.is_active}
+    )
+
     return UserFeedResponse.model_validate(feed)
 
 

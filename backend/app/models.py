@@ -30,6 +30,7 @@ class HuntTriggerType(str, Enum):
 
 class UserRole(str, Enum):
     ADMIN = "ADMIN"      # Full access: manage sources, users, global watchlist
+    ANALYST = "ANALYST"  # Threat intel analyst: reports, analysis, extraction, but not admin
     VIEWER = "VIEWER"    # Standard user: view feeds, manage personal feeds/watchlist
 
 
@@ -43,7 +44,10 @@ class ExtractedIntelligenceType(str, Enum):
 class AuditEventType(str, Enum):
     LOGIN = "LOGIN"
     LOGOUT = "LOGOUT"
+    REGISTRATION = "REGISTRATION"
+    PASSWORD_CHANGE = "PASSWORD_CHANGE"
     ARTICLE_LIFECYCLE = "ARTICLE_LIFECYCLE"
+    BOOKMARK = "BOOKMARK"
     EXTRACTION = "EXTRACTION"
     CONNECTOR_CONFIG = "CONNECTOR_CONFIG"
     HUNT_TRIGGER = "HUNT_TRIGGER"
@@ -55,6 +59,9 @@ class AuditEventType(str, Enum):
     KNOWLEDGE_BASE = "KNOWLEDGE_BASE"
     SCHEDULED_TASK = "SCHEDULED_TASK"
     ADMIN_ACTION = "ADMIN_ACTION"
+    WATCHLIST_CHANGE = "WATCHLIST_CHANGE"
+    FEED_MANAGEMENT = "FEED_MANAGEMENT"
+    SEARCH = "SEARCH"
 
 
 # Models
@@ -299,6 +306,7 @@ class WatchListKeyword(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     keyword = Column(String, unique=True, index=True, nullable=False)
+    category = Column(String(50), nullable=True, index=True)  # TTP, Threat Actor, Attack Type, Vulnerability, Malware, Custom
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

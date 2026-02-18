@@ -25,7 +25,7 @@ class ArticleBookmark(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    content_id = Column(Integer, ForeignKey("fetched_content.id", ondelete="CASCADE"), nullable=False)
+    content_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False)
     is_bookmarked = Column(Boolean, default=True)
     is_read = Column(Boolean, default=False)
     notes = Column(String, nullable=True)  # User's personal notes

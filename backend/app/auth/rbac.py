@@ -243,7 +243,31 @@ ROLE_PERMISSIONS = {
     # ADMIN: Full access - manage sources, users, global watchlist
     UserRole.ADMIN: [p.value for p in Permission],  # All permissions
 
-    # VIEWER: Standard user - read feeds, manage personal watchlist/feeds
+    # ANALYST: Threat intel analyst - read/analyze/extract/report, manage watchlist, but not admin
+    UserRole.ANALYST: [
+        Permission.READ_ARTICLES.value,
+        Permission.EXPORT_ARTICLES.value,
+        Permission.ANALYZE_ARTICLES.value,
+        Permission.EXTRACT_INTELLIGENCE.value,
+        Permission.MANAGE_PERSONAL_WATCHLIST.value,
+        Permission.MANAGE_GLOBAL_WATCHLIST.value,
+        Permission.MANAGE_USER_FEEDS.value,
+        Permission.REPORTS_VIEW.value,
+        Permission.REPORTS_CREATE.value,
+        Permission.REPORTS_EDIT.value,
+        Permission.REPORTS_EXPORT.value,
+        Permission.REPORTS_GENERATE.value,
+        Permission.HUNTS_VIEW.value,
+        Permission.HUNTS_VIEW_RESULTS.value,
+        Permission.IOC_VIEW.value,
+        Permission.IOC_SEARCH.value,
+        Permission.IOC_ENRICH.value,
+        Permission.IOC_EXPORT.value,
+        Permission.DASHBOARD_VIEW.value,
+        Permission.CHATBOT_USE.value,
+    ],
+
+    # VIEWER: Standard user - view feeds, manage personal feeds/watchlist
     UserRole.VIEWER: [
         Permission.READ_ARTICLES.value,
         Permission.EXPORT_ARTICLES.value,

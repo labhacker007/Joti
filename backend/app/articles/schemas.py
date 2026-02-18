@@ -73,6 +73,7 @@ class ArticleResponse(BaseModel):
     extracted_intelligence: List[ExtractedIntelligenceResponse] = []
     hunt_status: List[HuntStatusResponse] = []  # Hunt execution status
     is_read: Optional[bool] = None  # Per-user read status
+    is_bookmarked: bool = False  # Per-user bookmark status
     
     class Config:
         from_attributes = True

@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from bs4 import BeautifulSoup
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from app.core.database import get_db
@@ -834,6 +834,138 @@ def ingest_custom_feed(
         ttp_count=len(extracted_result.get("ttps", [])),
         status="success",
         message="Custom document ingested",
+        extraction_method=extraction_method,
+        created_source=created_source
+    )
+
+
+ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".doc", ".docx", ".xlsx", ".xls", ".csv", ".html", ".htm", ".txt"}
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
+
+
+@router.post("/custom/upload", response_model=CustomFeedIngestResponse, summary="Upload and ingest a document file")
+def upload_custom_document(
+    file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    high_priority: bool = Form(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Upload a file (PDF, Word, Excel, HTML, CSV, TXT) and ingest it as an article with GenAI analysis."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {suffix}. Allowed: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}"
+        )
+
+    file_data = file.file.read()
+    if len(file_data) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="File exceeds 50MB size limit")
+    if len(file_data) == 0:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    extracted_text = DocumentProcessor.extract_from_bytes(file_data, file.filename)
+    if not extracted_text or not extracted_text.strip():
+        raise HTTPException(status_code=400, detail="Could not extract text from the uploaded document")
+
+    normalized_content = FeedParser.normalize_content(extracted_text)
+    summary_text = extracted_text[:500] or None
+    content_hash = hashlib.sha256(extracted_text.encode("utf-8")).hexdigest()
+
+    doc_title = title or Path(file.filename).stem.replace("_", " ").replace("-", " ")
+
+    source_name = f"upload:{current_user.username}"
+    source = db.query(FeedSource).filter(FeedSource.name == source_name).first()
+    created_source = False
+    if not source:
+        source = FeedSource(
+            name=source_name,
+            description=f"Documents uploaded by {current_user.username}",
+            url=f"upload://{current_user.username}",
+            feed_type="custom",
+            is_active=True
+        )
+        db.add(source)
+        db.commit()
+        db.refresh(source)
+        created_source = True
+
+    duplicate = db.query(Article).filter(Article.content_hash == content_hash).first()
+    if duplicate:
+        ioc_count = db.query(ExtractedIntelligence).filter(
+            ExtractedIntelligence.article_id == duplicate.id,
+            ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.IOC
+        ).count()
+        ttp_count = db.query(ExtractedIntelligence).filter(
+            ExtractedIntelligence.article_id == duplicate.id,
+            ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.TTP
+        ).count()
+        return CustomFeedIngestResponse(
+            article_id=duplicate.id,
+            article_title=duplicate.title,
+            source_id=source.id,
+            source_name=source.name,
+            executive_summary=duplicate.executive_summary,
+            technical_summary=duplicate.technical_summary,
+            ioc_count=ioc_count,
+            ttp_count=ttp_count,
+            status="duplicate",
+            message="This document was already ingested",
+            created_source=created_source
+        )
+
+    article = Article(
+        source_id=source.id,
+        external_id=f"upload:{content_hash[:16]}",
+        title=doc_title,
+        raw_content=extracted_text,
+        normalized_content=normalized_content,
+        summary=summary_text,
+        url=f"upload://{file.filename}",
+        published_at=None,
+        status=ArticleStatus.NEW,
+        is_high_priority=high_priority,
+        content_hash=content_hash
+    )
+    db.add(article)
+    db.flush()
+
+    extracted_result, extraction_method = _auto_analyze_article(
+        db=db,
+        article=article,
+        content=extracted_text,
+        source_url=f"upload://{file.filename}"
+    )
+
+    source.last_fetched = datetime.utcnow()
+    source.fetch_error = None
+    db.commit()
+    db.refresh(article)
+
+    logger.info(
+        "document_uploaded_and_ingested",
+        source_id=source.id,
+        article_id=article.id,
+        filename=file.filename,
+        user_id=current_user.id
+    )
+
+    return CustomFeedIngestResponse(
+        article_id=article.id,
+        article_title=article.title,
+        source_id=source.id,
+        source_name=source.name,
+        executive_summary=article.executive_summary,
+        technical_summary=article.technical_summary,
+        ioc_count=len(extracted_result.get("iocs", [])),
+        ttp_count=len(extracted_result.get("ttps", [])),
+        status="success",
+        message=f"Document '{file.filename}' ingested successfully",
         extraction_method=extraction_method,
         created_source=created_source
     )

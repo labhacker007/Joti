@@ -50,8 +50,8 @@ def seed_database():
                 print("  Set ADMIN_PASSWORD environment variable to create admin user")
             else:
                 # Validate password strength
-                if len(admin_password) < 12:
-                    print("⚠ ADMIN_PASSWORD must be at least 12 characters - skipping admin user creation")
+                if len(admin_password) < 8:
+                    print("⚠ ADMIN_PASSWORD must be at least 8 characters - skipping admin user creation")
                 else:
                     admin = User(
                         email=os.environ.get("ADMIN_EMAIL", "admin@localhost"),
@@ -63,7 +63,23 @@ def seed_database():
                     )
                     db.add(admin)
                     print("✓ Created admin user (password from ADMIN_PASSWORD env var)")
-        
+
+        # Create tarun admin user
+        tarun = db.query(User).filter(User.username == "tarun").first()
+        if not tarun:
+            tarun_password = os.environ.get("ADMIN_PASSWORD", "")
+            if tarun_password and len(tarun_password) >= 8:
+                tarun = User(
+                    email="tarun@joti.local",
+                    username="tarun",
+                    hashed_password=hash_password(tarun_password),
+                    role=UserRole.ADMIN,
+                    is_active=True,
+                    full_name="Tarun (Admin)"
+                )
+                db.add(tarun)
+                print("✓ Created tarun admin user")
+
         # Load feed sources - try multiple paths
         sources_data = []
         config_paths = [

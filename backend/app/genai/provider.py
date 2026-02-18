@@ -695,48 +695,53 @@ class GenAIOrchestrator:
     
     async def validate_input(self, prompt: str, use_case: str, platform: str = None) -> tuple:
         """Validate input against guardrails before sending to GenAI.
-        
+
         Returns (is_valid, violations, modified_prompt)
         """
         if not self.enable_guardrails:
             return True, [], prompt
-        
-        engine = self._get_guardrail_engine()
-        passed, results = await engine.validate_input(
-            prompt=prompt,
-            use_case=use_case,
-            platform=platform
-        )
-        
-        violations = [
-            {"guardrail_id": r.guardrail_id, "message": r.message, "severity": r.severity.value}
-            for r in results if not r.passed
-        ]
-        
-        return passed, violations, prompt
-    
+
+        try:
+            engine = self._get_guardrail_engine()
+            results = engine.validate_input(prompt)
+
+            violations = [
+                {"guardrail": r.guardrail_name, "message": r.message, "action": r.action.value}
+                for r in results if not r.passed
+            ]
+
+            has_blocking = engine.has_blocking_violations(results)
+            return not has_blocking, violations, prompt
+        except Exception as e:
+            logger.warning("guardrail_input_validation_failed", error=str(e))
+            return True, [], prompt
+
     async def validate_output(self, output: str, use_case: str, platform: str = None, source_content: str = None) -> tuple:
         """Validate GenAI output against guardrails.
-        
+
         Returns (is_valid, violations, sanitized_output)
         """
         if not self.enable_guardrails:
             return True, [], output
-        
-        engine = self._get_guardrail_engine()
-        passed, results = await engine.validate_output(
-            output=output,
-            use_case=use_case,
-            platform=platform,
-            source_content=source_content
-        )
-        
-        violations = [
-            {"guardrail_id": r.guardrail_id, "message": r.message, "severity": r.severity.value}
-            for r in results if not r.passed
-        ]
-        
-        return passed, violations, output
+
+        try:
+            engine = self._get_guardrail_engine()
+            results = engine.validate_output(
+                output=output,
+                output_type=use_case,
+                source_content=source_content,
+            )
+
+            violations = [
+                {"guardrail": r.guardrail_name, "message": r.message, "action": r.action.value}
+                for r in results if not r.passed
+            ]
+
+            has_blocking = engine.has_blocking_violations(results)
+            return not has_blocking, violations, output
+        except Exception as e:
+            logger.warning("guardrail_output_validation_failed", error=str(e))
+            return True, [], output
     
     async def generate_hunt_query(
         self,

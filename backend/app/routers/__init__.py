@@ -100,6 +100,16 @@ def register(user_create: UserCreate, db: Session = Depends(get_db)):
 
     logger.info("user_registered", user_id=user.id, username=user.username, default_feeds_count=len(defaults))
 
+    AuditManager.log_event(
+        db=db,
+        user_id=user.id,
+        event_type="REGISTRATION",
+        action="User registered",
+        resource_type="user",
+        resource_id=user.id,
+        details={"username": user.username, "email": user.email}
+    )
+
     return user
 
 
@@ -295,6 +305,16 @@ def change_password(
     db.commit()
 
     logger.info("password_changed", user_id=current_user.id)
+
+    AuditManager.log_event(
+        db=db,
+        user_id=current_user.id,
+        event_type="PASSWORD_CHANGE",
+        action="Password changed",
+        resource_type="user",
+        resource_id=current_user.id
+    )
+
     return {"message": "Password changed successfully"}
 
 
@@ -442,7 +462,7 @@ def logout(
                 blacklist_token(jti, exp)
         except Exception:
             pass
-    AuditManager.log_event(db=db, user_id=current_user.id, event_type="security", action="logout", resource_type="auth")
+    AuditManager.log_event(db=db, user_id=current_user.id, event_type="LOGOUT", action="User logged out", resource_type="auth")
     logger.info("user_logout", user_id=current_user.id, username=current_user.username)
     return {"message": "Logged out successfully"}
 
@@ -580,7 +600,7 @@ def verify_otp_setup(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="security",
+        event_type="ADMIN_ACTION",
         action="OTP/2FA enabled",
         resource_type="user_security"
     )
@@ -626,7 +646,7 @@ def disable_otp(
     AuditManager.log_event(
         db=db,
         user_id=current_user.id,
-        event_type="security",
+        event_type="ADMIN_ACTION",
         action="OTP/2FA disabled",
         resource_type="user_security"
     )

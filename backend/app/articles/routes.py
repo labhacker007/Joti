@@ -11,10 +11,12 @@ from app.articles.service import (
     mark_article_as_read, get_article_read_status, get_hunt_status_for_article,
     update_article_status, search_articles, get_articles_with_hunt_status
 )
+from app.articles.bookmarks import ArticleBookmark
 from app.extraction.extractor import IntelligenceExtractor
 from app.audit.manager import AuditManager
 from app.core.logging import logger
 from typing import Optional, List
+from datetime import datetime
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
@@ -59,13 +61,20 @@ def article_to_response(article: Article, user_id: Optional[int] = None, db: Opt
         "updated_at": article.updated_at,
         "extracted_intelligence": [],
         "hunt_status": [],
-        "is_read": None
+        "is_read": None,
+        "is_bookmarked": False
     }
-    
-    # Add hunt status, read status if db and user_id provided
+
+    # Add hunt status, read status, bookmark status if db and user_id provided
     if db and user_id:
         response_data["is_read"] = get_article_read_status(db, article.id, user_id)
         response_data["hunt_status"] = get_hunt_status_for_article(db, article.id)
+        bookmark = db.query(ArticleBookmark).filter(
+            ArticleBookmark.user_id == user_id,
+            ArticleBookmark.content_id == article.id,
+            ArticleBookmark.is_bookmarked == True
+        ).first()
+        response_data["is_bookmarked"] = bookmark is not None
     
     # Load extracted intelligence if requested (for detail view)
     if db and include_intel:
@@ -129,6 +138,63 @@ def article_to_response(article: Article, user_id: Optional[int] = None, db: Opt
     return ArticleResponse(**response_data)
 
 
+@router.get("/trending", tags=["articles"])
+def get_trending_articles(
+    limit: int = Query(5, ge=1, le=10),
+    db: Session = Depends(get_db)
+):
+    """Get top trending articles from the last 48 hours.
+
+    Public endpoint (no auth required) - returns minimal article data
+    for display on the login page.
+
+    Prioritization:
+    1. High priority (watchlist matches) first
+    2. Then by published date (newest first)
+    """
+    from datetime import timedelta
+
+    cutoff = datetime.utcnow() - timedelta(hours=48)
+
+    articles = (
+        db.query(Article)
+        .filter(Article.published_at >= cutoff)
+        .order_by(
+            desc(Article.is_high_priority),
+            desc(Article.published_at),
+        )
+        .limit(limit)
+        .all()
+    )
+
+    # If not enough recent articles, fill from last 7 days
+    if len(articles) < limit:
+        cutoff_7d = datetime.utcnow() - timedelta(days=7)
+        articles = (
+            db.query(Article)
+            .filter(Article.published_at >= cutoff_7d)
+            .order_by(
+                desc(Article.is_high_priority),
+                desc(Article.published_at),
+            )
+            .limit(limit)
+            .all()
+        )
+
+    return [
+        {
+            "id": a.id,
+            "title": a.title,
+            "summary": (a.summary or "")[:200],
+            "published_at": a.published_at.isoformat() if a.published_at else None,
+            "source_name": a.feed_source.name if a.feed_source else None,
+            "is_high_priority": a.is_high_priority,
+            "url": a.url,
+        }
+        for a in articles
+    ]
+
+
 @router.get("/", tags=["articles"])
 def list_articles(
     page: int = Query(1, ge=1),
@@ -140,6 +206,8 @@ def list_articles(
     search: Optional[str] = Query(None, description="Search in title and summary"),
     unread_only: bool = Query(False, description="Filter unread articles only"),
     watchlist_only: bool = Query(False, description="Filter watchlist matches only"),
+    bookmarked_only: bool = Query(False, description="Filter bookmarked articles only"),
+    time_range: Optional[str] = Query(None, description="Time range filter: 24h, 7d, 30d, all"),
     current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
     db: Session = Depends(get_db)
 ):
@@ -151,6 +219,7 @@ def list_articles(
     - severity: Article severity level
     - threat_category: Threat category
     - search: Search in title/summary
+    - time_range: Time range (24h, 7d, 30d, all)
     - unread_only: Show only unread articles
     - watchlist_only: Show only watchlist matches
     """
@@ -159,6 +228,15 @@ def list_articles(
         from app.models import ArticleReadStatus
 
         query = db.query(Article).options(joinedload(Article.feed_source))
+
+        # Apply time range filter
+        if time_range and time_range != "all":
+            from datetime import timedelta
+            time_map = {"24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta(days=30)}
+            delta = time_map.get(time_range)
+            if delta:
+                cutoff = datetime.utcnow() - delta
+                query = query.filter(Article.created_at >= cutoff)
 
         # Apply basic filters
         if status_filter:
@@ -203,6 +281,14 @@ def list_articles(
         if watchlist_only:
             # Filter articles that have watchlist matches
             query = query.filter(Article.is_high_priority == True)
+
+        # Apply bookmarked filter
+        if bookmarked_only:
+            bookmarked_ids = db.query(ArticleBookmark.content_id).filter(
+                ArticleBookmark.user_id == current_user.id,
+                ArticleBookmark.is_bookmarked == True
+            ).subquery()
+            query = query.filter(Article.id.in_(bookmarked_ids))
 
         # Get total count before pagination
         total = query.count()
@@ -475,6 +561,47 @@ def mark_as_read(
     mark_article_as_read(db, article_id, current_user.id)
     
     return {"message": "Article marked as read", "article_id": article_id}
+
+
+@router.post("/{article_id}/bookmark")
+def toggle_bookmark(
+    article_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Toggle bookmark (save for later) on an article."""
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    from datetime import datetime as dt
+
+    bookmark = db.query(ArticleBookmark).filter(
+        ArticleBookmark.user_id == current_user.id,
+        ArticleBookmark.content_id == article_id
+    ).first()
+
+    if bookmark:
+        bookmark.is_bookmarked = not bookmark.is_bookmarked
+        if bookmark.is_bookmarked:
+            bookmark.bookmarked_at = dt.utcnow()
+    else:
+        bookmark = ArticleBookmark(
+            user_id=current_user.id,
+            content_id=article_id,
+            is_bookmarked=True,
+            is_read=False,
+            bookmarked_at=dt.utcnow()
+        )
+        db.add(bookmark)
+
+    db.commit()
+
+    return {
+        "message": "Bookmark toggled",
+        "article_id": article_id,
+        "is_bookmarked": bookmark.is_bookmarked
+    }
 
 
 @router.get("/search")

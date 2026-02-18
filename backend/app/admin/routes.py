@@ -3313,3 +3313,197 @@ def update_comprehensive_role_permissions(
 
 
 ## Duplicate route removed - using the one defined earlier in this file
+
+
+# ============================================
+# Data Retention / Purge Settings
+# ============================================
+
+class RetentionSettingsUpdate(BaseModel):
+    """Update retention/purge settings."""
+    article_retention_days: Optional[int] = Field(None, ge=1, le=3650)
+    audit_retention_days: Optional[int] = Field(None, ge=1, le=3650)
+    hunt_retention_days: Optional[int] = Field(None, ge=1, le=3650)
+
+
+@router.get("/retention-settings")
+async def get_retention_settings(
+    current_user: User = Depends(require_permission(MANAGE_USERS))
+):
+    """Get current data retention/purge settings."""
+    return {
+        "data": {
+            "article_retention_days": settings.ARTICLE_RETENTION_DAYS,
+            "audit_retention_days": settings.AUDIT_RETENTION_DAYS,
+            "hunt_retention_days": settings.HUNT_RETENTION_DAYS,
+        }
+    }
+
+
+@router.put("/retention-settings")
+async def update_retention_settings(
+    update: RetentionSettingsUpdate,
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Update data retention/purge settings (runtime only - set env vars for persistence)."""
+    changes = {}
+    if update.article_retention_days is not None:
+        settings.ARTICLE_RETENTION_DAYS = update.article_retention_days
+        changes["article_retention_days"] = update.article_retention_days
+    if update.audit_retention_days is not None:
+        settings.AUDIT_RETENTION_DAYS = update.audit_retention_days
+        settings.AUDIT_LOG_RETENTION_DAYS = update.audit_retention_days
+        changes["audit_retention_days"] = update.audit_retention_days
+    if update.hunt_retention_days is not None:
+        settings.HUNT_RETENTION_DAYS = update.hunt_retention_days
+        settings.HUNT_RESULTS_RETENTION_DAYS = update.hunt_retention_days
+        changes["hunt_retention_days"] = update.hunt_retention_days
+
+    if changes:
+        AuditManager.log_event(
+            db=db,
+            user_id=current_user.id,
+            event_type=AuditEventType.SYSTEM_CONFIG,
+            action="Updated data retention settings",
+            resource_type="retention_settings",
+            details=changes
+        )
+        db.commit()
+
+    return {
+        "data": {
+            "article_retention_days": settings.ARTICLE_RETENTION_DAYS,
+            "audit_retention_days": settings.AUDIT_RETENTION_DAYS,
+            "hunt_retention_days": settings.HUNT_RETENTION_DAYS,
+        },
+        "message": "Retention settings updated"
+    }
+
+
+# ============================================
+# Bulk Data Export API (for external systems)
+# ============================================
+
+@router.get("/export/articles")
+async def export_articles(
+    page: int = 1,
+    page_size: int = 100,
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Export articles data for external system integration."""
+    from app.models import Article
+    query = db.query(Article).order_by(Article.created_at.desc())
+    total = query.count()
+    articles = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    rows = []
+    for a in articles:
+        rows.append({
+            "id": a.id,
+            "title": a.title,
+            "url": a.url,
+            "source": a.feed_source.name if a.feed_source else None,
+            "status": a.status.value if hasattr(a.status, 'value') else str(a.status),
+            "is_high_priority": a.is_high_priority,
+            "watchlist_match_keywords": a.watchlist_match_keywords or [],
+            "executive_summary": a.executive_summary,
+            "technical_summary": a.technical_summary,
+            "published_at": a.published_at.isoformat() if a.published_at else None,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+
+    return {"data": rows, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/export/iocs")
+async def export_iocs(
+    page: int = 1,
+    page_size: int = 100,
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Export extracted IOCs for external system integration."""
+    from app.models import ExtractedIntelligence, ExtractedIntelligenceType, Article
+    query = db.query(ExtractedIntelligence).filter(
+        ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.IOC
+    ).order_by(ExtractedIntelligence.id.desc())
+    total = query.count()
+    iocs = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    rows = []
+    for ioc in iocs:
+        rows.append({
+            "id": ioc.id,
+            "article_id": ioc.article_id,
+            "type": ioc.intelligence_type.value if hasattr(ioc.intelligence_type, 'value') else str(ioc.intelligence_type),
+            "subtype": ioc.subtype,
+            "value": ioc.value,
+            "confidence": ioc.confidence,
+            "context": ioc.context,
+            "created_at": ioc.created_at.isoformat() if hasattr(ioc, 'created_at') and ioc.created_at else None,
+        })
+
+    return {"data": rows, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/export/ttps")
+async def export_ttps(
+    page: int = 1,
+    page_size: int = 100,
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Export extracted TTPs for external system integration."""
+    from app.models import ExtractedIntelligence, ExtractedIntelligenceType
+    query = db.query(ExtractedIntelligence).filter(
+        ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.TTP
+    ).order_by(ExtractedIntelligence.id.desc())
+    total = query.count()
+    ttps = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    rows = []
+    for ttp in ttps:
+        rows.append({
+            "id": ttp.id,
+            "article_id": ttp.article_id,
+            "type": ttp.intelligence_type.value if hasattr(ttp.intelligence_type, 'value') else str(ttp.intelligence_type),
+            "subtype": ttp.subtype,
+            "value": ttp.value,
+            "confidence": ttp.confidence,
+            "context": ttp.context,
+            "created_at": ttp.created_at.isoformat() if hasattr(ttp, 'created_at') and ttp.created_at else None,
+        })
+
+    return {"data": rows, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/export/audit-logs")
+async def export_audit_logs(
+    page: int = 1,
+    page_size: int = 100,
+    current_user: User = Depends(require_permission(VIEW_AUDIT_LOGS)),
+    db: Session = Depends(get_db)
+):
+    """Export audit logs for external system integration."""
+    from app.models import AuditLog
+    query = db.query(AuditLog).order_by(AuditLog.created_at.desc())
+    total = query.count()
+    logs = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    rows = []
+    for log in logs:
+        rows.append({
+            "id": log.id,
+            "user_id": log.user_id,
+            "event_type": log.event_type.value if hasattr(log.event_type, 'value') else str(log.event_type),
+            "action": log.action,
+            "resource_type": log.resource_type,
+            "resource_id": log.resource_id,
+            "ip_address": log.ip_address,
+            "details": log.details,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        })
+
+    return {"data": rows, "total": total, "page": page, "page_size": page_size}
