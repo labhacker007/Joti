@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.config import settings
-from app.auth.schemas import LoginRequest, LoginResponse, TokenRefreshRequest, TokenRefreshResponse, UserResponse, UserCreate
+from app.auth.schemas import LoginRequest, LoginResponse, TokenRefreshRequest, TokenRefreshResponse, UserResponse, UserCreate, ChangePasswordRequest
 from app.auth.security import (
     hash_password,
     verify_password,
@@ -274,19 +274,13 @@ def refresh_token(refresh_request: TokenRefreshRequest, db: Session = Depends(ge
 
 @router.post("/change-password")
 def change_password(
-    request_body: dict,
+    request_body: "ChangePasswordRequest",
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Change password for authenticated user."""
-    current_password = request_body.get("current_password")
-    new_password = request_body.get("new_password")
-
-    if not current_password or not new_password:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Both current_password and new_password are required"
-        )
+    current_password = request_body.current_password
+    new_password = request_body.new_password
 
     if len(new_password) < 12:
         raise HTTPException(

@@ -504,22 +504,24 @@ export default function Login() {
                 </button>
               </form>
 
-              {/* Credentials hint */}
-              <div className="mt-6 pt-4 border-t border-border/50">
-                <p className="text-center text-[11px] text-muted-foreground/70">
-                  Default credentials
-                </p>
-                <div className="mt-2 p-3 rounded-lg bg-secondary/50 border border-border/30">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Email</span>
-                    <code className="font-mono text-foreground/80">admin@localhost</code>
-                  </div>
-                  <div className="flex items-center justify-between text-xs mt-1.5">
-                    <span className="text-muted-foreground">Password</span>
-                    <code className="font-mono text-foreground/80">Admin@1234567</code>
+              {/* Credentials hint — only visible in development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-6 pt-4 border-t border-border/50">
+                  <p className="text-center text-[11px] text-muted-foreground/70">
+                    Dev credentials
+                  </p>
+                  <div className="mt-2 p-3 rounded-lg bg-secondary/50 border border-border/30">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Email</span>
+                      <code className="font-mono text-foreground/80">admin@localhost</code>
+                    </div>
+                    <div className="flex items-center justify-between text-xs mt-1.5">
+                      <span className="text-muted-foreground">Password</span>
+                      <code className="font-mono text-foreground/80">Admin@1234567</code>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Mobile: Compact trending */}

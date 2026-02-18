@@ -216,12 +216,13 @@ async def export_to_pdf(
             metadata=content.metadata
         )
 
-        filename = f"{content.title or 'report'}_{content_id}.pdf".replace(" ", "_")
+        safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in (content.title or 'report')[:50])
+        filename = f"{safe_title}_{content_id}.pdf".replace(" ", "_")
 
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
 
     except Exception as e:
@@ -254,12 +255,13 @@ async def export_to_word(
             metadata=content.metadata
         )
 
-        filename = f"{content.title or 'report'}_{content_id}.docx".replace(" ", "_")
+        safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in (content.title or 'report')[:50])
+        filename = f"{safe_title}_{content_id}.docx".replace(" ", "_")
 
         return Response(
             content=docx_bytes,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
 
     except Exception as e:

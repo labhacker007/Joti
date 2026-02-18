@@ -255,34 +255,20 @@ app.include_router(analytics_router, prefix="/api")
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint."""
+    """Health check endpoint — only exposes status, not internal counts."""
     from app.core.database import SessionLocal
-    from app.models import User, FeedSource, Article
-    
+
     db = SessionLocal()
     try:
-        user_count = db.query(User).count()
-        source_count = db.query(FeedSource).count()
-        article_count = db.query(Article).count()
+        # Simple connectivity check — don't expose counts publicly
+        db.execute(__import__("sqlalchemy").text("SELECT 1"))
     except Exception as e:
         logger.error("health_check_failed", error=str(e))
-        return {
-            "status": "unhealthy",
-            "version": settings.APP_VERSION,
-            "error": "unhealthy"
-        }
+        return {"status": "unhealthy", "version": settings.APP_VERSION}
     finally:
         db.close()
-    
-    return {
-        "status": "healthy",
-        "version": settings.APP_VERSION,
-        "database": {
-            "users": user_count,
-            "sources": source_count,
-            "articles": article_count
-        }
-    }
+
+    return {"status": "healthy", "version": settings.APP_VERSION}
 
 
 # Prometheus-compatible metrics endpoint

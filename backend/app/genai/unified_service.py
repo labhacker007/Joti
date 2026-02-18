@@ -153,7 +153,7 @@ class UnifiedGenAIService:
             
         except Exception as e:
             logger.error("guardrail_validation_error", error=str(e))
-            return True, [], None  # Fail open for availability
+            return False, [{"guardrail_id": "system", "message": "Security validation unavailable", "severity": "high"}], "Request blocked: security validation error"
     
     async def validate_output(
         self,
@@ -206,7 +206,7 @@ class UnifiedGenAIService:
             
         except Exception as e:
             logger.error("guardrail_output_validation_error", error=str(e))
-            return True, [], None
+            return False, [{"guardrail_id": "system", "message": "Output validation unavailable", "severity": "high"}], "Output blocked: security validation error"
     
     async def get_rag_context(
         self,

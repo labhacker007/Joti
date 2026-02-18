@@ -73,9 +73,12 @@ class DocumentProcessor:
 
     @staticmethod
     def _extract_from_url(url: str) -> str:
-        from bs4 import BeautifulSoup
+        from app.core.ssrf import validate_outbound_url, ssrf_policy_from_settings
         import requests
         try:
+            # Validate URL against SSRF policy before fetching
+            policy = ssrf_policy_from_settings()
+            validate_outbound_url(url, policy=policy)
             resp = requests.get(url, timeout=30, headers={"User-Agent": "Joti/1.0"})
             resp.raise_for_status()
             return DocumentProcessor._extract_html(resp.text)

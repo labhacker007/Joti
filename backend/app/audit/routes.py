@@ -113,7 +113,13 @@ def get_audit_log(
     db: Session = Depends(get_db)
 ):
     """Get a specific audit log entry."""
-    log = db.query(AuditLog).filter(AuditLog.id == log_id).first()
+    query = db.query(AuditLog).filter(AuditLog.id == log_id)
+    # Non-admin users can only view their own audit logs (IDOR protection)
+    effective_role = getattr(current_user, 'role', None)
+    role_val = effective_role.value if hasattr(effective_role, 'value') else str(effective_role)
+    if role_val != "ADMIN":
+        query = query.filter(AuditLog.user_id == current_user.id)
+    log = query.first()
     
     if not log:
         raise HTTPException(
@@ -147,9 +153,15 @@ def get_logs_by_correlation(
     db: Session = Depends(get_db)
 ):
     """Get all audit logs for a specific correlation ID."""
-    logs = db.query(AuditLog).filter(
+    query = db.query(AuditLog).filter(
         AuditLog.correlation_id == correlation_id
-    ).order_by(AuditLog.created_at).all()
+    )
+    # Non-admin users can only view their own audit logs (IDOR protection)
+    effective_role = getattr(current_user, 'role', None)
+    role_val = effective_role.value if hasattr(effective_role, 'value') else str(effective_role)
+    if role_val != "ADMIN":
+        query = query.filter(AuditLog.user_id == current_user.id)
+    logs = query.order_by(AuditLog.created_at).all()
     
     log_responses = []
     for log in logs:

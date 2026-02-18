@@ -89,6 +89,11 @@ class TokenRefreshResponse(BaseModel):
     refresh_token: Optional[str] = None  # New refresh token (rotation)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class EnableOTPRequest(BaseModel):
     pass
 

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:20-alpine3.21 AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci --legacy-peer-deps
 
 # Stage 2: Builder
-FROM node:20-alpine AS builder
+FROM node:20-alpine3.21 AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm run build
 
 # Stage 3: Runner
-FROM node:20-alpine AS runner
+FROM node:20-alpine3.21 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

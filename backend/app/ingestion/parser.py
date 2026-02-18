@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
-from bleach import clean as sanitize_html
+import nh3
 from app.core.logging import logger
 from app.core.config import settings
 
@@ -605,14 +605,14 @@ class FeedParser:
     @staticmethod
     def normalize_content(raw_html: str) -> str:
         """Sanitize and normalize HTML content."""
-        allowed_tags = ["p", "br", "strong", "em", "ul", "li", "ol", "a", "code", "pre", "blockquote"]
-        allowed_attrs = {"a": ["href", "title"]}
-        
-        cleaned = sanitize_html(
+        allowed_tags = {"p", "br", "strong", "em", "ul", "li", "ol", "a", "code", "pre", "blockquote"}
+        allowed_attrs = {"a": {"href", "title"}}
+
+        cleaned = nh3.clean(
             raw_html,
             tags=allowed_tags,
             attributes=allowed_attrs,
-            strip=True
+            strip_comments=True,
         )
         return cleaned
     
