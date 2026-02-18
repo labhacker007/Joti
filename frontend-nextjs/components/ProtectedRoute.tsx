@@ -9,13 +9,26 @@ import { Spinner } from './ui/spinner';
 // Map route paths to page keys - defined outside component to avoid re-creation
 const PATH_TO_PAGE_KEY: Record<string, string> = {
   '/feeds': 'feed',
+  '/my-feeds': 'feed',
   '/dashboard': 'dashboard',
   '/news': 'feed',
   '/sources': 'sources',
   '/watchlist': 'watchlist',
-  '/profile': 'profile',
+  '/profile': 'feed',  // profile is accessible to all authenticated users
+  '/document-upload': 'feed',
+  '/analytics': 'feed',
   '/audit': 'audit',
   '/admin': 'admin',
+  '/admin/sources': 'sources',
+  '/admin/users': 'users',
+  '/admin/rbac': 'rbac',
+  '/admin/connectors': 'connectors',
+  '/admin/genai': 'genai',
+  '/admin/guardrails': 'guardrails',
+  '/admin/analytics': 'admin',
+  '/admin/audit': 'audit',
+  '/admin/monitoring': 'monitoring',
+  '/admin/settings': 'settings',
 };
 
 interface ProtectedRouteProps {
@@ -40,7 +53,7 @@ function ProtectedRoute({
   requiredPageKey = null,
   requiredRole = null
 }: ProtectedRouteProps): React.JSX.Element {
-  const { accessToken, isImpersonating, assumedRole } = useAuthStore();
+  const { accessToken, isImpersonating, assumedRole, logout } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState<boolean>(true);
@@ -88,14 +101,21 @@ function ProtectedRoute({
       }
 
       setHasAccess(accessGranted);
-    } catch (err) {
+    } catch (err: any) {
       console.error('[ProtectedRoute] Failed to check permissions:', err);
-      // On error, deny access for safety (except to login page)
+      const status = err?.response?.status || err?.status;
+      if (status === 401 || status === 403) {
+        // Token is invalid/expired — clear state and redirect to login
+        logout();
+        router.replace('/login');
+        return;
+      }
+      // Other errors — deny access for safety
       setHasAccess(false);
     } finally {
       setLoading(false);
     }
-  }, [accessToken, requiredPageKey, requiredRole, pathname]);
+  }, [accessToken, requiredPageKey, requiredRole, pathname, logout, router]);
 
   useEffect(() => {
     // Reset loading state when impersonation changes
