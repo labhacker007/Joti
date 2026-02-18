@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { usersAPI, articlesAPI } from '@/api/client';
 import { useAuthStore } from '@/store';
 import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import {
@@ -89,17 +88,30 @@ export default function Login() {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [trending, setTrending] = useState<TrendingStory[]>([]);
+  const [activeStory, setActiveStory] = useState(0);
   const router = useRouter();
   const { setAuth } = useAuthStore();
   const { theme, setTheme, isDark } = useTheme();
 
   useEffect(() => {
     setMounted(true);
-    articlesAPI.getTrending().then((res: any) => {
-      const data = res?.data || res;
-      if (Array.isArray(data)) setTrending(data.slice(0, 5));
+    // Dynamic import to avoid SSR issues with axios
+    import('@/api/client').then(({ articlesAPI }) => {
+      articlesAPI.getTrending().then((res: any) => {
+        const data = res?.data || res;
+        if (Array.isArray(data)) setTrending(data.slice(0, 10));
+      }).catch(() => {});
     }).catch(() => {});
   }, []);
+
+  // Auto-rotate through stories every 4 seconds
+  useEffect(() => {
+    if (trending.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveStory((prev) => (prev + 1) % trending.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [trending.length]);
 
   const handleThemeChange = (newTheme: ThemeType) => {
     setTheme(newTheme as ThemeName);
@@ -111,6 +123,7 @@ export default function Login() {
     setError('');
 
     try {
+      const { usersAPI } = await import('@/api/client');
       const response = await usersAPI.login(email, password) as any;
       const data = response.data || response;
 
@@ -166,7 +179,7 @@ export default function Login() {
       {/* Main Layout */}
       <div className="relative z-10 min-h-screen flex">
 
-        {/* Left Panel: Branding + Top 5 News */}
+        {/* Left Panel: Branding + Auto-Rotating News */}
         <div className="hidden lg:flex lg:flex-1 flex-col justify-center px-10 xl:px-16 py-10">
           <div className="max-w-xl">
             {/* Branding */}
@@ -189,7 +202,7 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Top 5 Cyber News */}
+            {/* Auto-Rotating News Ticker */}
             <div>
               <div className="flex items-center gap-2 mb-5">
                 <TrendingUp className="w-4 h-4" style={{ color: dt.colors.primary }} />
@@ -197,120 +210,153 @@ export default function Login() {
                   className="text-xs font-bold uppercase tracking-[0.2em]"
                   style={{ color: dt.colors.primary }}
                 >
-                  Top Stories — Last 48h
+                  Live Threat Feed — Last 48h
                 </span>
+                {trending.length > 1 && (
+                  <span className="ml-auto text-[10px] text-muted-foreground/50 tabular-nums">
+                    {activeStory + 1}/{trending.length}
+                  </span>
+                )}
               </div>
 
               {trending.length > 0 ? (
-                <div className="space-y-3">
-                  {trending.map((story, idx) => (
-                    <div
-                      key={story.id}
-                      className="group flex items-start gap-3 p-3.5 rounded-xl backdrop-blur-md border border-border/40 bg-card/20 hover:bg-card/40 hover:border-border/60 transition-all duration-300"
-                    >
-                      <span
-                        className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold mt-0.5"
-                        style={{
-                          backgroundColor: `${dt.colors.primary}15`,
-                          color: dt.colors.primary,
-                        }}
+                <div className="space-y-2">
+                  {trending.map((story, idx) => {
+                    const isActive = idx === activeStory;
+                    return (
+                      <div
+                        key={story.id}
+                        className={`group flex items-start gap-3 p-3.5 rounded-xl backdrop-blur-md border transition-all duration-500 cursor-pointer ${
+                          isActive
+                            ? 'border-border/60 bg-card/40 scale-[1.02] shadow-lg'
+                            : 'border-border/20 bg-card/10 opacity-50 hover:opacity-70'
+                        }`}
+                        style={isActive ? { borderColor: `${dt.colors.primary}40` } : {}}
+                        onClick={() => setActiveStory(idx)}
                       >
-                        {idx + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold leading-snug mb-1 text-foreground line-clamp-2">
-                          {story.title}
-                        </h3>
-                        {story.summary && (
-                          <p className="text-xs leading-relaxed mb-1.5 text-muted-foreground line-clamp-2">
-                            {story.summary}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-3 flex-wrap">
-                          {story.source_name && (
-                            <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
-                              <Newspaper className="w-3 h-3" />
-                              {story.source_name}
-                            </span>
+                        <span
+                          className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold mt-0.5 transition-all duration-500 ${
+                            isActive ? 'scale-110' : ''
+                          }`}
+                          style={{
+                            backgroundColor: isActive ? `${dt.colors.primary}25` : `${dt.colors.primary}10`,
+                            color: dt.colors.primary,
+                          }}
+                        >
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <h3 className={`text-sm font-semibold leading-snug mb-1 text-foreground transition-all duration-500 ${
+                            isActive ? '' : 'line-clamp-1'
+                          }`}>
+                            {story.title}
+                          </h3>
+                          {isActive && story.summary && (
+                            <p className="text-xs leading-relaxed mb-1.5 text-muted-foreground line-clamp-2 animate-in fade-in duration-300">
+                              {story.summary}
+                            </p>
                           )}
-                          {story.published_at && (
-                            <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
-                              <Clock className="w-3 h-3" />
-                              {timeAgo(story.published_at)}
-                            </span>
-                          )}
-                          {story.is_high_priority && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/20 flex items-center gap-0.5">
-                              <AlertTriangle className="w-2.5 h-2.5" />
-                              Critical
-                            </span>
-                          )}
-                          {story.url && (
-                            <a
-                              href={story.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[11px] flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                              style={{ color: dt.colors.primary }}
-                            >
-                              Read more <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
+                          {isActive && (
+                            <div className="flex items-center gap-3 flex-wrap animate-in fade-in duration-300">
+                              {story.source_name && (
+                                <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
+                                  <Newspaper className="w-3 h-3" />
+                                  {story.source_name}
+                                </span>
+                              )}
+                              {story.published_at && (
+                                <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
+                                  <Clock className="w-3 h-3" />
+                                  {timeAgo(story.published_at)}
+                                </span>
+                              )}
+                              {story.is_high_priority && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/20 flex items-center gap-0.5">
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  Critical
+                                </span>
+                              )}
+                              {story.url && (
+                                <a
+                                  href={story.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] flex items-center gap-0.5 ml-auto"
+                                  style={{ color: dt.colors.primary }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Read more <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+
+                  {/* Progress bar */}
+                  <div className="flex gap-1 mt-3">
+                    {trending.map((_, idx) => (
+                      <div
+                        key={idx}
+                        className="h-0.5 flex-1 rounded-full transition-all duration-500"
+                        style={{
+                          backgroundColor: idx === activeStory ? dt.colors.primary : `${dt.colors.primary}20`,
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-3">
+                /* Placeholder skeleton when no stories */
+                <div className="space-y-2">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-3 p-3.5 rounded-xl backdrop-blur-md border border-border/30 bg-card/10"
+                      className={`flex items-start gap-3 p-3.5 rounded-xl backdrop-blur-md border transition-all ${
+                        i === 1 ? 'border-border/30 bg-card/15' : 'border-border/15 bg-card/5 opacity-40'
+                      }`}
                     >
                       <span
                         className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold opacity-30"
-                        style={{
-                          backgroundColor: `${dt.colors.primary}10`,
-                          color: dt.colors.primary,
-                        }}
+                        style={{ backgroundColor: `${dt.colors.primary}10`, color: dt.colors.primary }}
                       >
                         {i}
                       </span>
                       <div className="flex-1 space-y-2 py-1">
                         <div className="h-3 rounded bg-muted-foreground/10 w-4/5" />
-                        <div className="h-2 rounded bg-muted-foreground/5 w-3/5" />
+                        {i === 1 && <div className="h-2 rounded bg-muted-foreground/5 w-3/5" />}
                       </div>
                     </div>
                   ))}
-                  <p className="text-xs text-center text-muted-foreground/50 mt-4">
-                    News will appear here once feeds are ingested
+                  <p className="text-xs text-center text-muted-foreground/40 mt-4">
+                    News will appear once feeds are ingested
                   </p>
                 </div>
               )}
             </div>
 
-            <p className="text-[11px] mt-8 text-muted-foreground/60">
+            <p className="text-[11px] mt-8 text-muted-foreground/50">
               Built for SOC teams, threat researchers, and security analysts
             </p>
           </div>
         </div>
 
         {/* Right Panel: Login Dialog with Glass Effect */}
-        <div className="w-full lg:w-[420px] xl:w-[440px] flex items-center justify-center relative">
-          {/* Glass backdrop for right panel */}
+        <div className="w-full lg:w-[420px] xl:w-[440px] flex items-center justify-center relative shrink-0">
+          {/* Glass backdrop */}
           <div
             className="absolute inset-0 backdrop-blur-xl"
             style={{
-              backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.5)',
+              backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.55)',
             }}
           />
+          {/* Accent line */}
           <div
             className="absolute inset-y-0 left-0 w-px"
             style={{
-              background: isDark
-                ? `linear-gradient(to bottom, transparent, ${dt.colors.primary}30, transparent)`
-                : `linear-gradient(to bottom, transparent, ${dt.colors.primary}20, transparent)`,
+              background: `linear-gradient(to bottom, transparent, ${dt.colors.primary}30, transparent)`,
             }}
           />
 
@@ -443,10 +489,7 @@ export default function Login() {
                       <div className="flex items-start gap-2">
                         <span
                           className="shrink-0 w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold"
-                          style={{
-                            backgroundColor: `${dt.colors.primary}20`,
-                            color: dt.colors.primary,
-                          }}
+                          style={{ backgroundColor: `${dt.colors.primary}20`, color: dt.colors.primary }}
                         >
                           {idx + 1}
                         </span>
@@ -454,14 +497,6 @@ export default function Login() {
                           <p className="text-xs font-medium leading-snug text-foreground line-clamp-2">
                             {story.title}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            {story.source_name && (
-                              <span className="text-[10px] text-muted-foreground">{story.source_name}</span>
-                            )}
-                            {story.published_at && (
-                              <span className="text-[10px] text-muted-foreground">{timeAgo(story.published_at)}</span>
-                            )}
-                          </div>
                         </div>
                       </div>
                     </div>

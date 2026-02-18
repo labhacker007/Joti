@@ -420,7 +420,7 @@ export const MatrixRainBackground: React.FC<ColorBackgroundProps> = ({ color, cl
     const leftBound = Math.floor(width * 0.55);
     const columns = Math.floor(leftBound / fontSize);
     const drops: number[] = Array(columns).fill(0).map(() => Math.floor(Math.random() * -20));
-    const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+    const chars = '01';
 
     let frameCount = 0;
     const animate = () => {
