@@ -1,6 +1,6 @@
 """Article management API routes."""
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, contains_eager
 from sqlalchemy import desc
 from app.core.database import get_db
 from app.auth.dependencies import get_current_user, require_permission
@@ -230,11 +230,11 @@ def list_articles(
         from sqlalchemy import or_
         from app.models import ArticleReadStatus
 
-        query = db.query(Article).options(joinedload(Article.feed_source))
-
-        # Exclude user-scoped articles (uploads and personal feeds) from global feed
-        # These are only visible via the My Feeds page
-        query = query.outerjoin(FeedSource, Article.source_id == FeedSource.id).filter(
+        query = db.query(Article).outerjoin(
+            FeedSource, Article.source_id == FeedSource.id
+        ).options(
+            contains_eager(Article.feed_source)
+        ).filter(
             or_(
                 FeedSource.id == None,  # Articles without a source
                 ~FeedSource.name.like("upload:%") & ~FeedSource.name.like("User:%"),

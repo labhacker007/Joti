@@ -102,7 +102,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
         description="Main overview dashboard",
         category="Overview",
         permissions=[PagePermission.VIEW_DASHBOARD.value],
-        default_roles=["ADMIN", "EXECUTIVE", "MANAGER", "TI", "TH", "IR", "VIEWER"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "EXECUTIVE", "MANAGER", "TI", "TH", "IR", "VIEWER"]
     ),
     "feed": PageDefinition(
         page_key="feed",
@@ -114,7 +114,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.VIEW_FEED.value,
             PagePermission.MANAGE_FEED_SOURCES.value
         ],
-        default_roles=["ADMIN", "EXECUTIVE", "MANAGER", "TI", "TH", "IR", "VIEWER"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "EXECUTIVE", "MANAGER", "TI", "TH", "IR", "VIEWER"]
     ),
     "articles": PageDefinition(
         page_key="articles",
@@ -129,7 +129,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.ASSIGN_ARTICLES.value,
             PagePermission.TRIAGE_ARTICLES.value
         ],
-        default_roles=["ADMIN", "EXECUTIVE", "MANAGER", "TI", "TH", "IR"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "EXECUTIVE", "MANAGER", "TI", "TH", "IR"]
     ),
     "article_detail": PageDefinition(
         page_key="article_detail",
@@ -145,7 +145,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.EDIT_ARTICLE_INTELLIGENCE.value,
             PagePermission.DELETE_ARTICLE_INTELLIGENCE.value
         ],
-        default_roles=["ADMIN", "TI", "TH", "IR"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "TI", "TH", "IR"]
     ),
     "intelligence": PageDefinition(
         page_key="intelligence",
@@ -159,7 +159,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.DELETE_INTELLIGENCE.value,
             PagePermission.EXPORT_INTELLIGENCE.value
         ],
-        default_roles=["ADMIN", "EXECUTIVE", "MANAGER", "TI", "TH", "IR"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "EXECUTIVE", "MANAGER", "TI", "TH", "IR"]
     ),
     "hunts": PageDefinition(
         page_key="hunts",
@@ -175,7 +175,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.DELETE_HUNTS.value,
             PagePermission.VIEW_HUNT_RESULTS.value
         ],
-        default_roles=["ADMIN", "EXECUTIVE", "MANAGER", "TI", "TH", "IR"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "EXECUTIVE", "MANAGER", "TI", "TH", "IR"]
     ),
     "reports": PageDefinition(
         page_key="reports",
@@ -192,7 +192,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.SHARE_REPORTS.value,
             PagePermission.EXPORT_REPORTS.value
         ],
-        default_roles=["ADMIN", "EXECUTIVE", "MANAGER", "TI", "TH", "IR"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "EXECUTIVE", "MANAGER", "TI", "TH", "IR"]
     ),
     "connectors": PageDefinition(
         page_key="connectors",
@@ -205,7 +205,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.MANAGE_CONNECTORS.value,
             PagePermission.TEST_CONNECTORS.value
         ],
-        default_roles=["ADMIN"]
+        default_roles=["ADMIN", "ENGINEER"]
     ),
     "sources": PageDefinition(
         page_key="sources",
@@ -217,7 +217,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.VIEW_SOURCES.value,
             PagePermission.MANAGE_SOURCES.value
         ],
-        default_roles=["ADMIN", "TI"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "TI"]
     ),
     "watchlist": PageDefinition(
         page_key="watchlist",
@@ -229,7 +229,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.VIEW_WATCHLIST.value,
             PagePermission.MANAGE_WATCHLIST.value
         ],
-        default_roles=["ADMIN", "TI"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "TI"]
     ),
     "audit": PageDefinition(
         page_key="audit",
@@ -269,7 +269,7 @@ PAGE_DEFINITIONS: Dict[str, PageDefinition] = {
             PagePermission.USE_CHATBOT.value,
             PagePermission.VIEW_CHATBOT_HISTORY.value
         ],
-        default_roles=["ADMIN", "TI", "TH", "IR", "VIEWER"]
+        default_roles=["ADMIN", "ANALYST", "ENGINEER", "TI", "TH", "IR", "VIEWER"]
     ),
     "users": PageDefinition(
         page_key="users",
@@ -510,6 +510,66 @@ DEFAULT_ROLE_PAGE_PERMISSIONS = {
         PagePermission.VIEW_SOURCES.value,
         # Chatbot
         PagePermission.USE_CHATBOT.value
+    ],
+    "ANALYST": [
+        # Same as TI
+        PagePermission.VIEW_DASHBOARD.value,
+        PagePermission.VIEW_FEED.value,
+        PagePermission.MANAGE_FEED_SOURCES.value,
+        PagePermission.VIEW_ARTICLES.value,
+        PagePermission.EDIT_ARTICLES.value,
+        PagePermission.TRIAGE_ARTICLES.value,
+        PagePermission.ASSIGN_ARTICLES.value,
+        PagePermission.VIEW_ARTICLE_CONTENT.value,
+        PagePermission.VIEW_ARTICLE_INTELLIGENCE.value,
+        PagePermission.VIEW_ARTICLE_HUNTS.value,
+        PagePermission.VIEW_ARTICLE_COMMENTS.value,
+        PagePermission.EDIT_ARTICLE_INTELLIGENCE.value,
+        PagePermission.VIEW_INTELLIGENCE.value,
+        PagePermission.EDIT_INTELLIGENCE.value,
+        PagePermission.EXPORT_INTELLIGENCE.value,
+        PagePermission.VIEW_HUNTS.value,
+        PagePermission.CREATE_HUNTS.value,
+        PagePermission.VIEW_HUNT_RESULTS.value,
+        PagePermission.VIEW_REPORTS.value,
+        PagePermission.CREATE_REPORTS.value,
+        PagePermission.EDIT_REPORTS.value,
+        PagePermission.PUBLISH_REPORTS.value,
+        PagePermission.SHARE_REPORTS.value,
+        PagePermission.EXPORT_REPORTS.value,
+        PagePermission.VIEW_SOURCES.value,
+        PagePermission.MANAGE_SOURCES.value,
+        PagePermission.VIEW_WATCHLIST.value,
+        PagePermission.MANAGE_WATCHLIST.value,
+        PagePermission.USE_CHATBOT.value,
+        PagePermission.VIEW_CHATBOT_HISTORY.value,
+    ],
+    "ENGINEER": [
+        # Same as TH + connectors
+        PagePermission.VIEW_DASHBOARD.value,
+        PagePermission.VIEW_FEED.value,
+        PagePermission.VIEW_ARTICLES.value,
+        PagePermission.VIEW_ARTICLE_CONTENT.value,
+        PagePermission.VIEW_ARTICLE_INTELLIGENCE.value,
+        PagePermission.VIEW_ARTICLE_HUNTS.value,
+        PagePermission.VIEW_INTELLIGENCE.value,
+        PagePermission.EXPORT_INTELLIGENCE.value,
+        PagePermission.VIEW_HUNTS.value,
+        PagePermission.CREATE_HUNTS.value,
+        PagePermission.EXECUTE_HUNTS.value,
+        PagePermission.EDIT_HUNTS.value,
+        PagePermission.DELETE_HUNTS.value,
+        PagePermission.VIEW_HUNT_RESULTS.value,
+        PagePermission.VIEW_REPORTS.value,
+        PagePermission.EXPORT_REPORTS.value,
+        PagePermission.VIEW_SOURCES.value,
+        PagePermission.MANAGE_SOURCES.value,
+        PagePermission.VIEW_CONNECTORS.value,
+        PagePermission.MANAGE_CONNECTORS.value,
+        PagePermission.TEST_CONNECTORS.value,
+        PagePermission.VIEW_WATCHLIST.value,
+        PagePermission.MANAGE_WATCHLIST.value,
+        PagePermission.USE_CHATBOT.value,
     ],
     "VIEWER": [
         # Feed / News - VIEWER can only access news and feeds

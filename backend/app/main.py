@@ -16,6 +16,8 @@ from app.auth.saml import router as saml_router
 from app.admin.routes import router as admin_router
 from app.core.logging import logger
 
+# Import models that are defined outside models.py so their tables get created
+from app.articles.bookmarks import ArticleBookmark  # noqa: F401
 
 # Initialize database
 Base.metadata.create_all(bind=engine)
