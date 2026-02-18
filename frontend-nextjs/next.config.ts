@@ -5,8 +5,17 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'standalone',
 
-  // Prevent axios from being bundled into server chunks (uses window.location internally)
-  serverExternalPackages: ['axios'],
+  // Prevent axios from crashing during SSR (it references window.location internally).
+  // Replace axios with an empty module on the server side — all API calls only run client-side.
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        axios: false,
+      };
+    }
+    return config;
+  },
 
   // Disable x-powered-by header to reduce fingerprinting
   poweredByHeader: false,
