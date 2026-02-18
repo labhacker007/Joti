@@ -707,63 +707,96 @@ export default function Feeds() {
           ))}
         </div>
       ) : (
-        /* Card View */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        /* Card View — Feedly-style compact magazine grid */
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {articles.map((article) => {
             const favicon = getSourceFavicon(article.source_url);
             return (
               <div
                 key={article.id}
                 className={cn(
-                  'bg-card border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors flex flex-col cursor-pointer',
-                  !article.is_read && 'border-t-4 border-t-primary'
+                  'group bg-card border border-border rounded-lg overflow-hidden hover:border-primary/40 hover:shadow-md transition-all cursor-pointer flex flex-col',
+                  !article.is_read && 'ring-1 ring-primary/30'
                 )}
                 onClick={() => openArticleDetail(article.id)}
               >
+                {/* Compact image or colored strip */}
                 {article.image_url ? (
-                  <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                  <div className="relative h-28 w-full overflow-hidden bg-muted">
                     <img
                       src={article.image_url}
-                      alt={article.title}
-                      className="w-full h-full object-cover"
+                      alt=""
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
+                        target.parentElement!.style.display = 'none';
                       }}
                     />
+                    {article.is_high_priority && (
+                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-600 text-white uppercase">
+                        Priority
+                      </span>
+                    )}
                   </div>
                 ) : (
-                  <div className="h-20 w-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center gap-3">
+                  <div className="h-2 w-full bg-gradient-to-r from-primary/40 to-primary/10" />
+                )}
+
+                {/* Card body — tight padding */}
+                <div className="p-2.5 flex-1 flex flex-col min-h-0">
+                  {/* Source + time row */}
+                  <div className="flex items-center gap-1.5 mb-1.5 text-[10px] text-muted-foreground">
                     {favicon ? (
                       <img
                         src={favicon}
                         alt=""
-                        className="w-6 h-6 rounded"
+                        className="w-3.5 h-3.5 rounded-sm flex-shrink-0"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     ) : (
-                      <Rss className="w-6 h-6 text-primary/30" />
+                      <Globe className="w-3 h-3 flex-shrink-0" />
                     )}
-                    <span className="text-xs text-primary/50 font-medium truncate max-w-[60%]">
-                      {article.source_name}
-                    </span>
+                    <span className="truncate font-medium">{article.source_name}</span>
+                    <span className="ml-auto flex-shrink-0 opacity-60">{formatRelativeTime(article.published_at)}</span>
                   </div>
-                )}
 
-                <div className="p-3 flex-1 flex flex-col">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3
-                      className={cn(
-                        'text-sm line-clamp-2 flex-1',
-                        article.is_read ? 'text-muted-foreground' : 'font-semibold text-foreground'
-                      )}
-                    >
-                      {article.title}
-                    </h3>
+                  {/* Title — compact, max 2 lines */}
+                  <h3
+                    className={cn(
+                      'text-[13px] leading-snug line-clamp-2 mb-1',
+                      article.is_read ? 'text-muted-foreground' : 'font-semibold text-foreground'
+                    )}
+                  >
+                    {article.title}
+                  </h3>
+
+                  {/* One-line summary snippet */}
+                  <p className="text-[11px] leading-relaxed text-muted-foreground/80 line-clamp-2 mb-2">
+                    {article.executive_summary || article.summary}
+                  </p>
+
+                  {/* Bottom row: tags + bookmark */}
+                  <div className="mt-auto flex items-center gap-1 pt-1.5 border-t border-border/50">
+                    {article.threat_category && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-500/10 text-blue-600 truncate max-w-[50%]">
+                        {article.threat_category}
+                      </span>
+                    )}
+                    {article.watchlist_match_keywords && article.watchlist_match_keywords.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-yellow-500/10 text-yellow-600 flex items-center gap-0.5">
+                        <Star className="w-2.5 h-2.5" />
+                        {article.watchlist_match_keywords.length}
+                      </span>
+                    )}
+                    {!article.image_url && article.is_high_priority && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/10 text-red-600">
+                        !!
+                      </span>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleBookmark(article.id); }}
-                      className="flex-shrink-0 p-1 hover:bg-muted rounded-lg transition-colors"
-                      title={article.is_bookmarked ? 'Remove bookmark' : 'Save for later'}
+                      className="ml-auto flex-shrink-0 p-0.5 hover:bg-muted rounded transition-colors opacity-0 group-hover:opacity-100"
+                      title={article.is_bookmarked ? 'Remove bookmark' : 'Save'}
                     >
                       {article.is_bookmarked ? (
                         <BookmarkCheck className="w-3.5 h-3.5 text-primary" />
@@ -771,33 +804,6 @@ export default function Feeds() {
                         <Bookmark className="w-3.5 h-3.5 text-muted-foreground" />
                       )}
                     </button>
-                  </div>
-
-                  <p className="text-[11px] text-muted-foreground mb-2 line-clamp-2">
-                    {article.executive_summary || article.summary}
-                  </p>
-
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {article.is_high_priority && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-red-600 border border-red-500/30">
-                        PRIORITY
-                      </span>
-                    )}
-                    {article.watchlist_match_keywords && article.watchlist_match_keywords.length > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-500/10 text-yellow-600 border border-yellow-500/30 flex items-center gap-0.5">
-                        <Star className="w-2.5 h-2.5" />
-                        {article.watchlist_match_keywords[0]}
-                        {article.watchlist_match_keywords.length > 1 &&
-                          ` +${article.watchlist_match_keywords.length - 1}`}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-auto flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <Globe className="w-3 h-3" />
-                    <span className="truncate">{article.source_name}</span>
-                    <span className="text-muted-foreground/50">&middot;</span>
-                    <span>{formatRelativeTime(article.published_at)}</span>
                   </div>
                 </div>
               </div>

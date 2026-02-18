@@ -42,7 +42,7 @@ export default function ProtectedLayout({
               : 'ml-64'
           }`}
         >
-          <div className="p-6">
+          <div className="p-6 max-w-screen-2xl mx-auto w-full">
             {children}
           </div>
         </main>
