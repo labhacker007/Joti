@@ -8,6 +8,12 @@ import { User, Article } from './api';
 // AUTH STORE TYPES
 // ============================================
 
+export interface CachedPermissions {
+  pages: { key: string }[];
+  effectiveRole: string | null;
+  fetchedAt: number;
+}
+
 export interface AuthState {
   // State
   user: User | null;
@@ -17,6 +23,7 @@ export interface AuthState {
   isImpersonating: boolean;
   assumedRole: string | null;
   originalRole: string | null;
+  cachedPermissions: CachedPermissions | null;
 
   // Actions
   setAuth: (user: User, accessToken: string, refreshToken: string) => void;
@@ -27,6 +34,8 @@ export interface AuthState {
   restoreRole: (newToken: string, originalRole: string) => void;
   loadImpersonationState: () => void;
   loadAuthState: () => void;
+  setPermissions: (pages: { key: string }[], effectiveRole: string | null) => void;
+  clearPermissions: () => void;
 }
 
 // ============================================

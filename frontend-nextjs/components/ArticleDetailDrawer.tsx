@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
   Bookmark,
@@ -16,9 +16,14 @@ import {
   ChevronRight,
   AlertTriangle,
   FileDown,
+  FileText,
+  FileCode,
   Search,
   Users,
   Link2,
+  Download,
+  Maximize2,
+  Table,
 } from 'lucide-react';
 import { articlesAPI, get } from '@/api/client';
 import { formatRelativeTime, cn } from '@/lib/utils';
@@ -88,6 +93,127 @@ function getIocColor(type?: string) {
   return IOC_TYPE_COLORS[upper] || { bg: 'bg-blue-500/10', text: 'text-blue-600', border: 'border-blue-500/30' };
 }
 
+/** Convert markdown-like GenAI output to safe HTML */
+function markdownToHtml(text: string): string {
+  if (!text) return '';
+  // Escape HTML entities first for safety
+  let s = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  // Headers
+  s = s.replace(/^### (.+)$/gm, '<h5 style="font-weight:600;font-size:0.875rem;margin:0.75rem 0 0.25rem;">$1</h5>');
+  s = s.replace(/^## (.+)$/gm, '<h4 style="font-weight:600;font-size:1rem;margin:1rem 0 0.375rem;">$1</h4>');
+  s = s.replace(/^# (.+)$/gm, '<h3 style="font-weight:700;font-size:1.125rem;margin:1rem 0 0.5rem;">$1</h3>');
+  // Bold + italic
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Inline code
+  s = s.replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.06);padding:1px 4px;border-radius:3px;font-size:0.8em;font-family:monospace;">$1</code>');
+  // Bullet lists
+  s = s.replace(/^[\-\*\u2022] (.+)$/gm, '<li style="margin-left:1.25rem;list-style:disc;">$1</li>');
+  // Numbered lists
+  s = s.replace(/^\d+\.\s+(.+)$/gm, '<li style="margin-left:1.25rem;list-style:decimal;">$1</li>');
+  // Wrap consecutive <li> in <ul>
+  s = s.replace(/((?:<li[^>]*>.*?<\/li>\n?)+)/g, '<ul style="margin:0.5rem 0;">$1</ul>');
+  // Paragraphs: double newlines
+  s = s.replace(/\n\n+/g, '</p><p style="margin-bottom:0.5rem;">');
+  // Single newlines inside paragraphs
+  s = s.replace(/\n/g, '<br/>');
+  return `<p style="margin-bottom:0.5rem;">${s}</p>`;
+}
+
+/** Build a styled HTML document for export / new-tab preview */
+function buildSummaryHtml(article: ArticleDetail, type: 'executive' | 'technical' | 'both'): string {
+  const content = type === 'executive'
+    ? article.executive_summary || ''
+    : type === 'technical'
+      ? article.technical_summary || ''
+      : [article.executive_summary, article.technical_summary].filter(Boolean).join('\n\n---\n\n');
+  const title = type === 'executive' ? 'Executive Summary' : type === 'technical' ? 'Technical Summary' : 'Intelligence Report';
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${article.title} - ${title}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;max-width:800px;margin:0 auto;padding:2rem;color:#1a1a2e;line-height:1.7;background:#fafafa}
+.header{border-bottom:3px solid #2563eb;padding-bottom:1rem;margin-bottom:1.5rem}
+.header h1{font-size:1.5rem;color:#1a1a2e;margin-bottom:0.25rem}
+.header .meta{font-size:0.8rem;color:#6b7280}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:600;margin-right:4px}
+.badge-cat{background:#dbeafe;color:#2563eb}
+.badge-priority{background:#fee2e2;color:#dc2626}
+.section-title{font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:#2563eb;font-weight:700;margin:1.5rem 0 0.75rem;display:flex;align-items:center;gap:0.5rem}
+.section-title::before{content:'';width:4px;height:1rem;background:#2563eb;border-radius:2px}
+.content{font-size:0.9rem;line-height:1.8}
+.content h3,.content h4,.content h5{color:#1a1a2e}
+.content strong{color:#1a1a2e}
+.content code{background:#f1f5f9;padding:1px 4px;border-radius:3px;font-size:0.85em}
+.content li{margin-left:1.5rem;margin-bottom:0.25rem}
+.footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #e5e7eb;font-size:0.7rem;color:#9ca3af;text-align:center}
+@media print{body{padding:1rem;background:#fff}}
+</style></head><body>
+<div class="header">
+<h1>${article.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h1>
+<div class="meta">${article.source_name || ''} ${article.published_at ? '&middot; ' + new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</div>
+<div style="margin-top:0.5rem">
+${article.threat_category ? `<span class="badge badge-cat">${article.threat_category}</span>` : ''}
+${article.is_high_priority ? '<span class="badge badge-priority">HIGH PRIORITY</span>' : ''}
+</div>
+</div>
+${article.executive_summary && (type === 'executive' || type === 'both') ? `<div class="section-title">Executive Summary</div><div class="content">${markdownToHtml(article.executive_summary)}</div>` : ''}
+${article.technical_summary && (type === 'technical' || type === 'both') ? `<div class="section-title">Technical Summary</div><div class="content">${markdownToHtml(article.technical_summary)}</div>` : ''}
+${article.genai_analysis_remarks ? `<div class="footer">${article.genai_analysis_remarks} &middot; Generated by J.O.T.I</div>` : '<div class="footer">Generated by J.O.T.I</div>'}
+</body></html>`;
+}
+
+/** Export IOCs as CSV */
+function exportIocsCsv(iocs: Intelligence[], articleTitle: string) {
+  const header = 'Type,Value,Confidence,MITRE ID,MITRE Name,Source';
+  const rows = iocs.map((ioc) =>
+    [
+      ioc.ioc_type || ioc.intelligence_type || '',
+      `"${(ioc.value || '').replace(/"/g, '""')}"`,
+      ioc.confidence ?? '',
+      ioc.mitre_id || '',
+      `"${(ioc.mitre_name || '').replace(/"/g, '""')}"`,
+      `"${(ioc.source || '').replace(/"/g, '""')}"`,
+    ].join(',')
+  );
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `iocs-${articleTitle.slice(0, 40).replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/** Download HTML blob */
+function downloadHtml(html: string, filename: string) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/** Open HTML in new tab */
+function openInNewTab(html: string) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  // Revoke after short delay so browser has time to open
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
 interface SimilarArticle {
   id: number;
   title: string;
@@ -105,18 +231,21 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
   const [loading, setLoading] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
   const [extracting, setExtracting] = useState(false);
-  const [showTechnical, setShowTechnical] = useState(false);
+  const [showTechnical, setShowTechnical] = useState(true);
   const [showIntel, setShowIntel] = useState(true);
   const [showRelated, setShowRelated] = useState(false);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
   const [similarArticles, setSimilarArticles] = useState<SimilarArticle[]>([]);
+  const [previewType, setPreviewType] = useState<'executive' | 'technical' | null>(null);
+  const autoSummarizedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (articleId) {
       fetchArticleDetail(articleId);
     } else {
       setArticle(null);
+      autoSummarizedRef.current = null;
     }
   }, [articleId]);
 
@@ -127,16 +256,49 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
     try {
       const response = (await articlesAPI.getArticleDetail(id)) as any;
       const data = response.data || response;
+      if (!data || !data.id) {
+        throw new Error('Article data is invalid or missing');
+      }
       setArticle(data);
+      // Auto-summarize if no summary exists and hasn't been attempted for this article
+      if (!data.executive_summary && !data.technical_summary && autoSummarizedRef.current !== String(data.id)) {
+        autoSummarizedRef.current = String(data.id);
+        triggerAutoSummarize(data);
+      }
       // Fetch similar articles in background
       articlesAPI.getSimilarArticles(id).then((res: any) => {
         const similar = (res?.similar || res?.data?.similar || []) as SimilarArticle[];
         setSimilarArticles(similar);
       }).catch(() => {/* silently ignore */});
     } catch (err: any) {
-      setError(err.message || 'Failed to load article');
+      console.error('Failed to load article:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to load article';
+      setError(errorMessage);
+      setArticle(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const triggerAutoSummarize = async (data: ArticleDetail) => {
+    setSummarizing(true);
+    try {
+      const response = (await articlesAPI.summarizeArticle(data.id)) as any;
+      const result = response.data || response;
+      setArticle((prev) =>
+        prev
+          ? {
+              ...prev,
+              executive_summary: result.executive_summary,
+              technical_summary: result.technical_summary,
+              genai_analysis_remarks: `Summarized using ${result.model_used}`,
+            }
+          : null
+      );
+    } catch {
+      // Silent — auto-summarize is best-effort
+    } finally {
+      setSummarizing(false);
     }
   };
 
@@ -179,20 +341,30 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
   const handleExportPDF = async () => {
     if (!article) return;
     setExporting(true);
+    setError('');
     try {
-      const response = await get<any>(
-        `/articles/reports/${article.id}/pdf`,
-        { responseType: 'blob' }
+      const axios = (await import('axios')).default;
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const response = await axios.get(
+        `${API_BASE_URL}/articles/${article.id}/export/pdf`,
+        {
+          responseType: 'blob',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
       );
-      const blob = new Blob([response as any], { type: 'application/pdf' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `article-${article.id}-report.pdf`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError('Failed to export PDF.');
+    } catch (err: any) {
+      console.error('PDF export failed:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to export PDF');
     } finally {
       setExporting(false);
     }
@@ -249,7 +421,15 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
                   )}
                 </button>
                 <button
-                  onClick={() => onBookmarkToggle(article.id)}
+                  onClick={async () => {
+                    try {
+                      await onBookmarkToggle(article.id);
+                      setArticle((prev) => prev ? { ...prev, is_bookmarked: !prev.is_bookmarked } : null);
+                    } catch (err) {
+                      console.error('Bookmark toggle failed:', err);
+                      setError('Failed to toggle bookmark');
+                    }
+                  }}
                   className="p-2 hover:bg-muted rounded-lg transition-colors"
                   title={article.is_bookmarked ? 'Remove bookmark' : 'Save for later'}
                 >
@@ -328,7 +508,7 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
                 ) : (
                   <Sparkles className="w-4 h-4" />
                 )}
-                {article.executive_summary ? 'Re-Summarize' : 'AI Summarize'}
+                {summarizing ? 'Generating...' : article.executive_summary ? 'Re-Summarize' : 'AI Summarize'}
               </button>
               <button
                 onClick={handleExtract}
@@ -351,6 +531,17 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
               </div>
             )}
 
+            {/* Auto-summarizing indicator */}
+            {summarizing && !article.executive_summary && (
+              <div className="p-4 border border-primary/30 rounded-lg bg-primary/5 flex items-center gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Generating AI Summary...</p>
+                  <p className="text-xs text-muted-foreground">Analyzing article with GenAI for executive and technical summaries</p>
+                </div>
+              </div>
+            )}
+
             {/* GenAI Remarks */}
             {article.genai_analysis_remarks && (
               <p className="text-xs text-muted-foreground italic">
@@ -358,36 +549,88 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
               </p>
             )}
 
-            {/* Executive Summary - shown directly, no tabs */}
+            {/* Executive Summary — rendered as HTML */}
             {article.executive_summary && (
-              <div className="border border-border rounded-lg p-4 bg-primary/5">
-                <h4 className="text-xs font-semibold text-primary uppercase mb-3 flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Executive Summary
-                </h4>
-                <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                  {article.executive_summary}
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between p-3 bg-primary/5 border-b border-border">
+                  <h4 className="text-xs font-semibold text-primary uppercase flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Executive Summary
+                  </h4>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPreviewType('executive')}
+                      className="p-1.5 hover:bg-primary/10 rounded text-primary/60 hover:text-primary transition-colors"
+                      title="Preview in overlay"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => openInNewTab(buildSummaryHtml(article, 'executive'))}
+                      className="p-1.5 hover:bg-primary/10 rounded text-primary/60 hover:text-primary transition-colors"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => downloadHtml(buildSummaryHtml(article, 'executive'), `executive-summary-${article.id}.html`)}
+                      className="p-1.5 hover:bg-primary/10 rounded text-primary/60 hover:text-primary transition-colors"
+                      title="Export as HTML"
+                    >
+                      <FileCode className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
+                <div
+                  className="p-4 text-sm text-foreground leading-relaxed summary-content"
+                  dangerouslySetInnerHTML={{ __html: markdownToHtml(article.executive_summary) }}
+                />
               </div>
             )}
 
-            {/* Technical Summary - collapsible */}
+            {/* Technical Summary — rendered as HTML, expanded by default */}
             {article.technical_summary && (
-              <div className="border border-border rounded-lg">
-                <button
-                  onClick={() => setShowTechnical(!showTechnical)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
-                >
-                  <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-2">
-                    <Shield className="w-3.5 h-3.5" />
-                    Technical Summary
-                  </span>
-                  {showTechnical ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                </button>
-                {showTechnical && (
-                  <div className="border-t border-border p-4 text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                    {article.technical_summary}
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between p-3 border-b border-border">
+                  <button
+                    onClick={() => setShowTechnical(!showTechnical)}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-2">
+                      <Shield className="w-3.5 h-3.5" />
+                      Technical Summary
+                    </span>
+                    {showTechnical ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPreviewType('technical')}
+                      className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+                      title="Preview in overlay"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => openInNewTab(buildSummaryHtml(article, 'technical'))}
+                      className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => downloadHtml(buildSummaryHtml(article, 'technical'), `technical-summary-${article.id}.html`)}
+                      className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+                      title="Export as HTML"
+                    >
+                      <FileCode className="w-3.5 h-3.5" />
+                    </button>
                   </div>
+                </div>
+                {showTechnical && (
+                  <div
+                    className="p-4 text-sm text-foreground leading-relaxed summary-content"
+                    dangerouslySetInnerHTML={{ __html: markdownToHtml(article.technical_summary) }}
+                  />
                 )}
               </div>
             )}
@@ -406,7 +649,22 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
                       ({iocs.length} IOCs · {ttps.length} TTPs{threatActors.length > 0 ? ` · ${threatActors.length} Actors` : ''})
                     </span>
                   </span>
-                  {showIntel ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  <div className="flex items-center gap-2">
+                    {iocs.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          exportIocsCsv(iocs, article.title);
+                        }}
+                        className="px-2 py-1 text-[10px] font-medium bg-green-500/10 text-green-600 border border-green-500/30 rounded hover:bg-green-500/20 transition-colors flex items-center gap-1"
+                        title="Export IOCs as CSV"
+                      >
+                        <Table className="w-3 h-3" />
+                        CSV
+                      </button>
+                    )}
+                    {showIntel ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </div>
                 </button>
                 {showIntel && (
                   <div className="border-t border-border p-4 space-y-4">
@@ -532,7 +790,6 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
                           <button
                             className="text-sm font-medium text-left text-foreground hover:text-primary line-clamp-2 transition-colors"
                             onClick={() => {
-                              // Switch to this article in the drawer
                               setArticle(null);
                               fetchArticleDetail(String(sim.id));
                             }}
@@ -584,6 +841,56 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
           </div>
         )}
       </div>
+
+      {/* Summary Preview Overlay */}
+      {previewType && article && (
+        <>
+          <div className="fixed inset-0 bg-black/70 z-[60]" onClick={() => setPreviewType(null)} />
+          <div className="fixed inset-4 md:inset-12 bg-white rounded-xl z-[60] overflow-hidden flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-900">
+                {previewType === 'executive' ? 'Executive Summary' : 'Technical Summary'} Preview
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openInNewTab(buildSummaryHtml(article, previewType))}
+                  className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1.5"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  New Tab
+                </button>
+                <button
+                  onClick={() => downloadHtml(buildSummaryHtml(article, previewType), `${previewType}-summary-${article.id}.html`)}
+                  className="px-3 py-1.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 flex items-center gap-1.5"
+                >
+                  <FileCode className="w-3.5 h-3.5" />
+                  HTML
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  disabled={exporting}
+                  className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1.5"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  PDF
+                </button>
+                <button
+                  onClick={() => setPreviewType(null)}
+                  className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <iframe
+              srcDoc={buildSummaryHtml(article, previewType)}
+              className="flex-1 w-full border-0"
+              title="Summary Preview"
+              sandbox="allow-same-origin"
+            />
+          </div>
+        </>
+      )}
     </>
   );
 }

@@ -1,4 +1,5 @@
 """Celery tasks for asynchronous ingestion and processing."""
+import asyncio
 from celery import shared_task
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -91,14 +92,31 @@ def ingest_feed_source(self, source_id: int):
         source.fetch_error = None
         
         db.commit()
-        
+
+        # Auto-summarize newly ingested articles in background
+        if article_count > 0:
+            try:
+                new_articles = db.query(Article).filter(
+                    Article.source_id == source_id,
+                    Article.executive_summary.is_(None),
+                    Article.technical_summary.is_(None),
+                    Article.status == "NEW"
+                ).order_by(Article.created_at.desc()).limit(article_count).all()
+
+                for art in new_articles:
+                    auto_summarize_article.delay(art.id)
+
+                logger.info("queued_auto_summarization", source_id=source_id, count=len(new_articles))
+            except Exception as sum_err:
+                logger.warning("auto_summarize_queue_failed", source_id=source_id, error=str(sum_err))
+
         logger.info(
             "feed_ingestion_complete",
             source_id=source_id,
             new_articles=article_count,
             duplicates=duplicate_count
         )
-        
+
         return {"new_articles": article_count, "duplicates": duplicate_count}
         
     except Exception as e:
@@ -108,6 +126,77 @@ def ingest_feed_source(self, source_id: int):
         
         # Retry with exponential backoff
         raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+    finally:
+        db.close()
+
+
+@shared_task(bind=True, max_retries=2)
+def auto_summarize_article(self, article_id: int):
+    """Auto-summarize a single article using GenAI after ingestion."""
+    db = SessionLocal()
+    try:
+        article = db.query(Article).filter(Article.id == article_id).first()
+        if not article:
+            return
+
+        # Skip if already summarized
+        if article.executive_summary and article.technical_summary:
+            return
+
+        content = f"Title: {article.title}\n\n{article.normalized_content or article.raw_content or article.summary or ''}"
+        if not content.strip() or len(content) < 50:
+            logger.debug("auto_summarize_skipped_short_content", article_id=article_id)
+            return
+
+        from app.genai.provider import get_model_manager
+
+        model_manager = get_model_manager()
+
+        # Check if GenAI is configured
+        try:
+            primary_model = model_manager.get_primary_model()
+        except Exception:
+            logger.debug("auto_summarize_skipped_no_genai", article_id=article_id)
+            return
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            # Executive summary
+            if not article.executive_summary:
+                try:
+                    exec_result = loop.run_until_complete(model_manager.generate_with_fallback(
+                        system_prompt="You are a threat intelligence analyst writing for executives. Write a 2-3 paragraph executive summary covering the threat, business impact, key indicators, and high-level recommendations. Use clear, non-technical language.",
+                        user_prompt=f"Summarize this threat intelligence article:\n\n{content[:3000]}",
+                        preferred_model=primary_model
+                    ))
+                    article.executive_summary = exec_result.get("response", "")
+                except Exception as e:
+                    logger.warning("auto_exec_summary_failed", article_id=article_id, error=str(e))
+
+            # Technical summary
+            if not article.technical_summary:
+                try:
+                    tech_result = loop.run_until_complete(model_manager.generate_with_fallback(
+                        system_prompt="You are a senior SOC analyst. Write a technical summary with MITRE ATT&CK mapping, IOC breakdown, detection opportunities, and remediation steps. Be thorough and precise.",
+                        user_prompt=f"Write a technical summary for SOC analysts:\n\n{content[:4000]}",
+                        preferred_model=primary_model
+                    ))
+                    article.technical_summary = tech_result.get("response", "")
+                except Exception as e:
+                    logger.warning("auto_tech_summary_failed", article_id=article_id, error=str(e))
+        finally:
+            loop.close()
+
+        article.genai_analysis_remarks = f"Auto-summarized using {primary_model} during ingestion"
+        db.commit()
+
+        logger.info("auto_summarize_complete", article_id=article_id)
+
+    except Exception as e:
+        logger.error("auto_summarize_failed", article_id=article_id, error=str(e))
+        db.rollback()
+        raise self.retry(exc=e, countdown=120 * (2 ** self.request.retries))
     finally:
         db.close()
 

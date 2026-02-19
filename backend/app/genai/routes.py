@@ -1521,3 +1521,98 @@ async def get_my_quota(
         "monthly_cost_used": quota.current_monthly_cost,
         "is_exceeded": quota.is_exceeded
     }
+
+
+# ============================================================================
+# CYBERSECURITY QUOTE / JOKE ENDPOINT
+# ============================================================================
+
+# Pre-approved fallback jokes (clean, professional, workplace-appropriate)
+_FALLBACK_JOKES = [
+    {"text": "Why did the cybersecurity expert bring a ladder to work? Because they heard the firewall needed to be higher.", "type": "joke"},
+    {"text": "A SQL query walks into a bar, sees two tables and asks... 'Can I JOIN you?'", "type": "joke"},
+    {"text": "There are only 10 types of people in the world: those who understand binary and those who don't.", "type": "joke"},
+    {"text": "Why do programmers prefer dark mode? Because light attracts bugs.", "type": "joke"},
+    {"text": "My password is 'incorrect'. That way when I forget it, the computer will tell me: 'Your password is incorrect.'", "type": "joke"},
+    {"text": "The best thing about a Boolean is even if you are wrong, you are only off by a bit.", "type": "joke"},
+    {"text": "Why was the JavaScript developer sad? Because he didn't Node how to Express himself.", "type": "joke"},
+    {"text": "A pentester walks into a bar and orders 1 beer, 0 beers, -1 beers, 999999 beers, a lizard, and NULL beers.", "type": "joke"},
+    {"text": "How many hackers does it take to change a light bulb? None — they just make the whole room dark and tell you it's a feature.", "type": "joke"},
+    {"text": "I told my friend I was hacked last night. He said 'No way!' I said 'Wi-Fi.'", "type": "joke"},
+    {"text": "Why did the hacker cross the road? To get to the other site.", "type": "joke"},
+    {"text": "Knock knock. Who's there? Denial of Service. Denial of Service wh— ..................", "type": "joke"},
+    {"text": "Why do Java developers wear glasses? Because they don't C#.", "type": "joke"},
+    {"text": "An SEO expert walks into a bar, bars, tavern, pub, beer, drinks, alcohol...", "type": "joke"},
+    {"text": "Why don't cybersecurity professionals trust atoms? Because they make up everything — including zero-day exploits.", "type": "joke"},
+]
+
+# Content guardrail patterns — reject any GenAI output containing these
+_CONTENT_BLOCKLIST = [
+    "offensive", "vulgar", "nsfw", "explicit", "inappropriate", "racial",
+    "sexist", "discriminat", "harassment", "profanity", "obscen", "slur",
+    "hate speech", "violent", "gore", "drug", "alcohol abuse", "weapon",
+    "suicide", "self-harm", "abuse", "damn", "hell", "ass", "crap",
+]
+
+
+@router.get("/cyber-quote", summary="Get a cybersecurity quote or joke")
+async def get_cyber_quote(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate a cybersecurity-themed quote or joke using GenAI with content guardrails.
+    Falls back to pre-approved static jokes if GenAI is unavailable or produces
+    inappropriate content.
+
+    Guardrails applied:
+    - Professional content only — no vulgarity, slurs, or inappropriate language
+    - Workplace-safe — suitable for enterprise/SOC environment
+    - Cybersecurity/IT themed only
+    - Short format (1-2 sentences max)
+    """
+    import random
+
+    # Try GenAI first
+    try:
+        from app.genai.provider import get_model_manager
+
+        model_manager = get_model_manager()
+        primary_model = model_manager.get_primary_model()
+
+        result = await model_manager.generate_with_fallback(
+            system_prompt="""You generate SHORT cybersecurity-themed jokes and witty one-liners for a professional threat intelligence platform.
+
+STRICT RULES:
+1. Output ONLY the joke text — no labels, no quotation marks, no prefixes like "Here's a joke:"
+2. Must be 1-2 sentences maximum, under 200 characters
+3. Must be related to cybersecurity, hacking, programming, IT security, SOC operations, or infosec
+4. Must be WORKPLACE APPROPRIATE — suitable for a corporate security operations center
+5. ABSOLUTELY NO: vulgarity, profanity, sexual content, discriminatory language, violent imagery, references to real attacks/victims, or anything that could be considered offensive
+6. Tone: clever, nerdy, lighthearted — think dad-joke meets infosec
+7. Vary the style: puns, one-liners, knock-knock jokes, tech wordplay""",
+            user_prompt="Generate one short, clever cybersecurity joke or witty one-liner. Just the joke text, nothing else.",
+            preferred_model=primary_model,
+            temperature=0.95,
+            max_tokens=100
+        )
+
+        joke_text = (result.get("response") or "").strip().strip('"').strip("'")
+
+        # Content guardrail check
+        joke_lower = joke_text.lower()
+        if any(blocked in joke_lower for blocked in _CONTENT_BLOCKLIST):
+            logger.warning("cyber_quote_guardrail_blocked", text=joke_text[:100])
+            fallback = random.choice(_FALLBACK_JOKES)
+            return {"text": fallback["text"], "type": "joke", "source": "curated", "author": "Joti AI"}
+
+        # Length guardrail
+        if len(joke_text) > 300 or len(joke_text) < 10:
+            fallback = random.choice(_FALLBACK_JOKES)
+            return {"text": fallback["text"], "type": "joke", "source": "curated", "author": "Joti AI"}
+
+        return {"text": joke_text, "type": "joke", "source": "genai", "author": "Joti AI"}
+
+    except Exception as e:
+        logger.debug("cyber_quote_genai_failed", error=str(e))
+        fallback = random.choice(_FALLBACK_JOKES)
+        return {"text": fallback["text"], "type": "joke", "source": "curated", "author": "Joti AI"}

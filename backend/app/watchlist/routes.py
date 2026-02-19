@@ -15,13 +15,50 @@ from datetime import datetime
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 
 
-def reapply_watchlist_to_articles(db: Session):
+def reapply_watchlist_to_articles(db: Session, auto_process: bool = True):
     """Re-apply active watchlist keywords to all articles.
 
     - Articles matching ACTIVE keywords are marked high priority
     - Articles that only matched NOW-INACTIVE keywords are unmarked
+    - If auto_process=True, automatically summarizes and extracts intelligence for newly matched articles
     - Uses batched streaming to avoid loading all articles into memory
     """
+    from app.models import ExtractedIntelligence, ExtractedIntelligenceType
+    from app.extraction.extractor import IntelligenceExtractor
+    from app.core.utils import await_or_run
+    
+    # Import summarization function
+    def _generate_article_summaries(article, content, extracted):
+        """Generate executive and technical summaries via GenAI."""
+        try:
+            from app.genai.provider import get_model_manager
+            model_manager = get_model_manager()
+            content_for_summary = f"{article.title}\n\n{content[:4000]}"
+            
+            ioc_count = len(extracted.get("iocs", []))
+            ttp_list = [ttp.get("mitre_id") or ttp.get("name") for ttp in extracted.get("ttps", [])[:5]]
+            
+            exec_result = await_or_run(
+                model_manager.generate_with_fallback(
+                    system_prompt="""You are a threat intelligence analyst. Write a 2-3 sentence executive summary for C-level executives. Focus on business impact and key threats. Be concise.""",
+                    user_prompt=f"Summarize this threat intelligence article:\n\n{content_for_summary[:2000]}"
+                )
+            )
+            tech_result = await_or_run(
+                model_manager.generate_with_fallback(
+                    system_prompt="""You are a senior SOC analyst. Write a technical summary with key IOCs, TTPs, and detection opportunities. Be specific and actionable.""",
+                    user_prompt=f"Write a technical summary for SOC analysts:\n\nIOCs found: {ioc_count}\nTTPs: {ttp_list}\n\nArticle:\n{content_for_summary[:2500]}"
+                )
+            )
+            
+            article.executive_summary = exec_result.get("response", "")[:1000]
+            article.technical_summary = tech_result.get("response", "")[:2000]
+            article.genai_analysis_remarks = (
+                f"Auto-summarized via watchlist match using {exec_result.get('model_used', 'unknown')}"
+            )
+        except Exception as summary_err:
+            logger.warning("auto_summarization_failed_watchlist", article_id=article.id, error=str(summary_err))
+    
     # Get all active keywords
     active_keywords = db.query(WatchListKeyword).filter(WatchListKeyword.is_active == True).all()
     active_keyword_list = [kw.keyword.lower() for kw in active_keywords]
@@ -29,6 +66,7 @@ def reapply_watchlist_to_articles(db: Session):
     # Stream articles in batches to avoid memory exhaustion
     _BATCH_SIZE = 500
     updated_count = 0
+    processed_count = 0
 
     query = db.query(Article).yield_per(_BATCH_SIZE)
     for article in query:
@@ -39,14 +77,94 @@ def reapply_watchlist_to_articles(db: Session):
 
         # Update article based on current active matches
         new_priority = len(matched) > 0
+        was_high_priority = article.is_high_priority
 
         if article.is_high_priority != new_priority or article.watchlist_match_keywords != matched:
             article.is_high_priority = new_priority
             article.watchlist_match_keywords = matched if matched else []
             updated_count += 1
+            
+            # Auto-process newly matched articles: summarize and extract intelligence
+            if auto_process and new_priority and not was_high_priority:
+                # Only process if article doesn't have BOTH summaries or intelligence yet
+                has_both_summaries = article.executive_summary and article.technical_summary
+                has_intel = db.query(ExtractedIntelligence).filter(
+                    ExtractedIntelligence.article_id == article.id
+                ).first() is not None
+                
+                if not has_both_summaries or not has_intel:
+                    try:
+                        extraction_text = f"{article.title}\n\n{article.summary or ''}\n\n{article.normalized_content or article.raw_content or ''}"
+                        source_url = article.url or (article.feed_source.url if article.feed_source else None)
+                        
+                        # Extract intelligence
+                        try:
+                            extracted = await_or_run(
+                                IntelligenceExtractor.extract_with_genai(
+                                    extraction_text, 
+                                    source_url=source_url, 
+                                    db_session=db
+                                )
+                            )
+                            extraction_method = "genai"
+                        except Exception as genai_err:
+                            logger.warning("genai_extraction_fallback_watchlist", article_id=article.id, error=str(genai_err))
+                            extracted = IntelligenceExtractor.extract_all(extraction_text, source_url=source_url)
+                            extraction_method = "regex"
+                        
+                        # Save extracted intelligence if not exists
+                        if not has_intel:
+                            for ioc in extracted.get("iocs", []):
+                                if ioc.get("value"):
+                                    intel = ExtractedIntelligence(
+                                        article_id=article.id,
+                                        intelligence_type=ExtractedIntelligenceType.IOC,
+                                        value=ioc.get("value"),
+                                        confidence=ioc.get("confidence", 80),
+                                        evidence=ioc.get("evidence"),
+                                        meta={"type": ioc.get("type"), "source": extraction_method}
+                                    )
+                                    db.add(intel)
+                            
+                            for ttp in extracted.get("ttps", []):
+                                if ttp.get("mitre_id"):
+                                    intel = ExtractedIntelligence(
+                                        article_id=article.id,
+                                        intelligence_type=ExtractedIntelligenceType.TTP,
+                                        value=ttp.get("name", ""),
+                                        mitre_id=ttp.get("mitre_id"),
+                                        confidence=ttp.get("confidence", 80),
+                                        evidence=ttp.get("evidence"),
+                                        meta={"source": extraction_method}
+                                    )
+                                    db.add(intel)
+                            
+                            for atlas in extracted.get("atlas", []):
+                                if atlas.get("mitre_id"):
+                                    intel = ExtractedIntelligence(
+                                        article_id=article.id,
+                                        intelligence_type=ExtractedIntelligenceType.ATLAS,
+                                        value=atlas.get("name", ""),
+                                        mitre_id=atlas.get("mitre_id"),
+                                        confidence=atlas.get("confidence", 70),
+                                        meta={"framework": "ATLAS", "source": extraction_method}
+                                    )
+                                    db.add(intel)
+                        
+                        # Generate summaries if not both exist
+                        if not has_both_summaries:
+                            try:
+                                _generate_article_summaries(article, extraction_text, extracted)
+                            except Exception as summary_err:
+                                logger.warning("auto_summarization_failed_watchlist", article_id=article.id, error=str(summary_err))
+                        
+                        processed_count += 1
+                        logger.info("watchlist_auto_processed", article_id=article.id, extraction_method=extraction_method)
+                    except Exception as process_err:
+                        logger.error("watchlist_auto_process_failed", article_id=article.id, error=str(process_err))
 
     db.commit()
-    logger.info("watchlist_reapplied", updated_articles=updated_count, active_keywords=len(active_keyword_list))
+    logger.info("watchlist_reapplied", updated_articles=updated_count, processed_articles=processed_count, active_keywords=len(active_keyword_list))
     return updated_count
 
 

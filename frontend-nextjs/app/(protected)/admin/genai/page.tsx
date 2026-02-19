@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
-import GenAIManagement from '@/views/GenAIManagement';
+import AIEngineWrapper from '@/views/admin/AIEngineWrapper';
 
 export default function GenAIPage() {
-  return <GenAIManagement />;
+  return <AIEngineWrapper />;
 }

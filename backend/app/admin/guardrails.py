@@ -269,6 +269,60 @@ class GuardrailValidator:
         return len(violations) == 0, violations
 
     @staticmethod
+    def validate_keywords_required(text: str, config: Dict) -> tuple[bool, List[str]]:
+        """Validate that required keywords are present."""
+        violations = []
+        keywords = config.get("keywords", [])
+
+        text_lower = text.lower()
+        for keyword in keywords:
+            if keyword.lower() not in text_lower:
+                violations.append(f"Required keyword missing: {keyword}")
+
+        return len(violations) == 0, violations
+
+    @staticmethod
+    def validate_toxicity(text: str, config: Dict) -> tuple[bool, List[str]]:
+        """Basic toxicity detection via keyword matching."""
+        violations = []
+        categories = config.get("categories", ["hate", "violence", "sexual", "self-harm"])
+
+        toxic_patterns = {
+            "hate": [r'\b(hate\s+speech|racist|bigot|slur)\b'],
+            "violence": [r'\b(kill\s+them|murder|bomb\s+threat|shoot\s+up)\b'],
+            "sexual": [r'\b(explicit|pornograph|obscen)\b'],
+            "self-harm": [r'\b(suicide\s+method|self.?harm|cut\s+myself)\b'],
+        }
+
+        text_lower = text.lower()
+        for category in categories:
+            if category in toxic_patterns:
+                for pattern in toxic_patterns[category]:
+                    if re.search(pattern, text_lower):
+                        violations.append(f"Potential toxicity ({category}): matched pattern")
+                        break
+
+        return len(violations) == 0, violations
+
+    @staticmethod
+    def validate_format(text: str, config: Dict) -> tuple[bool, List[str]]:
+        """Validate output format (JSON, markdown, etc.)."""
+        import json as json_mod
+        violations = []
+        expected_format = config.get("format", "json")
+
+        if expected_format == "json":
+            try:
+                json_mod.loads(text.strip())
+            except (json_mod.JSONDecodeError, ValueError):
+                violations.append("Output is not valid JSON")
+        elif expected_format == "markdown":
+            if not any(marker in text for marker in ["#", "**", "- ", "* ", "```"]):
+                violations.append("Output does not appear to contain markdown formatting")
+
+        return len(violations) == 0, violations
+
+    @staticmethod
     def validate(guardrail_type: str, config: Dict, text: str) -> GuardrailTestResponse:
         """Main validation dispatcher."""
         if guardrail_type == "pii":
@@ -302,11 +356,31 @@ class GuardrailValidator:
                 violations=violations
             )
 
-        else:
-            # For unimplemented types, return placeholder
+        elif guardrail_type == "keywords_required":
+            passed, violations = GuardrailValidator.validate_keywords_required(text, config)
             return GuardrailTestResponse(
-                passed=True,
-                violations=[f"Validation for {guardrail_type} not yet implemented"]
+                passed=passed,
+                violations=violations
+            )
+
+        elif guardrail_type == "toxicity":
+            passed, violations = GuardrailValidator.validate_toxicity(text, config)
+            return GuardrailTestResponse(
+                passed=passed,
+                violations=violations
+            )
+
+        elif guardrail_type == "format":
+            passed, violations = GuardrailValidator.validate_format(text, config)
+            return GuardrailTestResponse(
+                passed=passed,
+                violations=violations
+            )
+
+        else:
+            return GuardrailTestResponse(
+                passed=False,
+                violations=[f"Unknown guardrail type: {guardrail_type}"]
             )
 
 

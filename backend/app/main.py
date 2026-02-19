@@ -122,7 +122,8 @@ async def add_security_headers(request, call_next):
     if not settings.DEBUG:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
     
-    # Content Security Policy
+    # Content Security Policy — only for pages served by the backend (Swagger docs)
+    # API-only responses (JSON) don't need CSP; the frontend controls its own CSP.
     if request.url.path in ("/docs", "/redoc", "/openapi.json"):
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
@@ -132,15 +133,6 @@ async def add_security_headers(request, call_next):
             "font-src 'self' data:; "
             "connect-src 'self'; "
             "frame-ancestors 'none';"
-        )
-    else:
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; "
-            "frame-ancestors 'none'; "
-            "base-uri 'none'; "
-            "form-action 'none'; "
-            "img-src 'self' data:; "
-            "connect-src 'self';"
         )
     
     # Referrer Policy
@@ -189,24 +181,23 @@ app.include_router(articles_router, prefix="/api")
 app.include_router(sources_router, prefix="/api")
 app.include_router(watchlist_router, prefix="/api")
 app.include_router(audit_router, prefix="/api")
-app.include_router(users_router, prefix="/api")
-app.include_router(admin_router, prefix="/api")
 
-# User Custom Feeds
+# Register specific /users/* sub-routers BEFORE the generic /users router
+# (otherwise /users/{user_id} catches /users/feeds, /users/watchlist, etc.)
 from app.users.feeds import router as user_feeds_router
 app.include_router(user_feeds_router, prefix="/api")
 
-# User Watchlist
 from app.users.watchlist import router as user_watchlist_router
 app.include_router(user_watchlist_router, prefix="/api")
 
-# User Categories
 from app.users.categories import router as user_categories_router
 app.include_router(user_categories_router, prefix="/api")
 
-# User Content Fetching
 from app.users.content import router as user_content_router
 app.include_router(user_content_router, prefix="/api")
+
+app.include_router(users_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 # Article Summarization (GenAI)
 from app.articles.summarization import router as article_summarization_router

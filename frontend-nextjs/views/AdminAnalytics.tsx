@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   BarChart3,
   Users,
@@ -19,6 +20,8 @@ import {
   Eye,
   Bookmark,
   Clock,
+  CheckCircle,
+  X,
 } from 'lucide-react';
 import { analyticsAPI, usersAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
@@ -83,10 +86,12 @@ interface ExportRow {
 }
 
 export default function AdminAnalytics() {
+  const router = useRouter();
   const [data, setData] = useState<AdminOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [timeRange, setTimeRange] = useState('30d');
+  const [downloadNotification, setDownloadNotification] = useState(false);
 
   // Export state
   const [showExport, setShowExport] = useState(false);
@@ -185,9 +190,39 @@ export default function AdminAnalytics() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `joti-analytics-export-${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `joti-analytics-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = filename;
     a.click();
     window.URL.revokeObjectURL(url);
+
+    // Show download notification
+    setDownloadNotification(true);
+    setTimeout(() => setDownloadNotification(false), 5000);
+  };
+
+  // Navigation handlers for clickable tiles
+  const handleTileClick = (tile: string) => {
+    switch (tile) {
+      case 'articles':
+        router.push('/feeds');
+        break;
+      case 'sources':
+        router.push('/admin/sources');
+        break;
+      case 'iocs':
+        router.push('/intelligence?tab=iocs');
+        break;
+      case 'ttps':
+        router.push('/intelligence?tab=ttps');
+        break;
+      case 'watchlist':
+        router.push('/watchlist');
+        break;
+      case 'users':
+        // Scroll to user engagement section on this page
+        document.getElementById('user-engagement')?.scrollIntoView({ behavior: 'smooth' });
+        break;
+    }
   };
 
   const filteredUsers = data?.user_stats
@@ -230,7 +265,30 @@ export default function AdminAnalytics() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl space-y-6 pb-8">
+    <div className="container mx-auto p-6 max-w-7xl space-y-6 pb-8 relative">
+      {/* CSV Download Notification */}
+      {downloadNotification && (
+        <div className="fixed top-6 right-6 z-[100] animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="bg-card border border-green-500/30 rounded-lg shadow-lg p-4 flex items-start gap-3 max-w-sm">
+            <div className="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-foreground">CSV Export Started</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your analytics data is being downloaded as a CSV file. Check your downloads folder.
+              </p>
+            </div>
+            <button
+              onClick={() => setDownloadNotification(false)}
+              className="p-1 hover:bg-muted rounded text-muted-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
@@ -392,14 +450,14 @@ export default function AdminAnalytics() {
 
       {data && (
         <>
-          {/* Summary Cards */}
+          {/* Summary Cards — clickable */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <SummaryCard icon={BookOpen} label="Total Articles" value={data.summary.total_articles} color="blue" />
-            <SummaryCard icon={Rss} label="Active Sources" value={data.summary.total_sources} color="cyan" />
-            <SummaryCard icon={Shield} label="IOCs Extracted" value={data.summary.total_iocs} color="green" />
-            <SummaryCard icon={Brain} label="TTPs Mapped" value={data.summary.total_ttps} color="purple" />
-            <SummaryCard icon={AlertTriangle} label="Watchlist Hits" value={data.summary.watchlist_matches} color="red" />
-            <SummaryCard icon={Users} label="Active Users" value={data.summary.total_users} color="amber" />
+            <SummaryCard icon={BookOpen} label="Total Articles" value={data.summary.total_articles} color="blue" onClick={() => handleTileClick('articles')} />
+            <SummaryCard icon={Rss} label="Active Sources" value={data.summary.total_sources} color="cyan" onClick={() => handleTileClick('sources')} />
+            <SummaryCard icon={Shield} label="IOCs Extracted" value={data.summary.total_iocs} color="green" onClick={() => handleTileClick('iocs')} />
+            <SummaryCard icon={Brain} label="TTPs Mapped" value={data.summary.total_ttps} color="purple" onClick={() => handleTileClick('ttps')} />
+            <SummaryCard icon={AlertTriangle} label="Watchlist Hits" value={data.summary.watchlist_matches} color="red" onClick={() => handleTileClick('watchlist')} />
+            <SummaryCard icon={Users} label="Active Users" value={data.summary.total_users} color="amber" onClick={() => handleTileClick('users')} />
           </div>
 
           {/* Pipeline Flow */}
@@ -456,7 +514,11 @@ export default function AdminAnalytics() {
               ) : (
                 <div className="space-y-3">
                   {data.source_breakdown.map((source, idx) => (
-                    <div key={source.name} className="flex items-center gap-3">
+                    <button
+                      key={source.name}
+                      onClick={() => router.push(`/feeds?source=${encodeURIComponent(source.name)}`)}
+                      className="flex items-center gap-3 w-full text-left hover:bg-muted/50 rounded-lg px-1 py-0.5 -mx-1 transition-colors cursor-pointer"
+                    >
                       <span className="text-xs font-bold text-muted-foreground w-5 text-right">{idx + 1}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
@@ -470,20 +532,24 @@ export default function AdminAnalytics() {
                           />
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Status Breakdown */}
+          {/* Status Breakdown — clickable to filter feeds */}
           {data.status_breakdown.length > 0 && (
             <div className="bg-card border border-border rounded-lg p-6">
               <h2 className="text-lg font-semibold text-foreground mb-4">Article Status Breakdown</h2>
               <div className="flex flex-wrap gap-4">
                 {data.status_breakdown.map((s) => (
-                  <div key={s.status} className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
+                  <button
+                    key={s.status}
+                    onClick={() => router.push(`/feeds?status=${encodeURIComponent(s.status)}`)}
+                    className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg hover:ring-2 hover:ring-primary/30 transition-all cursor-pointer"
+                  >
                     <div className={cn(
                       'w-3 h-3 rounded-full',
                       s.status === 'NEW' ? 'bg-blue-500' :
@@ -494,14 +560,14 @@ export default function AdminAnalytics() {
                     )} />
                     <span className="text-sm text-foreground font-medium">{s.status}</span>
                     <span className="text-sm text-muted-foreground">({s.count})</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
           )}
 
           {/* User Statistics Table */}
-          <div className="bg-card border border-border rounded-lg p-6">
+          <div id="user-engagement" className="bg-card border border-border rounded-lg p-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
               <h2 className="text-lg font-semibold text-foreground">User Engagement</h2>
               <div className="relative">
@@ -670,11 +736,13 @@ function SummaryCard({
   label,
   value,
   color,
+  onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number | string;
   color: string;
+  onClick?: () => void;
 }) {
   const colorMap: Record<string, string> = {
     blue: 'bg-blue-500/10 text-blue-600',
@@ -687,13 +755,16 @@ function SummaryCard({
   const colorClasses = colorMap[color] || colorMap.blue;
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4">
+    <button
+      onClick={onClick}
+      className="bg-card border border-border rounded-lg p-4 text-left hover:ring-2 hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer w-full"
+    >
       <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-2', colorClasses)}>
         <Icon className="w-4 h-4" />
       </div>
       <p className="text-2xl font-bold text-foreground">{value}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
+    </button>
   );
 }
 

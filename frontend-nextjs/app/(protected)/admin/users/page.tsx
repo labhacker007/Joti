@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
-import UserManagement from '@/views/UserManagement';
+import AccessControlWrapper from '@/views/admin/AccessControlWrapper';
 
 export default function UsersPage() {
-  return <UserManagement />;
+  return <AccessControlWrapper />;
 }

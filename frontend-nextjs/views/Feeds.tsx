@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -14,7 +14,6 @@ import {
   Rss,
   FileText,
   CheckCheck,
-  Filter,
   Plus,
   Upload,
   X,
@@ -22,8 +21,9 @@ import {
   Shield,
   Brain,
   Crosshair,
+  RefreshCw,
 } from 'lucide-react';
-import { articlesAPI, userFeedsAPI } from '@/api/client';
+import { articlesAPI, userFeedsAPI, sourcesAPI, genaiAPI } from '@/api/client';
 import { formatRelativeTime, cn } from '@/lib/utils';
 import { Pagination } from '@/components/Pagination';
 import { isSafeExternalUrl } from '@/utils/url';
@@ -118,11 +118,15 @@ export default function Feeds() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalArticles, setTotalArticles] = useState(0);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'watchlist' | 'bookmarked' | 'priority'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'watchlist' | 'bookmarked'>('all');
   const [timeRange, setTimeRange] = useState('24h');
   const [counts, setCounts] = useState<Counts>({ total: 0, unread: 0, watchlist_matches: 0 });
   const [viewMode, setViewMode] = useState<'list' | 'card'>('list');
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+  
+  // Get source/feed filter from URL params
+  const [sourceFilter, setSourceFilter] = useState<number | null>(null);
+  const [userFeedFilter, setUserFeedFilter] = useState<number | null>(null);
 
   // Add Feed state
   const [showAddFeed, setShowAddFeed] = useState(false);
@@ -136,13 +140,56 @@ export default function Feeds() {
   const [uploading, setUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
 
-  const pageSize = viewMode === 'card' ? 16 : 15;
+  // Refresh state
+  const [refreshing, setRefreshing] = useState(false);
 
-  const randomQuote = useMemo(() => CYBER_QUOTES[Math.floor(Math.random() * CYBER_QUOTES.length)], []);
+  // Dynamic quote/joke
+  const [dynamicQuote, setDynamicQuote] = useState<{ text: string; author: string } | null>(null);
 
+  // Infinite scroll state for card view
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const pageSize = viewMode === 'card' ? 12 : 15;
+
+  const staticQuote = useMemo(() => CYBER_QUOTES[Math.floor(Math.random() * CYBER_QUOTES.length)], []);
+  const displayQuote = dynamicQuote || staticQuote;
+
+  // Fetch a dynamic cybersecurity quote/joke on page load
   useEffect(() => {
-    fetchArticles();
-  }, [currentPage, searchQuery, activeFilter, timeRange, viewMode]);
+    const fetchQuote = async () => {
+      try {
+        const res = (await genaiAPI.getCyberQuote()) as any;
+        const data = res.data || res;
+        if (data?.text) {
+          setDynamicQuote({ text: data.text, author: data.author || 'Joti AI' });
+        }
+      } catch {
+        // Silent fallback to static quote
+      }
+    };
+    fetchQuote();
+  }, []);
+
+  // Read URL params for source/feed filtering
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const sourceId = params.get('source_id');
+      const userFeedId = params.get('user_feed_id');
+      setSourceFilter(sourceId ? parseInt(sourceId) : null);
+      setUserFeedFilter(userFeedId ? parseInt(userFeedId) : null);
+    }
+  }, []);
+
+  // Track previous page to detect "load more" vs "new filter"
+  const prevPageRef = useRef(currentPage);
+  useEffect(() => {
+    const isLoadMore = viewMode === 'card' && currentPage > 1 && currentPage > prevPageRef.current;
+    prevPageRef.current = currentPage;
+    fetchArticles(isLoadMore);
+  }, [currentPage, searchQuery, activeFilter, timeRange, viewMode, sourceFilter, userFeedFilter]);
 
   useEffect(() => {
     fetchCounts();
@@ -162,18 +209,23 @@ export default function Feeds() {
     }
   };
 
-  const fetchArticles = async () => {
+  const fetchArticles = async (append = false) => {
     try {
-      setLoading(true);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
       setError('');
 
-      const filters: Record<string, string | boolean> = {};
+      const filters: Record<string, string | boolean | number> = {};
       if (searchQuery) filters.search = searchQuery;
       if (activeFilter === 'unread') filters.unread_only = true;
       if (activeFilter === 'watchlist') filters.watchlist_only = true;
       if (activeFilter === 'bookmarked') filters.bookmarked_only = true;
-      if (activeFilter === 'priority') filters.watchlist_only = true;
       if (timeRange !== 'all') filters.time_range = timeRange;
+      if (sourceFilter) filters.source_id = sourceFilter;
+      if (userFeedFilter) filters.user_feed_id = userFeedFilter;
 
       const response = (await articlesAPI.getArticles(
         currentPage,
@@ -184,21 +236,35 @@ export default function Feeds() {
       const data = response.data || response;
       const fetchedArticles = data.items || [];
       const total = data.total || 0;
-      setArticles(fetchedArticles);
+
+      if (append && viewMode === 'card') {
+        // Infinite scroll: append new articles (deduplicate by id)
+        setArticles((prev) => {
+          const existingIds = new Set(prev.map((a) => String(a.id)));
+          const newOnes = fetchedArticles.filter((a: Article) => !existingIds.has(String(a.id)));
+          return [...prev, ...newOnes];
+        });
+      } else {
+        setArticles(fetchedArticles);
+      }
+
       setTotalArticles(total);
       setTotalPages(Math.ceil(total / pageSize));
+      setHasMore(currentPage * pageSize < total);
     } catch (err: any) {
       setError(err.message || 'Failed to load articles');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const handleMarkAsRead = async (articleId: string) => {
+  const handleMarkAsRead = async (articleId: string | number) => {
     try {
-      await articlesAPI.markAsRead(articleId);
+      const idString = String(articleId);
+      await articlesAPI.markAsRead(idString);
       setArticles((prev) =>
-        prev.map((a) => (a.id === articleId ? { ...a, is_read: true } : a))
+        prev.map((a) => (String(a.id) === idString ? { ...a, is_read: true } : a))
       );
       setCounts((prev) => ({ ...prev, unread: Math.max(0, prev.unread - 1) }));
     } catch {
@@ -206,26 +272,31 @@ export default function Feeds() {
     }
   };
 
-  const toggleBookmark = async (articleId: string) => {
+  const toggleBookmark = async (articleId: string | number) => {
+    const idString = String(articleId);
     setArticles((prev) =>
       prev.map((a) =>
-        a.id === articleId ? { ...a, is_bookmarked: !a.is_bookmarked } : a
+        String(a.id) === idString ? { ...a, is_bookmarked: !a.is_bookmarked } : a
       )
     );
     try {
-      await articlesAPI.toggleBookmark(articleId);
-    } catch {
+      await articlesAPI.toggleBookmark(idString);
+    } catch (err) {
+      console.error('Bookmark toggle failed:', err);
+      // Revert on error
       setArticles((prev) =>
         prev.map((a) =>
-          a.id === articleId ? { ...a, is_bookmarked: !a.is_bookmarked } : a
+          String(a.id) === idString ? { ...a, is_bookmarked: !a.is_bookmarked } : a
         )
       );
+      throw err; // Re-throw so drawer can handle it
     }
   };
 
-  const openArticleDetail = (articleId: string) => {
-    setSelectedArticleId(articleId);
-    handleMarkAsRead(articleId);
+  const openArticleDetail = (articleId: string | number) => {
+    const idString = String(articleId);
+    setSelectedArticleId(idString);
+    handleMarkAsRead(idString);
   };
 
   const handleAddFeed = async () => {
@@ -293,12 +364,70 @@ export default function Feeds() {
   const handleSearch = (value: string) => {
     setSearchQuery(value);
     setCurrentPage(1);
+    if (viewMode === 'card') { setArticles([]); setHasMore(true); }
   };
 
-  const setFilter = (filter: 'all' | 'unread' | 'watchlist' | 'bookmarked' | 'priority') => {
+  const handleRefreshFeeds = async () => {
+    setRefreshing(true);
+    try {
+      await sourcesAPI.ingestAll();
+      // Also refresh the quote
+      try {
+        const res = (await genaiAPI.getCyberQuote()) as any;
+        const data = res.data || res;
+        if (data?.text) {
+          setDynamicQuote({ text: data.text, author: data.author || 'Joti AI' });
+        }
+      } catch { /* silent */ }
+      // Wait briefly then refresh articles
+      setTimeout(() => {
+        fetchArticles();
+        fetchCounts();
+        setRefreshing(false);
+      }, 2000);
+    } catch (err: any) {
+      console.error('Refresh feeds failed:', err);
+      setRefreshing(false);
+      fetchArticles();
+    }
+  };
+
+  const setFilter = (filter: 'all' | 'unread' | 'watchlist' | 'bookmarked') => {
     setActiveFilter(filter);
     setCurrentPage(1);
+    if (viewMode === 'card') { setArticles([]); setHasMore(true); }
   };
+
+  // Infinite scroll: IntersectionObserver triggers next page load in card view
+  const loadMore = useCallback(() => {
+    if (viewMode === 'card' && hasMore && !loading && !loadingMore) {
+      setCurrentPage((prev) => prev + 1);
+    }
+  }, [viewMode, hasMore, loading, loadingMore]);
+
+  useEffect(() => {
+    if (viewMode !== 'card') return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [viewMode, loadMore]);
+
+  // Reset articles when switching view modes
+  useEffect(() => {
+    setCurrentPage(1);
+    setArticles([]);
+    setHasMore(true);
+  }, [viewMode]);
 
   if (loading && articles.length === 0) {
     return (
@@ -314,36 +443,76 @@ export default function Feeds() {
   return (
     <div className="space-y-4 pb-8">
       {/* Header Row */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 shrink-0">
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Rss className="w-7 h-7" />
             Feeds
           </h1>
           <p className="text-xs text-muted-foreground/70 mt-1 italic max-w-lg truncate">
-            &ldquo;{randomQuote.text}&rdquo; &mdash; {randomQuote.author}
+            &ldquo;{displayQuote.text}&rdquo; &mdash; {displayQuote.author}
           </p>
         </div>
 
-        {/* Search + Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder=""
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="w-44 pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder=""
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="w-44 pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+      </div>
 
-          {/* Time Range */}
+      {/* Toolbar Row: Action buttons | Time Range (centered) | View Toggle (right) */}
+      <div className="flex items-center gap-2">
+        {/* Left: Action buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setShowAddFeed(true); setShowUpload(false); }}
+            className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 flex items-center gap-1.5"
+            title="Add custom feed"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Feed
+          </button>
+          <button
+            onClick={() => { setShowUpload(true); setShowAddFeed(false); }}
+            className="px-3 py-1.5 bg-secondary text-secondary-foreground rounded-lg text-xs font-medium hover:bg-secondary/80 flex items-center gap-1.5"
+            title="Upload document for analysis"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Upload
+          </button>
+          <button
+            onClick={() => router.push('/watchlist')}
+            className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-xs font-medium hover:bg-accent flex items-center gap-1.5 border border-border"
+            title="Watchlist keywords"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+            Watchlist
+          </button>
+          <button
+            onClick={handleRefreshFeeds}
+            disabled={refreshing}
+            className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-xs font-medium hover:bg-accent flex items-center gap-1.5 border border-border disabled:opacity-50"
+            title="Refresh all feed sources"
+          >
+            <RefreshCw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+
+        {/* Center: Time Range */}
+        <div className="flex-1 flex justify-center">
           <div className="flex bg-muted rounded-lg p-0.5">
             {TIME_RANGES.map((tr) => (
               <button
                 key={tr.value}
-                onClick={() => { setTimeRange(tr.value); setCurrentPage(1); }}
+                onClick={() => { setTimeRange(tr.value); setCurrentPage(1); if (viewMode === 'card') { setArticles([]); setHasMore(true); } }}
                 className={cn(
                   'px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors',
                   timeRange === tr.value
@@ -355,60 +524,30 @@ export default function Feeds() {
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Add Feed */}
+        {/* Right: View Toggle */}
+        <div className="flex bg-muted rounded-lg p-0.5">
           <button
-            onClick={() => { setShowAddFeed(true); setShowUpload(false); }}
-            className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 flex items-center gap-1.5"
-            title="Add custom feed"
+            onClick={() => setViewMode('list')}
+            className={cn(
+              'p-1.5 rounded-md transition-colors',
+              viewMode === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+            )}
+            title="List View"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Add Feed
+            <List className="w-4 h-4" />
           </button>
-
-          {/* Upload Document */}
           <button
-            onClick={() => { setShowUpload(true); setShowAddFeed(false); }}
-            className="px-3 py-1.5 bg-secondary text-secondary-foreground rounded-lg text-xs font-medium hover:bg-secondary/80 flex items-center gap-1.5"
-            title="Upload document for analysis"
+            onClick={() => setViewMode('card')}
+            className={cn(
+              'p-1.5 rounded-md transition-colors',
+              viewMode === 'card' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+            )}
+            title="Card View"
           >
-            <Upload className="w-3.5 h-3.5" />
-            Upload
+            <LayoutGrid className="w-4 h-4" />
           </button>
-
-          {/* Watchlist */}
-          <button
-            onClick={() => router.push('/watchlist')}
-            className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-xs font-medium hover:bg-accent flex items-center gap-1.5 border border-border"
-            title="Watchlist keywords"
-          >
-            <Crosshair className="w-3.5 h-3.5" />
-            Watchlist
-          </button>
-
-          {/* View Toggle */}
-          <div className="flex bg-muted rounded-lg p-0.5">
-            <button
-              onClick={() => setViewMode('list')}
-              className={cn(
-                'p-1.5 rounded-md transition-colors',
-                viewMode === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-              )}
-              title="List View"
-            >
-              <List className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('card')}
-              className={cn(
-                'p-1.5 rounded-md transition-colors',
-                viewMode === 'card' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-              )}
-              title="Card View"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -545,7 +684,6 @@ export default function Feeds() {
 
       {/* Filter Chips */}
       <div className="flex items-center gap-2">
-        <Filter className="w-4 h-4 text-muted-foreground" />
         <button
           onClick={() => setFilter('all')}
           className={cn(
@@ -596,18 +734,6 @@ export default function Feeds() {
         >
           <Bookmark className="w-3 h-3" />
           Bookmarked
-        </button>
-        <button
-          onClick={() => setFilter('priority')}
-          className={cn(
-            'px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5',
-            activeFilter === 'priority'
-              ? 'bg-red-600 text-white'
-              : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-accent'
-          )}
-        >
-          <Shield className="w-3 h-3" />
-          Priority
         </button>
 
         {counts.unread > 0 && (
@@ -738,7 +864,7 @@ export default function Feeds() {
         </div>
       ) : (
         /* Card View — Feedly-style compact magazine grid */
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {articles.map((article) => {
             const favicon = getSourceFavicon(article.source_url);
             return (
@@ -842,20 +968,40 @@ export default function Feeds() {
         </div>
       )}
 
-      {/* Pagination */}
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        loading={loading}
-      />
-
-      {/* Article Count Info */}
-      {totalArticles > 0 && (
-        <div className="text-xs text-muted-foreground text-center">
-          Showing {(currentPage - 1) * pageSize + 1} to{' '}
-          {Math.min(currentPage * pageSize, totalArticles)} of {totalArticles} articles
-        </div>
+      {/* Pagination for list view / Infinite scroll sentinel for card view */}
+      {viewMode === 'list' ? (
+        <>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            loading={loading}
+          />
+          {totalArticles > 0 && (
+            <div className="text-xs text-muted-foreground text-center">
+              Showing {(currentPage - 1) * pageSize + 1} to{' '}
+              {Math.min(currentPage * pageSize, totalArticles)} of {totalArticles} articles
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="h-1" />
+          {loadingMore && (
+            <div className="flex justify-center py-6">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader className="w-4 h-4 animate-spin" />
+                Loading more articles...
+              </div>
+            </div>
+          )}
+          {!hasMore && articles.length > 0 && (
+            <div className="text-xs text-muted-foreground text-center py-4">
+              Showing all {articles.length} of {totalArticles} articles
+            </div>
+          )}
+        </>
       )}
 
       {/* Article Detail Drawer */}

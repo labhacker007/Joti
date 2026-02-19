@@ -27,7 +27,7 @@ class UserWatchlistResponse(BaseModel):
         from_attributes = True
 
 
-@router.get("/", response_model=List[UserWatchlistResponse])
+@router.get("", response_model=List[UserWatchlistResponse])
 def list_user_watchlist(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -40,7 +40,7 @@ def list_user_watchlist(
     return keywords
 
 
-@router.post("/", response_model=UserWatchlistResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserWatchlistResponse, status_code=status.HTTP_201_CREATED)
 def create_user_watchlist_keyword(
     payload: UserWatchlistCreate,
     current_user: User = Depends(get_current_user),

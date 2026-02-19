@@ -105,7 +105,7 @@ async def fetch_content_from_url(
     return ContentFetchResponse.model_validate(fetched)
 
 
-@router.get("/", response_model=ContentListResponse)
+@router.get("", response_model=ContentListResponse)
 async def list_fetched_content(
     feed_id: Optional[int] = None,
     content_format: Optional[str] = None,

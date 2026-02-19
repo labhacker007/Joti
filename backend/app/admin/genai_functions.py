@@ -152,6 +152,61 @@ def calculate_statistics(
 
 
 # ============================================================================
+# API Routes - Fixed paths first (before /{function_name})
+# ============================================================================
+
+@router.get("/logs/all")
+async def get_all_execution_logs(
+    limit: int = 50,
+    offset: int = 0,
+    function_name: Optional[str] = None,
+    guardrails_failed: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
+):
+    """
+    Get all execution logs across all functions.
+    Shows what prompts were sent to GenAI, responses, guardrail results.
+
+    Permissions: ADMIN_GENAI_VIEW
+    """
+    query = db.query(PromptExecutionLog)
+
+    if function_name:
+        query = query.filter(PromptExecutionLog.function_name == function_name)
+
+    if guardrails_failed is not None:
+        query = query.filter(PromptExecutionLog.guardrails_passed == (not guardrails_failed))
+
+    total = query.count()
+    logs = query.order_by(PromptExecutionLog.timestamp.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "logs": [
+            {
+                "id": log.id,
+                "prompt_id": log.prompt_id,
+                "function_name": log.function_name,
+                "final_prompt": log.final_prompt[:500] if log.final_prompt else None,
+                "model_used": log.model_used,
+                "response": log.response[:300] if log.response else None,
+                "tokens_used": log.tokens_used,
+                "cost": log.cost,
+                "guardrails_passed": log.guardrails_passed,
+                "guardrail_failures": log.guardrail_failures,
+                "execution_time_ms": log.execution_time_ms,
+                "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+                "user_id": log.user_id,
+            }
+            for log in logs
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+# ============================================================================
 # API Routes - CRUD Operations
 # ============================================================================
 
@@ -625,6 +680,61 @@ async def get_model_recommendations(
             return recommendations
 
     return default_recommendations
+
+
+@router.get("/{function_name}/logs")
+async def get_function_execution_logs(
+    function_name: str,
+    limit: int = 50,
+    offset: int = 0,
+    guardrails_failed: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
+):
+    """
+    Get execution logs for a function — shows final prompts sent, responses,
+    guardrail results, and cost/token usage.
+
+    Permissions: ADMIN_GENAI_VIEW
+    """
+    query = db.query(PromptExecutionLog).filter(
+        PromptExecutionLog.function_name == function_name
+    )
+
+    if guardrails_failed is not None:
+        query = query.filter(PromptExecutionLog.guardrails_passed == (not guardrails_failed))
+
+    total = query.count()
+    logs = query.order_by(PromptExecutionLog.timestamp.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "logs": [
+            {
+                "id": log.id,
+                "prompt_id": log.prompt_id,
+                "function_name": log.function_name,
+                "final_prompt": log.final_prompt[:500] if log.final_prompt else None,
+                "final_prompt_full": log.final_prompt,
+                "model_used": log.model_used,
+                "temperature": log.temperature,
+                "max_tokens": log.max_tokens,
+                "response": log.response[:500] if log.response else None,
+                "response_full": log.response,
+                "tokens_used": log.tokens_used,
+                "cost": log.cost,
+                "guardrails_passed": log.guardrails_passed,
+                "guardrail_failures": log.guardrail_failures,
+                "retry_count": log.retry_count,
+                "execution_time_ms": log.execution_time_ms,
+                "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+                "user_id": log.user_id,
+            }
+            for log in logs
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.post("/{function_name}/reset-stats")

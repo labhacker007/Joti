@@ -1,34 +1,38 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '../store/index';
 import { Spinner } from './ui/spinner';
 
 // Map route paths to page keys - defined outside component to avoid re-creation
 const PATH_TO_PAGE_KEY: Record<string, string> = {
-  '/feeds': 'feed',
-  '/my-feeds': 'feed',
-  '/dashboard': 'dashboard',
-  '/news': 'feed',
+  '/feeds': 'feeds',
+  '/my-feeds': 'feeds',
+  '/dashboard': 'feeds',
+  '/news': 'feeds',
   '/sources': 'sources',
   '/watchlist': 'watchlist',
-  '/profile': 'feed',  // profile is accessible to all authenticated users
-  '/document-upload': 'feed',
-  '/analytics': 'feed',
+  '/intelligence': 'feeds',
+  '/profile': 'feeds',  // profile is accessible to all authenticated users
+  '/document-upload': 'feeds',
+  '/analytics': 'feeds',
   '/audit': 'audit',
   '/admin': 'admin',
-  '/admin/sources': 'sources',
-  '/admin/users': 'users',
-  '/admin/rbac': 'rbac',
-  '/admin/connectors': 'connectors',
-  '/admin/genai': 'genai',
-  '/admin/guardrails': 'guardrails',
+  '/admin/sources': 'admin',
+  '/admin/users': 'admin',
+  '/admin/rbac': 'admin',
+  '/admin/connectors': 'admin',
+  '/admin/genai': 'admin',
+  '/admin/guardrails': 'admin',
   '/admin/analytics': 'admin',
-  '/admin/audit': 'audit',
-  '/admin/monitoring': 'monitoring',
-  '/admin/settings': 'settings',
+  '/admin/audit': 'admin',
+  '/admin/monitoring': 'admin',
+  '/admin/settings': 'admin',
 };
+
+// Permission cache TTL: 5 minutes
+const PERMISSION_CACHE_TTL = 5 * 60 * 1000;
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -41,75 +45,104 @@ function ProtectedRoute({
   requiredPageKey = null,
   requiredRole = null
 }: ProtectedRouteProps): React.JSX.Element {
-  const { accessToken, isImpersonating, assumedRole, logout } = useAuthStore();
+  const {
+    accessToken, isImpersonating, assumedRole, logout,
+    cachedPermissions, setPermissions, clearPermissions
+  } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState<boolean>(true);
   const [hasAccess, setHasAccess] = useState<boolean>(false);
   const [mounted, setMounted] = useState(false);
+  const fetchingRef = useRef(false);
 
   // Only run on client side
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const checkPermissions = useCallback(async () => {
-    if (!accessToken) {
+  // Check access using cached or fresh permissions
+  const checkAccess = useCallback((
+    pages: { key: string }[],
+    effectiveRole: string | null,
+    currentPath: string
+  ) => {
+    const pageKey = requiredPageKey || PATH_TO_PAGE_KEY[currentPath as keyof typeof PATH_TO_PAGE_KEY];
+
+    if (!pageKey) {
+      // Unknown page - allow access if user is authenticated
+      return true;
+    }
+
+    let accessGranted = pages.some((p) => p.key === pageKey);
+
+    // Also check legacy requiredRole if specified
+    if (requiredRole && !accessGranted) {
+      const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+      if (effectiveRole && allowedRoles.includes(effectiveRole)) {
+        accessGranted = true;
+      }
+    }
+
+    return accessGranted;
+  }, [requiredPageKey, requiredRole]);
+
+  // Fetch permissions from API (only when cache is missing or stale)
+  const fetchPermissions = useCallback(async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+
+    try {
+      const { usersAPI } = await import('../api/client');
+      const response = await usersAPI.getMyPermissions() as any;
+      const pages = response.data?.accessible_pages || [];
+      const effectiveRole = response.data?.effective_role || null;
+
+      // Cache permissions in store
+      setPermissions(pages, effectiveRole);
+
+      // Check access for current path
+      const granted = checkAccess(pages, effectiveRole, pathname);
+      setHasAccess(granted);
+    } catch (err: any) {
+      console.error('[ProtectedRoute] Failed to check permissions:', err);
+      const status = err?.response?.status || err?.status;
+      if (status === 401 || status === 403) {
+        logout();
+        router.replace('/login');
+        return;
+      }
+      setHasAccess(false);
+    } finally {
+      setLoading(false);
+      fetchingRef.current = false;
+    }
+  }, [accessToken, setPermissions, checkAccess, pathname, logout, router]);
+
+  // Main permission check effect - runs on mount and when auth state changes
+  useEffect(() => {
+    if (!mounted || !accessToken) {
       setLoading(false);
       setHasAccess(false);
       return;
     }
 
-    try {
-      // Dynamic import to avoid loading axios during SSR
-      const { usersAPI } = await import('../api/client');
-      const response = await usersAPI.getMyPermissions() as any;
-      const pages = response.data?.accessible_pages || [];
-      const effectiveRole = response.data?.effective_role;
-
-      // Determine which page key to check
-      const pageKey = requiredPageKey || PATH_TO_PAGE_KEY[pathname as keyof typeof PATH_TO_PAGE_KEY];
-
-      let accessGranted = false;
-
-      if (!pageKey) {
-        // Unknown page - allow access if user is authenticated
-        accessGranted = true;
-      } else {
-        // Check if user has access to this page
-        accessGranted = pages.some((p: { key: string }) => p.key === pageKey);
-      }
-
-      // Also check legacy requiredRole if specified
-      if (requiredRole && !accessGranted) {
-        const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-        if (effectiveRole && allowedRoles.includes(effectiveRole)) {
-          accessGranted = true;
-        }
-      }
-
-      setHasAccess(accessGranted);
-    } catch (err: any) {
-      console.error('[ProtectedRoute] Failed to check permissions:', err);
-      const status = err?.response?.status || err?.status;
-      if (status === 401 || status === 403) {
-        // Token is invalid/expired — clear state and redirect to login
-        logout();
-        router.replace('/login');
-        return;
-      }
-      // Other errors — deny access for safety
-      setHasAccess(false);
-    } finally {
+    // Check if we have valid cached permissions
+    if (
+      cachedPermissions &&
+      (Date.now() - cachedPermissions.fetchedAt) < PERMISSION_CACHE_TTL
+    ) {
+      // Use cached permissions — instant, no API call
+      const granted = checkAccess(cachedPermissions.pages, cachedPermissions.effectiveRole, pathname);
+      setHasAccess(granted);
       setLoading(false);
+      return;
     }
-  }, [accessToken, requiredPageKey, requiredRole, pathname, logout, router]);
 
-  useEffect(() => {
-    if (!mounted) return;
+    // No cache or stale — fetch from API
     setLoading(true);
-    checkPermissions();
-  }, [mounted, checkPermissions, isImpersonating, assumedRole]);
+    fetchPermissions();
+  }, [mounted, accessToken, isImpersonating, assumedRole, pathname, cachedPermissions, checkAccess, fetchPermissions]);
 
   // During SSR or before hydration, show loading
   if (!mounted) {
@@ -128,7 +161,7 @@ function ProtectedRoute({
     return <></>;
   }
 
-  // Still checking permissions
+  // Still checking permissions (only on first load)
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-background">

@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
-import SystemSettings from '@/views/SystemSettings';
+import PlatformWrapper from '@/views/admin/PlatformWrapper';
 
 export default function SettingsPage() {
-  return <SystemSettings />;
+  return <PlatformWrapper />;
 }

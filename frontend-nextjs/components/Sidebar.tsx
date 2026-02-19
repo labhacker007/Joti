@@ -15,15 +15,14 @@ import {
   FileText,
   Plug,
   Bot,
-  Lock,
   Activity,
   LogOut,
   UserCircle,
-  BarChart3,
   Eye,
   Globe,
   Bookmark,
   Wrench,
+  Layers,
 } from 'lucide-react';
 import { useAuthStore } from '@/store';
 import { usersAPI, sourcesAPI, userFeedsAPI } from '@/api/client';
@@ -46,15 +45,11 @@ interface FeedItem {
 
 const adminItems: NavItem[] = [
   { label: 'Sources', path: '/admin/sources', icon: Rss },
-  { label: 'Users', path: '/admin/users', icon: Users },
-  { label: 'RBAC', path: '/admin/rbac', icon: Lock },
+  { label: 'Access Control', path: '/admin/users', icon: Users },
   { label: 'Connectors', path: '/admin/connectors', icon: Plug },
-  { label: 'GenAI', path: '/admin/genai', icon: Bot },
-  { label: 'Guardrails', path: '/admin/guardrails', icon: Shield },
-  { label: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
+  { label: 'AI Engine', path: '/admin/genai', icon: Bot },
   { label: 'Audit Logs', path: '/admin/audit', icon: FileText },
-  { label: 'Monitoring', path: '/admin/monitoring', icon: Activity },
-  { label: 'Settings', path: '/admin/settings', icon: Settings },
+  { label: 'Platform', path: '/admin/settings', icon: Layers },
 ];
 
 interface SidebarProps {
@@ -84,10 +79,12 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
   const [orgFeedsOpen, setOrgFeedsOpen] = useState(true);
   const [customFeedsOpen, setCustomFeedsOpen] = useState(true);
 
-  // Auto-open admin section if on an admin page
+  // Auto-open admin section if on an admin page, and collapse feeds
   useEffect(() => {
     if (pathname?.startsWith('/admin')) {
       setShowAdmin(true);
+      setOrgFeedsOpen(false);
+      setCustomFeedsOpen(false);
     }
   }, [pathname]);
 
@@ -260,6 +257,20 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
             {!collapsed && <span>Watchlist</span>}
           </Link>
 
+          {/* Threat Intelligence link */}
+          <Link
+            href="/intelligence"
+            className={`flex items-center gap-3 px-3 py-2 rounded-md transition text-sm ${
+              pathname === '/intelligence'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+            }`}
+            title={collapsed ? 'Intelligence' : undefined}
+          >
+            <Shield className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && <span>Intelligence</span>}
+          </Link>
+
           {/* Org Feeds — scrollable section */}
           {!collapsed && orgFeeds.length > 0 && (
             <div className="mt-3">
@@ -353,7 +364,7 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
 
           {/* Admin Section — toggled from button, not always shown */}
           {isAdmin && showAdmin && (
-            <>
+            <div id="sidebar-admin-section">
               <div className="my-2 border-t border-border" />
               {!collapsed && (
                 <p className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -363,7 +374,7 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
               <ul className="space-y-0.5">
                 {adminItems.map(renderNavLink)}
               </ul>
-            </>
+            </div>
           )}
         </nav>
 
@@ -382,7 +393,32 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
           {/* Admin Toggle (for admins) */}
           {isAdmin && (
             <button
-              onClick={() => setShowAdmin(!showAdmin)}
+              onClick={() => {
+                if (!showAdmin) {
+                  // Opening admin: show admin items, collapse all feeds
+                  setShowAdmin(true);
+                  setOrgFeedsOpen(false);
+                  setCustomFeedsOpen(false);
+                  if (!pathname?.startsWith('/admin')) {
+                    router.push('/admin/sources');
+                  }
+                  setTimeout(() => {
+                    document.getElementById('sidebar-admin-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 100);
+                } else if (orgFeedsOpen || customFeedsOpen) {
+                  // Admin is open but feeds are also open — collapse feeds, keep admin
+                  setOrgFeedsOpen(false);
+                  setCustomFeedsOpen(false);
+                  setTimeout(() => {
+                    document.getElementById('sidebar-admin-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 100);
+                } else {
+                  // Admin is open and feeds are collapsed — close admin, restore feeds
+                  setShowAdmin(false);
+                  setOrgFeedsOpen(true);
+                  setCustomFeedsOpen(true);
+                }
+              }}
               className={`flex items-center gap-3 px-3 py-2 rounded-md transition w-full text-sm ${
                 showAdmin
                   ? 'bg-primary/10 text-primary'

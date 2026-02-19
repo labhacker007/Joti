@@ -125,8 +125,11 @@ export default function Watchlist() {
         setExpandedCategory(addedCategory);
       }
       setNewKeyword(''); setNewCategory(''); setShowAddPanel(false);
-    } catch (err: any) { setError(getErrorMessage(err)); }
-    finally { setAdding(false); }
+    } catch (err: any) {
+      const errorMsg = getErrorMessage(err);
+      console.error('[Watchlist] Add keyword error:', err);
+      setError(errorMsg);
+    } finally { setAdding(false); }
   };
 
   const handleDelete = async (id: string) => {
@@ -214,31 +217,31 @@ export default function Watchlist() {
   return (
     <div className="space-y-4 pb-8">
       {/* ── Header Row ── */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-3">
         <h1 className="text-lg font-semibold text-foreground shrink-0">Watchlist</h1>
         <span className="text-xs text-muted-foreground shrink-0">{activeCount}/{items.length} active</span>
 
-        {/* Tabs */}
-        <div className="flex bg-muted rounded-md p-0.5 shrink-0">
-          <button
-            onClick={() => setActiveTab('global')}
-            className={cn('px-2.5 py-1 text-[11px] font-medium rounded transition-colors',
-              activeTab === 'global' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            Org
-          </button>
-          <button
-            onClick={() => setActiveTab('personal')}
-            className={cn('px-2.5 py-1 text-[11px] font-medium rounded transition-colors',
-              activeTab === 'personal' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            Personal
-          </button>
+        {/* Tabs — centered */}
+        <div className="flex-1 flex justify-center">
+          <div className="flex bg-muted rounded-md p-0.5">
+            <button
+              onClick={() => setActiveTab('global')}
+              className={cn('px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                activeTab === 'global' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Org
+            </button>
+            <button
+              onClick={() => setActiveTab('personal')}
+              className={cn('px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                activeTab === 'personal' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Personal
+            </button>
+          </div>
         </div>
-
-        <div className="flex-1" />
 
         {/* Search */}
         <div className="relative w-48 shrink-0">

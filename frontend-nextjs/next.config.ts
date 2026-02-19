@@ -51,9 +51,9 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: https:",
-              "font-src 'self' data:",
+              "font-src 'self' data: https://fonts.gstatic.com",
               `connect-src 'self' ${(() => {
                 try {
                   const u = new URL(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');

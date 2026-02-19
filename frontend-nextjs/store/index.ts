@@ -15,6 +15,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isImpersonating: false,
   assumedRole: null,
   originalRole: null,
+  cachedPermissions: null,
 
   // Actions
   setAuth: (user: User, accessToken: string, refreshToken: string) => {
@@ -55,7 +56,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAdmin: false,
       isImpersonating: false,
       assumedRole: null,
-      originalRole: null
+      originalRole: null,
+      cachedPermissions: null
     });
   },
 
@@ -70,7 +72,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       accessToken: newToken,
       isImpersonating: true,
       assumedRole,
-      originalRole
+      originalRole,
+      cachedPermissions: null  // Clear cache on role switch
     });
   },
 
@@ -81,7 +84,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       accessToken: newToken,
       isImpersonating: false,
       assumedRole: null,
-      originalRole: null
+      originalRole: null,
+      cachedPermissions: null  // Clear cache on role restore
     });
   },
 
@@ -120,6 +124,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (e) {
       console.error('Failed to load auth state:', e);
     }
+  },
+
+  setPermissions: (pages: { key: string }[], effectiveRole: string | null) => {
+    set({
+      cachedPermissions: {
+        pages,
+        effectiveRole,
+        fetchedAt: Date.now()
+      }
+    });
+  },
+
+  clearPermissions: () => {
+    set({ cachedPermissions: null });
   }
 }));
 

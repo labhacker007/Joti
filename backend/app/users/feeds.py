@@ -82,7 +82,7 @@ class UserFeedListResponse(BaseModel):
 
 
 # Routes
-@router.get("/", response_model=UserFeedListResponse)
+@router.get("", response_model=UserFeedListResponse)
 async def list_user_feeds(
     include_inactive: bool = False,
     category_id: Optional[int] = None,  # Filter by category
@@ -210,7 +210,7 @@ async def validate_feed_url(
         }
 
 
-@router.post("/", response_model=UserFeedResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserFeedResponse, status_code=status.HTTP_201_CREATED)
 async def create_user_feed(
     feed_data: UserFeedCreate,
     validate: bool = True,

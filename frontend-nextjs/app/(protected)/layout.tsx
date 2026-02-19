@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Sidebar from '@/components/Sidebar';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuthStore } from '@/store';
@@ -30,11 +30,13 @@ export default function ProtectedLayout({
   return (
     <ProtectedRoute>
       <div className="flex min-h-screen">
-        <Sidebar
-          userRole={user?.role}
-          collapsed={collapsed}
-          onToggle={handleToggle}
-        />
+        <Suspense fallback={<div className="w-48" />}>
+          <Sidebar
+            userRole={user?.role}
+            collapsed={collapsed}
+            onToggle={handleToggle}
+          />
+        </Suspense>
         <main
           className={`flex-1 min-w-0 transition-all duration-300 bg-background ${
             mounted

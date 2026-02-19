@@ -1,7 +1,7 @@
 """Audit log viewing APIs."""
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from app.core.database import get_db
 from app.auth.dependencies import require_permission
 from app.auth.rbac import Permission
@@ -38,6 +38,19 @@ class AuditLogListResponse(BaseModel):
     page_size: int
 
 
+@router.get("/event-types")
+def get_event_types(
+    current_user: User = Depends(require_permission(Permission.AUDIT_READ.value)),
+):
+    """Get all available audit event types for filtering."""
+    return {
+        "event_types": [
+            {"value": e.value, "label": e.value.replace("_", " ").title()}
+            for e in AuditEventType
+        ]
+    }
+
+
 @router.get("/", response_model=AuditLogListResponse)
 def list_audit_logs(
     page: int = Query(1, ge=1),
@@ -46,6 +59,9 @@ def list_audit_logs(
     user_id: Optional[int] = None,
     resource_type: Optional[str] = None,
     correlation_id: Optional[str] = None,
+    search: Optional[str] = Query(None, description="Search across action and user email"),
+    date_from: Optional[str] = Query(None, description="Start date (ISO format)"),
+    date_to: Optional[str] = Query(None, description="End date (ISO format)"),
     current_user: User = Depends(require_permission(Permission.AUDIT_READ.value)),
     db: Session = Depends(get_db)
 ):
@@ -70,6 +86,27 @@ def list_audit_logs(
         query = query.filter(AuditLog.resource_type == resource_type)
     if correlation_id:
         query = query.filter(AuditLog.correlation_id == correlation_id)
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                AuditLog.action.ilike(search_term),
+                User.email.ilike(search_term),
+                User.username.ilike(search_term),
+            )
+        )
+    if date_from:
+        try:
+            dt_from = datetime.fromisoformat(date_from.replace("Z", "+00:00"))
+            query = query.filter(AuditLog.created_at >= dt_from)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt_to = datetime.fromisoformat(date_to.replace("Z", "+00:00"))
+            query = query.filter(AuditLog.created_at <= dt_to)
+        except ValueError:
+            pass
     
     # Get total count
     total = query.count()

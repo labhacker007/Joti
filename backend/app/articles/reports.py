@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.auth.dependencies import get_current_user
-from app.models import User, FetchedContent
+from app.models import User, FetchedContent, AuditEventType
 from typing import List, Optional
 from datetime import datetime
 from io import BytesIO
 from app.core.logging import logger
+from app.audit.manager import AuditManager
 
 router = APIRouter(prefix="/articles/reports", tags=["article-reports"])
 
@@ -219,6 +220,19 @@ async def export_to_pdf(
         safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in (content.title or 'report')[:50])
         filename = f"{safe_title}_{content_id}.pdf".replace(" ", "_")
 
+        try:
+            AuditManager.log_event(
+                db=db,
+                user_id=current_user.id,
+                event_type=AuditEventType.REPORT_GENERATION,
+                action=f"Exported PDF report for content {content_id}",
+                resource_type="content",
+                resource_id=content_id,
+                details={"format": "pdf", "title": content.title}
+            )
+        except Exception:
+            pass  # Non-critical
+
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -257,6 +271,19 @@ async def export_to_word(
 
         safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in (content.title or 'report')[:50])
         filename = f"{safe_title}_{content_id}.docx".replace(" ", "_")
+
+        try:
+            AuditManager.log_event(
+                db=db,
+                user_id=current_user.id,
+                event_type=AuditEventType.REPORT_GENERATION,
+                action=f"Exported Word report for content {content_id}",
+                resource_type="content",
+                resource_id=content_id,
+                details={"format": "docx", "title": content.title}
+            )
+        except Exception:
+            pass  # Non-critical
 
         return Response(
             content=docx_bytes,
@@ -327,6 +354,18 @@ async def batch_export_pdf(
         buffer.seek(0)
 
         filename = f"digest_report_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
+
+        try:
+            AuditManager.log_event(
+                db=db,
+                user_id=current_user.id,
+                event_type=AuditEventType.REPORT_GENERATION,
+                action=f"Batch exported {len(contents)} articles as PDF digest",
+                resource_type="content",
+                details={"format": "pdf", "count": len(contents), "content_ids": content_ids[:10]}
+            )
+        except Exception:
+            pass  # Non-critical
 
         return Response(
             content=buffer.getvalue(),

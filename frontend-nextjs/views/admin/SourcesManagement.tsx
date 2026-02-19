@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, RefreshCw, ExternalLink, CheckCircle, AlertCircle, Edit2, Rss, Activity } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, ExternalLink, CheckCircle, AlertCircle, Edit2, Rss, Activity, Clock, Settings } from 'lucide-react';
 import { sourcesAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,17 @@ interface AddSourceForm {
   description: string;
 }
 
+const INTERVAL_PRESETS = [
+  { value: 5, label: '5 min' },
+  { value: 15, label: '15 min' },
+  { value: 30, label: '30 min' },
+  { value: 60, label: '1 hour' },
+  { value: 120, label: '2 hours' },
+  { value: 360, label: '6 hours' },
+  { value: 720, label: '12 hours' },
+  { value: 1440, label: '24 hours' },
+];
+
 export default function SourcesManagement() {
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,9 +53,54 @@ export default function SourcesManagement() {
     description: '',
   });
 
+  // Polling settings state
+  const [showPollingSettings, setShowPollingSettings] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState(60);
+  const [autoFetchEnabled, setAutoFetchEnabled] = useState(true);
+  const [minInterval, setMinInterval] = useState(5);
+  const [maxInterval, setMaxInterval] = useState(1440);
+  const [concurrentLimit, setConcurrentLimit] = useState(5);
+  const [savingPolling, setSavingPolling] = useState(false);
+
   useEffect(() => {
     fetchSources();
+    fetchPollingSettings();
   }, []);
+
+  const fetchPollingSettings = async () => {
+    try {
+      const res = (await sourcesAPI.getSystemRefreshSettings()) as any;
+      const data = res.data || res;
+      if (data) {
+        setPollingInterval(data.default_refresh_interval_minutes || 60);
+        setAutoFetchEnabled(data.auto_fetch_enabled !== false);
+        setMinInterval(data.min_refresh_interval_minutes || 5);
+        setMaxInterval(data.max_refresh_interval_minutes || 1440);
+        setConcurrentLimit(data.concurrent_fetch_limit || 5);
+      }
+    } catch {
+      // Use defaults silently
+    }
+  };
+
+  const savePollingSettings = async () => {
+    setSavingPolling(true);
+    try {
+      await sourcesAPI.updateSystemRefreshSettings({
+        default_refresh_interval_minutes: pollingInterval,
+        auto_fetch_enabled: autoFetchEnabled,
+        min_refresh_interval_minutes: minInterval,
+        max_refresh_interval_minutes: maxInterval,
+        concurrent_fetch_limit: concurrentLimit,
+      });
+      setSuccessMessage('Polling settings saved successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: any) {
+      setError(getErrorMessage(err) || 'Failed to save polling settings');
+    } finally {
+      setSavingPolling(false);
+    }
+  };
 
   const fetchSources = async () => {
     try {
@@ -198,22 +254,22 @@ export default function SourcesManagement() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="container mx-auto p-4 max-w-6xl">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Rss className="w-8 h-8" />
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Rss className="w-5 h-5" />
             Feed Sources Management
           </h1>
-          <p className="text-muted-foreground mt-1">Manage global feed sources for all users</p>
+          <p className="text-xs text-muted-foreground mt-1">Manage global feed sources for all users</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={handleIngestAll}
             disabled={ingestingAll}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
           >
-            <RefreshCw className={cn('w-4 h-4', ingestingAll && 'animate-spin')} />
+            <RefreshCw className={cn('w-3.5 h-3.5', ingestingAll && 'animate-spin')} />
             {ingestingAll ? 'Ingesting...' : 'Ingest All'}
           </button>
           <button
@@ -221,9 +277,9 @@ export default function SourcesManagement() {
               setShowAddForm(!showAddForm);
               if (editingSourceId) handleCancelEdit();
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             Add Source
           </button>
         </div>
@@ -231,23 +287,23 @@ export default function SourcesManagement() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Total Sources</p>
-          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Rss className="w-5 h-5 text-blue-600" />
+        <div className="bg-card border border-border rounded-lg p-3">
+          <p className="text-xs text-muted-foreground">Total Sources</p>
+          <p className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Rss className="w-4 h-4 text-blue-600" />
             {sources.length}
           </p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Active Sources</p>
-          <p className="text-2xl font-bold text-green-600 flex items-center gap-2">
-            <Activity className="w-5 h-5" />
+        <div className="bg-card border border-border rounded-lg p-3">
+          <p className="text-xs text-muted-foreground">Active Sources</p>
+          <p className="text-lg font-bold text-green-600 flex items-center gap-2">
+            <Activity className="w-4 h-4" />
             {activeCount}
           </p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Disabled</p>
-          <p className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+        <div className="bg-card border border-border rounded-lg p-3">
+          <p className="text-xs text-muted-foreground">Disabled</p>
+          <p className="text-lg font-bold text-muted-foreground flex items-center gap-2">
             {sources.length - activeCount}
           </p>
         </div>
@@ -269,7 +325,7 @@ export default function SourcesManagement() {
 
       {showAddForm && (
         <div className="mb-6 p-6 border border-border rounded-lg bg-card">
-          <h2 className="text-xl font-semibold mb-4">
+          <h2 className="text-sm font-semibold mb-4">
             {editingSourceId ? 'Edit Source' : 'Add New Source'}
           </h2>
           <form onSubmit={handleAddSource} className="space-y-4">
@@ -368,7 +424,7 @@ export default function SourcesManagement() {
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-foreground">{source.name}</h3>
+                    <h3 className="text-sm font-semibold text-foreground">{source.name}</h3>
                     <span
                       className={`px-2 py-1 rounded text-xs font-medium ${
                         sourceTypeColors[(source.feed_type || source.source_type)] || 'bg-gray-500/10 text-gray-700'
@@ -466,6 +522,113 @@ export default function SourcesManagement() {
               </div>
             </div>
           ))
+        )}
+      </div>
+
+      {/* Polling Settings */}
+      <div className="mt-8 border border-border rounded-lg overflow-hidden">
+        <button
+          onClick={() => setShowPollingSettings(!showPollingSettings)}
+          className="w-full flex items-center justify-between p-4 bg-card hover:bg-muted/50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-foreground">Feed Polling Settings</h3>
+          </div>
+          <Settings className={cn('w-4 h-4 text-muted-foreground transition-transform', showPollingSettings && 'rotate-90')} />
+        </button>
+
+        {showPollingSettings && (
+          <div className="p-4 space-y-4 border-t border-border bg-card">
+            {/* Auto-fetch toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-foreground">Auto-fetch enabled</label>
+                <p className="text-xs text-muted-foreground">Automatically poll feed sources on schedule</p>
+              </div>
+              <button
+                onClick={() => setAutoFetchEnabled(!autoFetchEnabled)}
+                className={cn(
+                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                  autoFetchEnabled ? 'bg-primary' : 'bg-muted'
+                )}
+              >
+                <span className={cn(
+                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                  autoFetchEnabled ? 'translate-x-6' : 'translate-x-1'
+                )} />
+              </button>
+            </div>
+
+            {/* Default interval */}
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-1">Default polling interval</label>
+              <div className="flex flex-wrap gap-2">
+                {INTERVAL_PRESETS.map((preset) => (
+                  <button
+                    key={preset.value}
+                    onClick={() => setPollingInterval(preset.value)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors',
+                      pollingInterval === preset.value
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted text-muted-foreground border-border hover:border-primary/50'
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Min/Max + Concurrent */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">Min interval (min)</label>
+                <input
+                  type="number"
+                  value={minInterval}
+                  onChange={(e) => setMinInterval(Number(e.target.value))}
+                  className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg"
+                  min={1}
+                  max={60}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">Max interval (min)</label>
+                <input
+                  type="number"
+                  value={maxInterval}
+                  onChange={(e) => setMaxInterval(Number(e.target.value))}
+                  className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg"
+                  min={60}
+                  max={10080}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">Concurrent fetches</label>
+                <input
+                  type="number"
+                  value={concurrentLimit}
+                  onChange={(e) => setConcurrentLimit(Number(e.target.value))}
+                  className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg"
+                  min={1}
+                  max={20}
+                />
+              </div>
+            </div>
+
+            {/* Save button */}
+            <div className="flex justify-end">
+              <button
+                onClick={savePollingSettings}
+                disabled={savingPolling}
+                className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              >
+                {savingPolling ? 'Saving...' : 'Save Polling Settings'}
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

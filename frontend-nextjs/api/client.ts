@@ -118,6 +118,17 @@ const getApiClient = (): AxiosInstance => {
  */
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
+    // Network errors (no response) - connection issues
+    if (!error.response) {
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        return 'Request timed out. Please check your connection and try again.';
+      }
+      if (error.message.includes('Network Error') || error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED') {
+        return 'Network error. Please check your connection and ensure the backend server is running.';
+      }
+      return `Network error: ${error.message || 'Unable to connect to server'}`;
+    }
+
     const data = error.response?.data as ApiError | undefined;
 
     if (data?.detail) {
@@ -131,6 +142,29 @@ export const getErrorMessage = (error: unknown): string => {
 
     if (data?.msg) return data.msg;
     if (data?.message) return data.message;
+    
+    // Handle specific HTTP status codes
+    if (error.response?.status === 409) {
+      if (data?.detail) {
+        if (typeof data.detail === 'string') {
+          return data.detail;
+        }
+        if (Array.isArray(data.detail)) {
+          return data.detail.join(', ');
+        }
+      }
+      return 'This keyword already exists';
+    }
+    if (error.response?.status === 401) {
+      return 'Authentication failed. Please log in again.';
+    }
+    if (error.response?.status === 403) {
+      return 'You do not have permission to perform this action.';
+    }
+    if (error.response?.status === 500) {
+      return 'Server error. Please try again later.';
+    }
+    
     if (error.message) return error.message;
   }
 
@@ -453,6 +487,60 @@ export const articlesAPI = {
   getSimilarArticles: async (id: string, limit = 5) => {
     return get(`/articles/${id}/similar?limit=${limit}`);
   },
+
+  /**
+   * Intelligence summary dashboard
+   */
+  getIntelligenceSummary: async (params?: { intel_type?: string; time_range?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.intel_type) query.append('intel_type', params.intel_type);
+    if (params?.time_range) query.append('time_range', params.time_range);
+    const qs = query.toString();
+    return get(`/articles/intelligence/summary${qs ? '?' + qs : ''}`);
+  },
+
+  /**
+   * Get all extracted intelligence (paginated)
+   */
+  getAllIntelligence: async (params?: {
+    page?: number;
+    page_size?: number;
+    intel_type?: string;
+    ioc_type?: string;
+    article_id?: string;
+    mitre_framework?: string;
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.page_size) query.append('page_size', String(params.page_size));
+    if (params?.intel_type) query.append('intel_type', params.intel_type);
+    if (params?.ioc_type) query.append('ioc_type', params.ioc_type);
+    if (params?.article_id) query.append('article_id', params.article_id);
+    if (params?.mitre_framework) query.append('mitre_framework', params.mitre_framework);
+    const qs = query.toString();
+    return get(`/articles/intelligence/all${qs ? '?' + qs : ''}`);
+  },
+
+  /**
+   * Get MITRE ATT&CK matrix data
+   */
+  getMitreMatrix: async (framework = 'attack') => {
+    return get(`/articles/intelligence/mitre-matrix?framework=${framework}`);
+  },
+
+  /**
+   * Get intelligence for a specific article
+   */
+  getArticleIntelligence: async (id: string) => {
+    return get(`/articles/${id}/intelligence`);
+  },
+
+  /**
+   * Review intelligence item
+   */
+  reviewIntelligence: async (intelId: number, data: { is_reviewed?: boolean; is_false_positive?: boolean; notes?: string }) => {
+    return post(`/articles/intelligence/${intelId}/review`, data);
+  },
 };
 
 // ============================================
@@ -483,6 +571,22 @@ export const sourcesAPI = {
   },
   ingestAll: async () => {
     return post('/sources/ingest-all', {});
+  },
+  // Refresh/polling settings
+  getRefreshPresets: async () => {
+    return get('/sources/refresh/presets');
+  },
+  getSystemRefreshSettings: async () => {
+    return get('/sources/refresh/system');
+  },
+  updateSystemRefreshSettings: async (data: any) => {
+    return put('/sources/refresh/system', data);
+  },
+  getSourceRefreshSettings: async () => {
+    return get('/sources/refresh/sources');
+  },
+  updateSourceRefreshSettings: async (sourceId: string, data: any) => {
+    return put(`/sources/refresh/sources/${sourceId}`, data);
   },
 };
 
@@ -530,17 +634,36 @@ export const watchlistAPI = {
 
 export const auditAPI = {
   /**
-   * Get audit logs
+   * Get audit logs with filters
    */
-  getLogs: async (page = 1, pageSize = 10, filters?: any) => {
+  getLogs: async (page = 1, pageSize = 50, filters?: {
+    event_type?: string;
+    user_id?: number;
+    resource_type?: string;
+    search?: string;
+    date_from?: string;
+    date_to?: string;
+  }) => {
     const params = new URLSearchParams({
       page: page.toString(),
       page_size: pageSize.toString(),
     });
     if (filters) {
-      params.append('filter', JSON.stringify(filters));
+      if (filters.event_type) params.append('event_type', filters.event_type);
+      if (filters.user_id) params.append('user_id', filters.user_id.toString());
+      if (filters.resource_type) params.append('resource_type', filters.resource_type);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.date_from) params.append('date_from', filters.date_from);
+      if (filters.date_to) params.append('date_to', filters.date_to);
     }
     return get(`/audit/?${params}`);
+  },
+
+  /**
+   * Get available event types
+   */
+  getEventTypes: async () => {
+    return get('/audit/event-types');
   },
 
   /**
@@ -581,7 +704,7 @@ export const userFeedsAPI = {
    * Update user's custom feed
    */
   updateFeed: async (feedId: string, data: any) => {
-    return put(`/users/feeds/${feedId}`, data);
+    return patch(`/users/feeds/${feedId}`, data);
   },
 
   /**
@@ -832,6 +955,28 @@ export const genaiAPI = {
   // Admin GenAI test
   testProvider: async (provider: string, testType?: string) => {
     return post('/admin/genai/test', { provider, test_type: testType || 'summary' });
+  },
+  // Cybersecurity quote/joke
+  getCyberQuote: async () => {
+    return get('/genai/cyber-quote');
+  },
+  // Execution logs (admin visibility)
+  getExecutionLogs: async (params?: { function_name?: string; guardrails_failed?: boolean; limit?: number; offset?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.function_name) query.append('function_name', params.function_name);
+    if (params?.guardrails_failed !== undefined) query.append('guardrails_failed', String(params.guardrails_failed));
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.offset) query.append('offset', String(params.offset));
+    const qs = query.toString();
+    return get(`/admin/genai/functions/logs/all${qs ? '?' + qs : ''}`);
+  },
+  getFunctionLogs: async (functionName: string, params?: { limit?: number; offset?: number; guardrails_failed?: boolean }) => {
+    const query = new URLSearchParams();
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.offset) query.append('offset', String(params.offset));
+    if (params?.guardrails_failed !== undefined) query.append('guardrails_failed', String(params.guardrails_failed));
+    const qs = query.toString();
+    return get(`/admin/genai/functions/${functionName}/logs${qs ? '?' + qs : ''}`);
   },
 };
 

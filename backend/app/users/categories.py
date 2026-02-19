@@ -51,7 +51,7 @@ class CategoryResponse(BaseModel):
 # Routes
 # ============================================================================
 
-@router.get("/", response_model=List[CategoryResponse])
+@router.get("", response_model=List[CategoryResponse])
 def list_categories(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -86,7 +86,7 @@ def list_categories(
     return result
 
 
-@router.post("/", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 def create_category(
     payload: CategoryCreate,
     current_user: User = Depends(get_current_user),

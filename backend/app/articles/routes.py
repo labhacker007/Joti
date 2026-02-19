@@ -637,6 +637,18 @@ def search_articles_endpoint(
         article_dict["hunt_status"] = [hs.model_dump() for hs in hunt_status]
         results.append(article_dict)
     
+    # Audit log search actions
+    try:
+        AuditManager.log_event(
+            db=db,
+            user_id=current_user.id,
+            event_type=AuditEventType.SEARCH,
+            action=f"Searched articles: '{q}'",
+            details={"query": q, "results_count": len(results), "limit": limit}
+        )
+    except Exception:
+        pass  # Non-critical
+
     return {"results": results, "count": len(results), "query": q}
 
 
@@ -760,12 +772,24 @@ def update_status(
 def get_similar_articles(
     article_id: int,
     limit: int = Query(5, ge=1, le=10),
+    min_similarity: float = Query(0.70, ge=0.0, le=1.0, description="Minimum similarity threshold (0.0-1.0). Default 70%"),
+    days_window: int = Query(7, ge=1, le=90, description="Only consider articles published within this many days"),
     current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
-    """Get articles similar to the given article based on shared IOCs, TTPs, or threat actors."""
+    """
+    Get articles similar to the given article based on shared IOCs, TTPs, threat actors,
+    and topic overlap.
+
+    Guardrails:
+    - At least 70% combined overlap across IOCs, TTPs, issue/topic, and impacted entities
+    - Only articles published within the configured time window (default 7 days)
+    - Compares IOCs, TTPs, threat actors, and title/topic keywords
+    """
     from sqlalchemy import func
     from app.models import ExtractedIntelligenceType as EIT
+    from difflib import SequenceMatcher
+    import re
 
     article = db.query(Article).filter(Article.id == article_id).first()
     if not article:
@@ -776,72 +800,167 @@ def get_similar_articles(
         ExtractedIntelligence.article_id == article_id
     ).all()
 
-    if not this_intel:
-        return {"similar": [], "article_id": article_id}
-
     # Build lookup sets by type
     this_ioc_values = {i.value for i in this_intel if i.intelligence_type == EIT.IOC}
     this_ttp_values = {i.value for i in this_intel if i.intelligence_type == EIT.TTP}
     this_actor_values = {i.value for i in this_intel if i.intelligence_type == EIT.THREAT_ACTOR}
     this_values = {i.value for i in this_intel}
 
-    if not this_values:
-        return {"similar": [], "article_id": article_id}
+    # Extract topic keywords from title for issue/topic comparison
+    stopwords = {"the", "a", "an", "is", "are", "was", "were", "in", "on", "at", "to", "for",
+                 "of", "and", "or", "but", "with", "from", "by", "as", "its", "it", "this",
+                 "that", "has", "have", "had", "not", "new", "how", "can", "may", "will", "be"}
+    title_words = set(re.findall(r'\b[a-zA-Z]{3,}\b', (article.title or "").lower())) - stopwords
+    summary_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', (article.summary or "")[:500].lower())) - stopwords
+    this_topic_words = title_words | summary_words
 
-    # Find other articles sharing intel values
-    matches = (
-        db.query(ExtractedIntelligence.article_id, ExtractedIntelligence.value, ExtractedIntelligence.intelligence_type)
-        .filter(
-            ExtractedIntelligence.article_id != article_id,
-            ExtractedIntelligence.value.in_(this_values)
-        )
-        .all()
-    )
+    # Count total dimensions for percentage calculation
+    # Each non-empty category contributes equally: IOCs, TTPs, actors, topic
+    dimension_count = sum([
+        1 if this_ioc_values else 0,
+        1 if this_ttp_values else 0,
+        1 if this_actor_values else 0,
+        1 if this_topic_words else 0,
+    ])
 
-    # Score each candidate article
-    scores: dict = {}
-    reasons: dict = {}
-    for row in matches:
-        aid = row.article_id
-        val = row.value
-        itype = row.intelligence_type
-        if aid not in scores:
-            scores[aid] = 0
-            reasons[aid] = []
-        if itype == EIT.THREAT_ACTOR and val in this_actor_values:
-            scores[aid] += 10
-            reasons[aid].append(f"Threat actor: {val}")
-        elif itype == EIT.TTP and val in this_ttp_values:
-            scores[aid] += 5
-            reasons[aid].append(f"TTP: {val}")
-        elif itype == EIT.IOC and val in this_ioc_values:
-            scores[aid] += 3
-            reasons[aid].append(f"IOC: {val}")
+    if dimension_count == 0:
+        return {"similar": [], "article_id": article_id, "guardrails": {
+            "min_similarity": min_similarity, "days_window": days_window
+        }}
 
-    # Sort by score descending and take top N
-    top_ids = sorted(scores, key=lambda x: scores[x], reverse=True)[:limit]
+    # Time window guardrail — only consider articles within N days
+    from datetime import datetime, timedelta
+    cutoff_date = datetime.utcnow() - timedelta(days=days_window)
 
-    if not top_ids:
-        return {"similar": [], "article_id": article_id}
+    # Find candidate articles within time window
+    candidate_articles = db.query(Article).filter(
+        Article.id != article_id,
+        Article.published_at >= cutoff_date
+    ).all()
 
-    similar_articles = db.query(Article).filter(Article.id.in_(top_ids)).all()
+    if not candidate_articles:
+        return {"similar": [], "article_id": article_id, "guardrails": {
+            "min_similarity": min_similarity, "days_window": days_window
+        }}
 
-    result = []
-    for a in similar_articles:
-        result.append({
-            "id": a.id,
-            "title": a.title,
-            "summary": (a.summary or "")[:200],
-            "published_at": a.published_at.isoformat() if a.published_at else None,
-            "source_name": a.feed_source.name if a.feed_source else None,
-            "url": a.url,
-            "is_high_priority": a.is_high_priority,
-            "match_score": scores.get(a.id, 0),
-            "match_reasons": list(dict.fromkeys(reasons.get(a.id, [])))[:3],
+    candidate_ids = [a.id for a in candidate_articles]
+    candidate_map = {a.id: a for a in candidate_articles}
+
+    # Fetch all intel for candidates in bulk
+    candidate_intel = db.query(ExtractedIntelligence).filter(
+        ExtractedIntelligence.article_id.in_(candidate_ids)
+    ).all()
+
+    # Build per-article intel sets
+    cand_iocs: dict = {}
+    cand_ttps: dict = {}
+    cand_actors: dict = {}
+    for ci in candidate_intel:
+        aid = ci.article_id
+        if ci.intelligence_type == EIT.IOC:
+            cand_iocs.setdefault(aid, set()).add(ci.value)
+        elif ci.intelligence_type == EIT.TTP:
+            cand_ttps.setdefault(aid, set()).add(ci.value)
+        elif ci.intelligence_type == EIT.THREAT_ACTOR:
+            cand_actors.setdefault(aid, set()).add(ci.value)
+
+    # Score each candidate with percentage-based similarity
+    results = []
+    for aid, cand_article in candidate_map.items():
+        dimension_scores = []
+        match_reasons = []
+
+        # IOC overlap (Jaccard similarity)
+        if this_ioc_values:
+            other_iocs = cand_iocs.get(aid, set())
+            if other_iocs:
+                intersection = this_ioc_values & other_iocs
+                union = this_ioc_values | other_iocs
+                ioc_sim = len(intersection) / len(union) if union else 0
+                dimension_scores.append(ioc_sim)
+                if intersection:
+                    match_reasons.extend([f"IOC: {v}" for v in list(intersection)[:2]])
+            else:
+                dimension_scores.append(0)
+
+        # TTP overlap (Jaccard similarity)
+        if this_ttp_values:
+            other_ttps = cand_ttps.get(aid, set())
+            if other_ttps:
+                intersection = this_ttp_values & other_ttps
+                union = this_ttp_values | other_ttps
+                ttp_sim = len(intersection) / len(union) if union else 0
+                dimension_scores.append(ttp_sim)
+                if intersection:
+                    match_reasons.extend([f"TTP: {v}" for v in list(intersection)[:2]])
+            else:
+                dimension_scores.append(0)
+
+        # Threat actor / impacted firm overlap
+        if this_actor_values:
+            other_actors = cand_actors.get(aid, set())
+            if other_actors:
+                intersection = this_actor_values & other_actors
+                union = this_actor_values | other_actors
+                actor_sim = len(intersection) / len(union) if union else 0
+                dimension_scores.append(actor_sim)
+                if intersection:
+                    match_reasons.extend([f"Threat actor: {v}" for v in list(intersection)[:2]])
+            else:
+                dimension_scores.append(0)
+
+        # Topic/issue overlap (keyword Jaccard on title + summary)
+        if this_topic_words:
+            cand_title_words = set(re.findall(r'\b[a-zA-Z]{3,}\b', (cand_article.title or "").lower())) - stopwords
+            cand_summary_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', (cand_article.summary or "")[:500].lower())) - stopwords
+            cand_topic_words = cand_title_words | cand_summary_words
+            if cand_topic_words:
+                intersection = this_topic_words & cand_topic_words
+                union = this_topic_words | cand_topic_words
+                topic_sim = len(intersection) / len(union) if union else 0
+                dimension_scores.append(topic_sim)
+                if intersection and topic_sim > 0.3:
+                    top_keywords = sorted(intersection, key=lambda w: len(w), reverse=True)[:2]
+                    match_reasons.append(f"Topic: {', '.join(top_keywords)}")
+            else:
+                dimension_scores.append(0)
+
+        if not dimension_scores:
+            continue
+
+        # Overall similarity: average across all compared dimensions
+        overall_similarity = sum(dimension_scores) / len(dimension_scores)
+
+        # Guardrail: enforce minimum 70% similarity threshold
+        if overall_similarity < min_similarity:
+            continue
+
+        results.append({
+            "id": cand_article.id,
+            "title": cand_article.title,
+            "summary": (cand_article.summary or "")[:200],
+            "published_at": cand_article.published_at.isoformat() if cand_article.published_at else None,
+            "source_name": cand_article.feed_source.name if cand_article.feed_source else None,
+            "url": cand_article.url,
+            "is_high_priority": cand_article.is_high_priority,
+            "match_score": round(overall_similarity * 100, 1),
+            "similarity_pct": round(overall_similarity * 100, 1),
+            "match_reasons": list(dict.fromkeys(match_reasons))[:5],
         })
 
-    result.sort(key=lambda x: x["match_score"], reverse=True)
-    return {"similar": result, "article_id": article_id}
+    # Sort by similarity descending and take top N
+    results.sort(key=lambda x: x["match_score"], reverse=True)
+    results = results[:limit]
+
+    return {
+        "similar": results,
+        "article_id": article_id,
+        "guardrails": {
+            "min_similarity": min_similarity,
+            "days_window": days_window,
+            "dimensions_compared": ["IOCs", "TTPs", "threat_actors", "topic_keywords"],
+        }
+    }
 
 
 # ============ COMMENTS ENDPOINTS ============
@@ -1782,41 +1901,65 @@ async def summarize_article(
     try:
         model_manager = get_model_manager()
         
-        # Use specified model or default
-        model_id = request.model_id or model_manager.get_primary_model()
+        # Check if GenAI is configured
+        try:
+            primary_model = model_manager.get_primary_model()
+        except Exception as model_err:
+            logger.error("genai_not_configured", error=str(model_err))
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="GenAI provider is not configured. Please configure a GenAI provider (Ollama, OpenAI, Claude, or Gemini) in Admin > Configuration > GenAI."
+            )
         
-        # Executive summary prompt
-        exec_result = await model_manager.generate_with_fallback(
-            system_prompt="""You are a threat intelligence analyst writing for executives. 
+        # Use specified model or default
+        model_id = request.model_id or primary_model
+        
+        # Executive summary prompt - generate even if technical fails
+        exec_summary = article.executive_summary  # Keep existing if generation fails
+        try:
+            exec_result = await model_manager.generate_with_fallback(
+                system_prompt="""You are a threat intelligence analyst writing for executives. 
 Write a 2-3 paragraph executive summary covering:
 1. What the threat is and its business impact
 2. Key indicators and attack techniques  
 3. High-level recommendations
 Use clear, non-technical language suitable for C-level executives.""",
-            user_prompt=f"Summarize this threat intelligence article:\n\n{content[:3000]}",
-            preferred_model=model_id
-        )
-        exec_summary = exec_result.get("response", "")
+                user_prompt=f"Summarize this threat intelligence article:\n\n{content[:3000]}",
+                preferred_model=model_id
+            )
+            exec_summary = exec_result.get("response", "")
+            model_used = exec_result.get("model_used", model_id)
+        except Exception as exec_err:
+            logger.warning("executive_summary_generation_failed", article_id=article_id, error=str(exec_err))
+            model_used = model_id
         
-        # Technical summary prompt
-        tech_result = await model_manager.generate_with_fallback(
-            system_prompt="""You are a senior SOC analyst writing a technical summary.
+        # Technical summary prompt - generate even if executive failed
+        tech_summary = article.technical_summary  # Keep existing if generation fails
+        try:
+            tech_result = await model_manager.generate_with_fallback(
+                system_prompt="""You are a senior SOC analyst writing a technical summary.
 Include:
 1. Attack chain analysis with MITRE ATT&CK mapping
 2. Detailed IOC breakdown by type
 3. Detection opportunities and hunt queries
 4. Remediation steps
 Be thorough and technical, suitable for SOC analysts and threat hunters.""",
-            user_prompt=f"Write a technical summary for SOC analysts:\n\n{content[:4000]}",
-            preferred_model=model_id
-        )
-        tech_summary = tech_result.get("response", "")
+                user_prompt=f"Write a technical summary for SOC analysts:\n\n{content[:4000]}",
+                preferred_model=model_id
+            )
+            tech_summary = tech_result.get("response", "")
+            if not model_used:
+                model_used = tech_result.get("model_used", model_id)
+        except Exception as tech_err:
+            logger.warning("technical_summary_generation_failed", article_id=article_id, error=str(tech_err))
+            if not model_used:
+                model_used = model_id
         
-        model_used = exec_result.get("model_used", model_id)
-        
-        # Update article
-        article.executive_summary = exec_summary
-        article.technical_summary = tech_summary
+        # Update article - update both summaries independently
+        if exec_summary:
+            article.executive_summary = exec_summary
+        if tech_summary:
+            article.technical_summary = tech_summary
         article.genai_analysis_remarks = f"Summarized using {model_used} by {current_user.username}"
         
         db.commit()
@@ -1824,10 +1967,11 @@ Be thorough and technical, suitable for SOC analysts and threat hunters.""",
         AuditManager.log_event(
             db=db,
             user_id=current_user.id,
-            event_type=AuditEventType.ARTICLE_LIFECYCLE,
+            event_type=AuditEventType.GENAI_SUMMARIZATION,
             action=f"Generated AI summary for article {article_id} using {model_used}",
             resource_type="article",
-            resource_id=article_id
+            resource_id=article_id,
+            details={"model": model_used, "has_executive": bool(exec_summary), "has_technical": bool(tech_summary)}
         )
         
         logger.info("article_summarized", article_id=article_id, user_id=current_user.id, model=model_used)
@@ -1841,11 +1985,18 @@ Be thorough and technical, suitable for SOC analysts and threat hunters.""",
             "technical_summary": tech_summary
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("summarization_failed", article_id=article_id, error=str(e))
+        error_msg = str(e)
+        if "not configured" in error_msg.lower() or "api key" in error_msg.lower():
+            detail = "GenAI provider is not configured. Please configure a GenAI provider in Admin > Configuration > GenAI."
+        else:
+            detail = f"Failed to generate summary: {error_msg}"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate summary"
+            detail=detail
         )
 
 

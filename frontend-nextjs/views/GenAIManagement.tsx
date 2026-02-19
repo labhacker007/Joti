@@ -24,6 +24,10 @@ import {
   Trash2,
   HardDrive,
   Loader2,
+  ScrollText,
+  Clock,
+  XCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { genaiAPI, connectorsAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
@@ -79,6 +83,27 @@ interface OllamaLibraryModel {
   category: string;
   installed: boolean;
   installed_size?: string;
+}
+
+interface ExecutionLog {
+  id: number;
+  prompt_id?: number;
+  function_name?: string;
+  final_prompt?: string;
+  final_prompt_full?: string;
+  model_used?: string;
+  temperature?: number;
+  max_tokens?: number;
+  response?: string;
+  response_full?: string;
+  tokens_used?: number;
+  cost?: number;
+  guardrails_passed: boolean;
+  guardrail_failures?: any[];
+  retry_count?: number;
+  execution_time_ms?: number;
+  timestamp?: string;
+  user_id?: number;
 }
 
 // Provider definitions
@@ -138,7 +163,14 @@ export default function GenAIManagement() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'providers' | 'models' | 'functions' | 'ollama'>('providers');
+  const [activeTab, setActiveTab] = useState<'providers' | 'models' | 'functions' | 'ollama' | 'logs'>('providers');
+
+  // Execution logs state
+  const [executionLogs, setExecutionLogs] = useState<ExecutionLog[]>([]);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsFilter, setLogsFilter] = useState<'all' | 'failed'>('all');
+  const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
 
   // Provider config states
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
@@ -154,6 +186,13 @@ export default function GenAIManagement() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Load logs when the logs tab is selected
+  useEffect(() => {
+    if (activeTab === 'logs' && executionLogs.length === 0) {
+      loadExecutionLogs();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (success) {
@@ -211,6 +250,24 @@ export default function GenAIManagement() {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadExecutionLogs = async (filterOverride?: 'all' | 'failed') => {
+    try {
+      setLogsLoading(true);
+      const filter = filterOverride ?? logsFilter;
+      const res = await genaiAPI.getExecutionLogs({
+        guardrails_failed: filter === 'failed' ? true : undefined,
+        limit: 50,
+      }) as any;
+      const data = res?.data || res;
+      setExecutionLogs(data?.logs || []);
+      setLogsTotal(data?.total || 0);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLogsLoading(false);
     }
   };
 
@@ -397,6 +454,7 @@ export default function GenAIManagement() {
     { key: 'models' as const, label: 'Models', icon: Brain },
     { key: 'functions' as const, label: 'Function Mapping', icon: ArrowRightLeft },
     { key: 'ollama' as const, label: 'Ollama Library', icon: HardDrive },
+    { key: 'logs' as const, label: 'Execution Logs', icon: ScrollText },
   ];
 
   if (loading) {
@@ -837,6 +895,162 @@ export default function GenAIManagement() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ====== EXECUTION LOGS TAB ====== */}
+      {activeTab === 'logs' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              View what prompts are sent to GenAI, responses received, guardrail results, and cost.
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex bg-muted rounded-lg p-0.5">
+                {(['all', 'failed'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => { setLogsFilter(f); loadExecutionLogs(f); }}
+                    className={cn(
+                      'px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize',
+                      logsFilter === f ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {f === 'failed' ? 'Guardrail Failures' : 'All Logs'}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => loadExecutionLogs()}
+                disabled={logsLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+              >
+                <RefreshCw className={cn('w-3.5 h-3.5', logsLoading && 'animate-spin')} />
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {logsLoading && executionLogs.length === 0 ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            </div>
+          ) : executionLogs.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-border rounded-lg">
+              <ScrollText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground">No execution logs yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Logs will appear here when GenAI functions are used (summarization, IOC extraction, etc.)
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">{logsTotal} total logs</p>
+              {executionLogs.map((log) => {
+                const isExpanded = expandedLogId === log.id;
+                return (
+                  <div key={log.id} className="bg-card border border-border rounded-lg overflow-hidden">
+                    <div
+                      className="p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                    >
+                      {log.guardrails_passed ? (
+                        <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-foreground">
+                            {log.function_name || 'Unknown'}
+                          </span>
+                          {log.model_used && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-500/10 text-purple-600">
+                              {log.model_used}
+                            </span>
+                          )}
+                          {log.tokens_used && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {log.tokens_used} tokens
+                            </span>
+                          )}
+                          {log.cost != null && log.cost > 0 && (
+                            <span className="text-[10px] text-muted-foreground">
+                              ${log.cost.toFixed(4)}
+                            </span>
+                          )}
+                          {log.execution_time_ms && (
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                              <Clock className="w-2.5 h-2.5" />
+                              {log.execution_time_ms}ms
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                          {log.final_prompt?.slice(0, 120) || 'No prompt recorded'}...
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] text-muted-foreground">
+                          {log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}
+                        </span>
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t border-border p-4 bg-muted/30 space-y-3">
+                        {/* Final Prompt */}
+                        <div>
+                          <p className="text-xs font-semibold text-foreground mb-1">Final Prompt Sent to Model:</p>
+                          <pre className="text-xs text-muted-foreground bg-background border border-border rounded p-3 max-h-48 overflow-y-auto whitespace-pre-wrap">
+                            {log.final_prompt_full || log.final_prompt || 'Not recorded'}
+                          </pre>
+                        </div>
+
+                        {/* Response */}
+                        <div>
+                          <p className="text-xs font-semibold text-foreground mb-1">Model Response:</p>
+                          <pre className="text-xs text-muted-foreground bg-background border border-border rounded p-3 max-h-48 overflow-y-auto whitespace-pre-wrap">
+                            {log.response_full || log.response || 'No response'}
+                          </pre>
+                        </div>
+
+                        {/* Guardrail Results */}
+                        {log.guardrail_failures && log.guardrail_failures.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-red-600 mb-1">Guardrail Failures:</p>
+                            <div className="space-y-1">
+                              {log.guardrail_failures.map((f: any, i: number) => (
+                                <div key={i} className="text-xs bg-red-500/10 text-red-600 rounded p-2">
+                                  {typeof f === 'string' ? f : JSON.stringify(f)}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Metadata row */}
+                        <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground border-t border-border pt-2">
+                          <span>Model: {log.model_used || 'N/A'}</span>
+                          <span>Temperature: {log.temperature ?? 'N/A'}</span>
+                          <span>Max Tokens: {log.max_tokens ?? 'N/A'}</span>
+                          <span>Tokens Used: {log.tokens_used ?? 'N/A'}</span>
+                          <span>Cost: ${(log.cost ?? 0).toFixed(4)}</span>
+                          <span>Retries: {log.retry_count ?? 0}</span>
+                          <span>Duration: {log.execution_time_ms ?? 'N/A'}ms</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

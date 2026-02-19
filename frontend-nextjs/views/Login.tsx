@@ -322,10 +322,10 @@ export default function Login() {
                   J.O.T.I
                 </h1>
                 <p
-                  className="text-xs tracking-widest uppercase"
+                  className="text-[10px] tracking-widest uppercase"
                   style={{ color: dt.leftTextSecondary }}
                 >
-                  Threat Intelligence
+                  Joint Operational Threat Intelligence
                 </p>
               </div>
             </div>
@@ -333,7 +333,7 @@ export default function Login() {
               className="text-[11px] leading-relaxed max-w-xs text-center opacity-75"
               style={{ color: dt.leftTextSecondary }}
             >
-              News &amp; Feed Aggregator &middot; AI-Powered Summary &middot; IOC Extraction &amp; TTP Mapping &middot; Hunt Query Builder
+              From news to hunt queries — AI-powered threat intelligence, fully automated.
             </p>
           </div>
 
