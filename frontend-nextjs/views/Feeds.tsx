@@ -22,6 +22,8 @@ import {
   Brain,
   Crosshair,
   RefreshCw,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { articlesAPI, userFeedsAPI, sourcesAPI, genaiAPI } from '@/api/client';
 import { formatRelativeTime, cn } from '@/lib/utils';
@@ -146,12 +148,16 @@ export default function Feeds() {
   // Dynamic quote/joke
   const [dynamicQuote, setDynamicQuote] = useState<{ text: string; author: string } | null>(null);
 
+  // Org feeds (user-added feeds) — collapsible section
+  const [orgFeeds, setOrgFeeds] = useState<any[]>([]);
+  const [orgFeedsOpen, setOrgFeedsOpen] = useState(true);
+
   // Infinite scroll state for card view
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const pageSize = viewMode === 'card' ? 12 : 15;
+  const pageSize = viewMode === 'card' ? 9 : 15;
 
   const staticQuote = useMemo(() => CYBER_QUOTES[Math.floor(Math.random() * CYBER_QUOTES.length)], []);
   const displayQuote = dynamicQuote || staticQuote;
@@ -170,6 +176,20 @@ export default function Feeds() {
       }
     };
     fetchQuote();
+  }, []);
+
+  // Fetch user's org feeds
+  useEffect(() => {
+    const fetchOrgFeeds = async () => {
+      try {
+        const res = (await userFeedsAPI.getMyFeeds()) as any;
+        const data = res.data || res;
+        setOrgFeeds(Array.isArray(data) ? data : data?.feeds || []);
+      } catch {
+        // Non-critical
+      }
+    };
+    fetchOrgFeeds();
   }, []);
 
   // Read URL params for source/feed filtering
@@ -449,7 +469,7 @@ export default function Feeds() {
             <Rss className="w-7 h-7" />
             Feeds
           </h1>
-          <p className="text-xs text-muted-foreground/70 mt-1 italic max-w-lg truncate">
+          <p className="text-xs text-muted-foreground/70 mt-2 italic max-w-2xl leading-relaxed">
             &ldquo;{displayQuote.text}&rdquo; &mdash; {displayQuote.author}
           </p>
         </div>
@@ -682,6 +702,54 @@ export default function Feeds() {
         </div>
       )}
 
+      {/* Org Feeds — Collapsible, Scrollable */}
+      {orgFeeds.length > 0 && (
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <button
+            onClick={() => setOrgFeedsOpen(!orgFeedsOpen)}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              {orgFeedsOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+              <Rss className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">Your Feeds</span>
+              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{orgFeeds.length}</span>
+            </div>
+          </button>
+          {orgFeedsOpen && (
+            <div className="border-t border-border max-h-48 overflow-y-auto px-2 py-2 space-y-1">
+              {orgFeeds.map((feed: any) => (
+                <button
+                  key={feed.id}
+                  onClick={() => {
+                    if (userFeedFilter === feed.id) {
+                      setUserFeedFilter(null);
+                    } else {
+                      setUserFeedFilter(feed.id);
+                      setSourceFilter(null);
+                    }
+                    setCurrentPage(1);
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-left transition-colors text-sm',
+                    userFeedFilter === feed.id
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-foreground hover:bg-muted'
+                  )}
+                >
+                  <Globe className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                  <span className="truncate flex-1">{feed.name || feed.url}</span>
+                  <span className={cn(
+                    'w-2 h-2 rounded-full flex-shrink-0',
+                    feed.is_active ? 'bg-green-500' : 'bg-gray-400'
+                  )} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Filter Chips */}
       <div className="flex items-center gap-2">
         <button
@@ -863,101 +931,116 @@ export default function Feeds() {
           ))}
         </div>
       ) : (
-        /* Card View — Feedly-style compact magazine grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        /* Card View — magazine-style grid, 3 per row */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {articles.map((article) => {
             const favicon = getSourceFavicon(article.source_url);
             return (
               <div
                 key={article.id}
                 className={cn(
-                  'group bg-card border border-border rounded-lg overflow-hidden hover:border-primary/40 hover:shadow-md transition-all cursor-pointer flex flex-col',
+                  'group bg-card border border-border rounded-xl overflow-hidden hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer flex flex-col',
                   !article.is_read && 'ring-1 ring-primary/30'
                 )}
                 onClick={() => openArticleDetail(article.id)}
               >
-                {/* Compact image or colored strip */}
+                {/* Article image or favicon placeholder */}
                 {article.image_url ? (
-                  <div className="relative h-20 w-full overflow-hidden bg-muted">
+                  <div className="relative h-40 w-full overflow-hidden bg-muted">
                     <img
                       src={article.image_url}
                       alt=""
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.parentElement!.style.display = 'none';
+                        const parent = target.parentElement!;
+                        // Replace broken image with favicon fallback
+                        parent.classList.remove('h-40');
+                        parent.classList.add('h-24');
+                        parent.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-muted/50"><img src="${favicon || ''}" alt="" class="w-10 h-10 rounded opacity-40" onerror="this.style.display='none'" /></div>`;
                       }}
                     />
                     {article.is_high_priority && (
-                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-600 text-white uppercase">
+                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white uppercase shadow-sm">
                         Priority
                       </span>
                     )}
                   </div>
                 ) : (
-                  <div className="h-2 w-full bg-gradient-to-r from-primary/40 to-primary/10" />
-                )}
-
-                {/* Card body — tight padding */}
-                <div className="p-2 flex-1 flex flex-col min-h-0">
-                  {/* Source + time row */}
-                  <div className="flex items-center gap-1.5 mb-1.5 text-[10px] text-muted-foreground">
+                  <div className="relative h-24 w-full overflow-hidden bg-muted/30 flex items-center justify-center">
                     {favicon ? (
                       <img
                         src={favicon}
                         alt=""
-                        className="w-3.5 h-3.5 rounded-sm flex-shrink-0"
+                        className="w-10 h-10 rounded opacity-40"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     ) : (
-                      <Globe className="w-3 h-3 flex-shrink-0" />
+                      <Globe className="w-8 h-8 text-muted-foreground/20" />
+                    )}
+                    {article.is_high_priority && (
+                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white uppercase shadow-sm">
+                        Priority
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Card body */}
+                <div className="p-3.5 flex-1 flex flex-col min-h-0">
+                  {/* Source + time row */}
+                  <div className="flex items-center gap-2 mb-2 text-[11px] text-muted-foreground">
+                    {favicon ? (
+                      <img
+                        src={favicon}
+                        alt=""
+                        className="w-4 h-4 rounded-sm flex-shrink-0"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <Globe className="w-3.5 h-3.5 flex-shrink-0" />
                     )}
                     <span className="truncate font-medium">{article.source_name}</span>
                     <span className="ml-auto flex-shrink-0 opacity-60">{formatRelativeTime(article.published_at)}</span>
                   </div>
 
-                  {/* Title — compact, max 2 lines */}
+                  {/* Title */}
                   <h3
                     className={cn(
-                      'text-[13px] leading-snug line-clamp-2 mb-1',
+                      'text-sm leading-snug line-clamp-2 mb-1.5',
                       article.is_read ? 'text-muted-foreground' : 'font-semibold text-foreground'
                     )}
                   >
                     {article.title}
                   </h3>
 
-                  {/* One-line summary snippet */}
-                  <p className="text-[11px] leading-relaxed text-muted-foreground/80 line-clamp-2 mb-2">
+                  {/* Summary snippet */}
+                  <p className="text-xs leading-relaxed text-muted-foreground/80 line-clamp-2 mb-3">
                     {article.executive_summary || article.summary}
                   </p>
 
                   {/* Bottom row: tags + bookmark */}
-                  <div className="mt-auto flex items-center gap-1 pt-1.5 border-t border-border/50">
+                  <div className="mt-auto flex items-center gap-1.5 pt-2 border-t border-border/50">
                     {article.threat_category && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-500/10 text-blue-600 truncate max-w-[50%]">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-600 truncate max-w-[50%]">
                         {article.threat_category}
                       </span>
                     )}
                     {article.watchlist_match_keywords && article.watchlist_match_keywords.length > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-yellow-500/10 text-yellow-600 flex items-center gap-0.5">
-                        <Star className="w-2.5 h-2.5" />
+                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-yellow-500/10 text-yellow-600 flex items-center gap-0.5">
+                        <Star className="w-3 h-3" />
                         {article.watchlist_match_keywords.length}
-                      </span>
-                    )}
-                    {!article.image_url && article.is_high_priority && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/10 text-red-600">
-                        !!
                       </span>
                     )}
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleBookmark(article.id); }}
-                      className="ml-auto flex-shrink-0 p-0.5 hover:bg-muted rounded transition-colors opacity-0 group-hover:opacity-100"
+                      className="ml-auto flex-shrink-0 p-1 hover:bg-muted rounded transition-colors opacity-0 group-hover:opacity-100"
                       title={article.is_bookmarked ? 'Remove bookmark' : 'Save'}
                     >
                       {article.is_bookmarked ? (
-                        <BookmarkCheck className="w-3.5 h-3.5 text-primary" />
+                        <BookmarkCheck className="w-4 h-4 text-primary" />
                       ) : (
-                        <Bookmark className="w-3.5 h-3.5 text-muted-foreground" />
+                        <Bookmark className="w-4 h-4 text-muted-foreground" />
                       )}
                     </button>
                   </div>

@@ -260,12 +260,14 @@ For TTPs, identify MITRE ATT&CK techniques referenced or implied in the text:
 - confidence: integer 1-100
 - evidence: a short phrase from the text supporting this mapping
 
-IMPORTANT RULES:
-1. Only extract REAL indicators — skip example/documentation values, RFC IPs (10.x, 192.168.x), localhost, well-known benign domains (google.com, microsoft.com, github.com).
-2. Defang indicators: if you see hxxp, [.], [dot], etc., reconstruct the real value.
-3. For hashes, verify length: MD5=32, SHA1=40, SHA256=64 hex chars.
-4. For TTPs, only use valid MITRE ATT&CK IDs from the Enterprise matrix.
-5. If the text contains no IOCs or TTPs, return empty arrays — do NOT hallucinate.
+CRITICAL RULES:
+1. ONLY extract indicators that are EXPLICITLY mentioned in the article text. NEVER fabricate, invent, or assume indicators that are not present. Zero hallucination tolerance.
+2. DO NOT extract the article's source/publisher domain or any URLs belonging to the publication website. These are NOT indicators of compromise.
+3. Skip example/documentation values, RFC IPs (10.x, 192.168.x, 172.16.x), localhost, well-known benign domains (google.com, microsoft.com, github.com, twitter.com, linkedin.com).
+4. Defang indicators: if you see hxxp, [.], [dot], etc., reconstruct the real value.
+5. For hashes, verify length: MD5=32, SHA1=40, SHA256=64 hex chars.
+6. For TTPs, only use valid MITRE ATT&CK IDs from the Enterprise matrix (T#### or T####.### format).
+7. If the text contains no IOCs or TTPs, return empty arrays — do NOT make up indicators to fill the response.
 
 Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 {
@@ -459,13 +461,26 @@ class IntelligenceExtractor:
         # Truncate to a reasonable size for the LLM context window
         content_for_llm = content[:12000]
 
+        # Extract source domain to exclude from results
+        source_domain = None
+        if source_url:
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(source_url)
+                source_domain = parsed.netloc.lower()
+                if source_domain.startswith("www."):
+                    source_domain = source_domain[4:]
+            except Exception:
+                pass
+
         genai_iocs: List[Dict] = []
         genai_ttps: List[Dict] = []
 
         try:
             model_manager = get_model_manager()
 
-            user_prompt = f"Extract all IOCs and TTPs from the following threat intelligence text:\n\n{content_for_llm}"
+            source_note = f"\n\nIMPORTANT: The article source domain is '{source_domain}'. Do NOT extract '{source_domain}' or any URL containing it as an IOC." if source_domain else ""
+            user_prompt = f"Extract all IOCs and TTPs from the following threat intelligence text:{source_note}\n\n{content_for_llm}"
 
             result = await model_manager.generate_with_fallback(
                 system_prompt=_EXTRACTION_SYSTEM_PROMPT,
@@ -501,6 +516,10 @@ class IntelligenceExtractor:
         merged_iocs = _merge_iocs(genai_iocs, regex_iocs)
         merged_ttps = _merge_ttps(genai_ttps, regex_ttps)
 
+        # Filter out IOCs matching the article's source domain
+        if source_domain:
+            merged_iocs = _filter_source_domain(merged_iocs, source_domain)
+
         logger.info(
             "extraction_merged",
             genai_iocs=len(genai_iocs),
@@ -521,6 +540,24 @@ class IntelligenceExtractor:
             "executive_summary": None,
             "technical_summary": None,
         }
+
+
+def _filter_source_domain(iocs: List[Dict], source_domain: str) -> List[Dict]:
+    """Remove IOCs that match the article's source/publisher domain."""
+    filtered = []
+    for ioc in iocs:
+        value = ioc.get("value", "").lower()
+        ioc_type = ioc.get("type", "")
+        if ioc_type == "domain" and (
+            value == source_domain
+            or value == f"www.{source_domain}"
+            or value.endswith(f".{source_domain}")
+        ):
+            continue
+        if ioc_type == "url" and source_domain in value:
+            continue
+        filtered.append(ioc)
+    return filtered
 
 
 def _merge_iocs(primary: List[Dict], secondary: List[Dict]) -> List[Dict]:

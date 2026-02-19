@@ -15,7 +15,8 @@ Features:
 
 Permissions: ADMIN_GENAI_VIEW, ADMIN_GENAI_EDIT
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.core.database import get_db
@@ -26,6 +27,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import re
+import json
 
 router = APIRouter(prefix="/admin/genai-guardrails", tags=["admin-guardrails"])
 
@@ -498,6 +500,131 @@ async def validate_input(
         violations=all_violations,
         sanitized_input=sanitized_text if sanitized_text != payload.input_text else None
     )
+
+
+# ============================================================================
+# API Routes - Bulk Export / Import / Seed (MUST be before /{guardrail_id})
+# ============================================================================
+
+class BulkImportResult(BaseModel):
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+    errors: List[str] = []
+
+
+@router.get("/export")
+async def export_guardrails(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
+):
+    """Export all guardrails as JSON for backup/transfer."""
+    guardrails = db.query(Guardrail).order_by(Guardrail.id).all()
+    data = []
+    for g in guardrails:
+        data.append({
+            "name": g.name,
+            "description": g.description,
+            "type": g.type,
+            "config": g.config,
+            "action": getattr(g, "action", "log"),
+            "max_retries": getattr(g, "max_retries", 2),
+            "is_active": g.is_active,
+        })
+    return JSONResponse(content={
+        "version": "1.0",
+        "exported_at": datetime.utcnow().isoformat(),
+        "count": len(data),
+        "guardrails": data,
+    })
+
+
+@router.post("/import", response_model=BulkImportResult)
+async def import_guardrails(
+    payload: Dict[str, Any],
+    overwrite: bool = Query(False, description="Overwrite existing guardrails with same name"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
+):
+    """Import guardrails from JSON export. Use overwrite=true to update existing."""
+    guardrails_data = payload.get("guardrails", [])
+    if not guardrails_data:
+        raise HTTPException(status_code=400, detail="No guardrails found in import data")
+
+    result = BulkImportResult()
+    for item in guardrails_data:
+        name = item.get("name", "").strip()
+        if not name:
+            result.errors.append("Skipped entry with missing name")
+            result.skipped += 1
+            continue
+
+        existing = db.query(Guardrail).filter(Guardrail.name == name).first()
+        if existing:
+            if overwrite:
+                existing.description = item.get("description", existing.description)
+                existing.config = item.get("config", existing.config)
+                existing.is_active = item.get("is_active", existing.is_active)
+                if hasattr(existing, "action"):
+                    existing.action = item.get("action", existing.action)
+                if hasattr(existing, "max_retries"):
+                    existing.max_retries = item.get("max_retries", existing.max_retries)
+                result.updated += 1
+            else:
+                result.skipped += 1
+        else:
+            try:
+                guardrail = Guardrail(
+                    name=name,
+                    description=item.get("description"),
+                    type=item.get("type", "input_validation"),
+                    config=item.get("config", {}),
+                    action=item.get("action", "log"),
+                    max_retries=item.get("max_retries", 2),
+                    is_active=item.get("is_active", True),
+                    created_by_id=current_user.id,
+                )
+                db.add(guardrail)
+                result.created += 1
+            except Exception as e:
+                result.errors.append(f"Error creating '{name}': {str(e)}")
+
+    db.commit()
+    return result
+
+
+@router.post("/seed-catalog", response_model=BulkImportResult)
+async def seed_from_catalog(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
+):
+    """Seed guardrails from the built-in GenAI attack catalog (51 attack protections)."""
+    from app.guardrails.genai_attack_catalog import get_default_guardrail_seeds
+
+    seeds = get_default_guardrail_seeds()
+    result = BulkImportResult()
+
+    for seed in seeds:
+        existing = db.query(Guardrail).filter(Guardrail.name == seed["name"]).first()
+        if existing:
+            result.skipped += 1
+        else:
+            try:
+                guardrail = Guardrail(
+                    name=seed["name"],
+                    description=seed["description"],
+                    type=seed["type"],
+                    config=seed["config"],
+                    is_active=True,
+                    created_by_id=current_user.id,
+                )
+                db.add(guardrail)
+                result.created += 1
+            except Exception as e:
+                result.errors.append(f"Error seeding '{seed['name']}': {str(e)}")
+
+    db.commit()
+    return result
 
 
 # ============================================================================

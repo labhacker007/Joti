@@ -393,6 +393,7 @@ def _seed_skills(db):
 
 def _seed_guardrails(db):
     """Seed global and function-specific guardrails."""
+    # Platform guardrails (operational)
     guardrails = [
         {
             "name": "Anti-Prompt-Injection",
@@ -535,6 +536,25 @@ def _seed_guardrails(db):
             existing.config = gr_data["config"]
             existing.description = gr_data["description"]
             print(f"↻ Updated guardrail: {gr_data['name']}")
+
+    # Seed from attack catalog (51 security attack guardrails)
+    try:
+        from app.guardrails.genai_attack_catalog import get_default_guardrail_seeds
+        catalog_seeds = get_default_guardrail_seeds()
+        for seed in catalog_seeds:
+            existing = db.query(Guardrail).filter(Guardrail.name == seed["name"]).first()
+            if not existing:
+                guardrail = Guardrail(
+                    name=seed["name"],
+                    description=seed["description"],
+                    type=seed["type"],
+                    config=seed["config"],
+                    is_active=True,
+                )
+                db.add(guardrail)
+                print(f"✓ Added catalog guardrail: {seed['name']}")
+    except ImportError:
+        print("⚠ Attack catalog not available, skipping catalog guardrails")
 
 
 if __name__ == "__main__":

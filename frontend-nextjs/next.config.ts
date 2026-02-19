@@ -74,12 +74,13 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Proxy API requests to FastAPI backend
+  // Proxy API requests to FastAPI backend (server-side rewrite)
   async rewrites() {
+    const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
     return [
       {
         source: '/api/:path*',
-        destination: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/:path*'
+        destination: `${backendUrl}/:path*`,
       }
     ];
   },

@@ -295,8 +295,11 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
             }
           : null
       );
-    } catch {
-      // Silent — auto-summarize is best-effort
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      if (detail) {
+        setError(detail);
+      }
     } finally {
       setSummarizing(false);
     }
@@ -319,7 +322,8 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
           : null
       );
     } catch (err: any) {
-      setError('Failed to generate summary. Is a GenAI provider configured?');
+      const detail = err?.response?.data?.detail || 'Failed to generate summary. Is a GenAI provider configured?';
+      setError(detail);
     } finally {
       setSummarizing(false);
     }

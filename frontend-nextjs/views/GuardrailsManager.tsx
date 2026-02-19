@@ -13,6 +13,9 @@ import {
   X,
   RefreshCw,
   Sparkles,
+  Upload,
+  Download,
+  Database,
 } from 'lucide-react';
 import { guardrailsAPI, skillsAPI, getErrorMessage } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -253,6 +256,62 @@ export default function GuardrailsManager() {
     }
   };
 
+  const [importing, setImporting] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      setError('');
+      const res = await guardrailsAPI.exportAll() as any;
+      const data = res.data || res;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `guardrails-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setSuccess(`Exported ${data.count || 0} guardrails`);
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setImporting(true);
+      setError('');
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const res = await guardrailsAPI.importBulk(data, true) as any;
+      const result = res.data || res;
+      setSuccess(`Import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+      await fetchGuardrails();
+    } catch (err: any) {
+      setError(err instanceof SyntaxError ? 'Invalid JSON file' : getErrorMessage(err));
+    } finally {
+      setImporting(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleSeedCatalog = async () => {
+    try {
+      setSeeding(true);
+      setError('');
+      const res = await guardrailsAPI.seedCatalog() as any;
+      const result = res.data || res;
+      setSuccess(`Catalog seeded: ${result.created} created, ${result.skipped} already exist`);
+      await fetchGuardrails();
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   const resetGForm = () => {
     setGForm({ name: '', description: '', type: 'pii', config: '{}', action: 'retry', max_retries: 2, is_active: true });
   };
@@ -373,13 +432,41 @@ export default function GuardrailsManager() {
             Manage GenAI safety guardrails and domain expertise skills
           </p>
         </div>
-        <button
-          onClick={() => activeTab === 'guardrails' ? setShowCreateGuardrail(true) : setShowCreateSkill(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add {activeTab === 'guardrails' ? 'Guardrail' : 'Skill'}
-        </button>
+        <div className="flex items-center gap-2">
+          {activeTab === 'guardrails' && (
+            <>
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-1.5 px-3 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors text-sm"
+                title="Export all guardrails as JSON"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <label className="flex items-center gap-1.5 px-3 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors text-sm cursor-pointer">
+                <Upload className="w-4 h-4" />
+                {importing ? 'Importing...' : 'Import'}
+                <input type="file" accept=".json" onChange={handleImport} className="hidden" disabled={importing} />
+              </label>
+              <button
+                onClick={handleSeedCatalog}
+                disabled={seeding}
+                className="flex items-center gap-1.5 px-3 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors text-sm disabled:opacity-50"
+                title="Seed from built-in attack catalog (51 protections)"
+              >
+                <Database className="w-4 h-4" />
+                {seeding ? 'Seeding...' : 'Seed Catalog'}
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => activeTab === 'guardrails' ? setShowCreateGuardrail(true) : setShowCreateSkill(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add {activeTab === 'guardrails' ? 'Guardrail' : 'Skill'}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

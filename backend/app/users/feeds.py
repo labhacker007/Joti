@@ -168,12 +168,47 @@ async def validate_feed_url(
             # feedparser couldn't parse it
             bozo_exception = str(parsed.bozo_exception) if parsed.bozo_exception else "Unknown error"
             
-            # Check if it might be HTML (not a feed)
+            # Check if it might be HTML — try to auto-discover a feed or accept as HTML
             if '<html' in content.lower()[:1000]:
+                from app.ingestion.html_scraper import HTMLPageScraper
+                scraper = HTMLPageScraper()
+
+                # Try to discover an RSS/Atom feed URL from the HTML page
+                discovered_feed = scraper.discover_feed_url(content, url)
+                if discovered_feed:
+                    # Validate the discovered feed
+                    try:
+                        feed_result = await safe_fetch_text_async(
+                            discovered_feed, policy=policy,
+                            headers={'User-Agent': 'Jyoti Feed Reader/1.0'},
+                            timeout_seconds=15.0, max_bytes=2_000_000,
+                        )
+                        disc_parsed = feedparser.parse(feed_result.text)
+                        if disc_parsed.entries:
+                            disc_type = "atom" if disc_parsed.version and 'atom' in disc_parsed.version.lower() else "rss"
+                            return {
+                                "valid": True,
+                                "feed_type": disc_type,
+                                "title": disc_parsed.feed.get('title', 'Discovered Feed'),
+                                "item_count": len(disc_parsed.entries),
+                                "discovered_feed_url": discovered_feed,
+                                "version": disc_parsed.version,
+                            }
+                    except Exception:
+                        pass  # Discovery failed, fall through to HTML acceptance
+
+                # No feed discovered — accept the HTML page directly
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(content, "lxml")
+                page_title = soup.title.string.strip() if soup.title and soup.title.string else "Web Page"
+                articles_found = scraper.extract_articles(content, url)
+
                 return {
-                    "valid": False,
-                    "error": "URL returns an HTML page, not a feed",
-                    "suggestion": "Look for RSS/Atom feed link on the page. Try adding /feed, /rss, or /atom.xml to the URL"
+                    "valid": True,
+                    "feed_type": "html",
+                    "title": page_title,
+                    "item_count": len(articles_found),
+                    "description": f"HTML page with {len(articles_found)} detected articles",
                 }
             
             return {
@@ -241,6 +276,11 @@ async def create_user_feed(
         # Auto-detect feed type
         detected_type = validation.get('feed_type', 'rss')
         feed_data.feed_type = detected_type
+
+        # If an RSS/Atom feed was discovered from an HTML page, use that URL instead
+        discovered_url = validation.get('discovered_feed_url')
+        if discovered_url:
+            feed_data.url = discovered_url
     
     # Validate category_id if provided
     if feed_data.category_id:
@@ -465,21 +505,54 @@ async def ingest_user_feed(
         )
     
     try:
-        # Parse the feed (RSS/Atom)
-        parser = FeedParser()
-        parsed_feed = parser.parse_feed(feed.url)
-        entries = parser.extract_entries(parsed_feed)
-        
+        entries = []
+
+        if feed.feed_type == "html":
+            # HTML page — scrape articles directly
+            from app.ingestion.html_scraper import HTMLPageScraper
+            from app.core.fetch import safe_fetch_text_sync, FetchError as CoreFetchError
+            from app.core.ssrf import ssrf_policy_from_settings
+
+            scraper = HTMLPageScraper()
+            policy = ssrf_policy_from_settings(enforce_allowlist=None)
+
+            try:
+                result = safe_fetch_text_sync(
+                    feed.url, policy=policy,
+                    headers={"User-Agent": "Jyoti Feed Reader/1.0"},
+                    timeout_seconds=15.0, max_bytes=2_000_000,
+                )
+                entries = scraper.extract_articles(result.text, feed.url)
+
+                # Enrich entries with full article content (first 10 to avoid slowness)
+                for entry in entries[:10]:
+                    if not entry.get("raw_content"):
+                        detail = scraper.fetch_article_content(entry["url"])
+                        if detail:
+                            entry["raw_content"] = detail.get("raw_content", "")
+                            if detail.get("published_at") and not entry.get("published_at"):
+                                entry["published_at"] = detail["published_at"]
+                            if detail.get("image_url") and not entry.get("image_url"):
+                                entry["image_url"] = detail["image_url"]
+            except CoreFetchError as e:
+                feed.fetch_error = f"Failed to fetch HTML page: {str(e)}"
+                feed.last_fetched = datetime.utcnow()
+                db.commit()
+                raise HTTPException(status_code=502, detail=f"Failed to fetch page: {str(e)}")
+        else:
+            # RSS/Atom feed — use standard parser
+            parser = FeedParser()
+            parsed_feed = parser.parse_feed(feed.url)
+            entries = parser.extract_entries(parsed_feed)
+
         if not entries:
-            # Maybe it's a website URL, try to detect feed URL
-            feed.fetch_error = "No entries found - try adding an RSS/Atom feed URL"
+            feed.fetch_error = "No entries found"
             feed.last_fetched = datetime.utcnow()
             db.commit()
             return {
                 "status": "partial",
-                "message": "No entries found in feed. Make sure URL is an RSS/Atom feed.",
+                "message": "No entries found. For HTML pages, make sure the page has article links.",
                 "articles_fetched": 0,
-                "suggestion": "Look for RSS icon on the website or try adding /feed, /rss, or /atom to the URL"
             }
         
         # Create or find a FeedSource for this user's custom feed

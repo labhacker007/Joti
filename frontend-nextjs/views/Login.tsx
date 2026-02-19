@@ -333,7 +333,7 @@ export default function Login() {
               className="text-[11px] leading-relaxed max-w-xs text-center opacity-75"
               style={{ color: dt.leftTextSecondary }}
             >
-              From news to hunt queries — AI-powered threat intelligence, fully automated.
+              From news to hunt queries and beyond - Yes , it is AI
             </p>
           </div>
 

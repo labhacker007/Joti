@@ -20,7 +20,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api
+ARG INTERNAL_API_URL=http://localhost:8000/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV INTERNAL_API_URL=$INTERNAL_API_URL
 
 RUN mkdir -p public
 RUN --mount=type=cache,target=/root/.npm \

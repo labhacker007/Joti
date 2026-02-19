@@ -1,252 +1,469 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Shield,
-  Crosshair,
-  Globe,
-  Hash,
-  Mail,
-  AlertTriangle,
-  FileText,
-  RefreshCw,
-  Search,
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  Eye,
-  CheckCircle,
-  XCircle,
-  Copy,
-  Target,
+  Shield, Crosshair, Globe, Hash, Mail, AlertTriangle, FileText, RefreshCw,
+  Search, ChevronDown, ChevronRight, ExternalLink, Eye, CheckCircle, XCircle,
+  Copy, Target, Plus, Upload, Download, Sparkles, Link2, Users, Loader2,
+  Trash2, Check, X, Database, Radar, Brain, BarChart3, Grid3X3,
 } from 'lucide-react';
 import { articlesAPI } from '@/api/client';
-import { cn } from '@/lib/utils';
-import { formatRelativeTime } from '@/lib/utils';
+import { cn, formatRelativeTime } from '@/lib/utils';
 import ArticleDetailDrawer from '@/components/ArticleDetailDrawer';
 
-// ---- Types ----
+// ======================== TYPES ========================
+
+interface ArticleInfo {
+  id: number;
+  title: string;
+  status: string;
+  is_high_priority: boolean;
+  source_name?: string;
+  published_at?: string;
+  created_at?: string;
+  watchlist_matches?: string[];
+}
 
 interface IntelItem {
   id: number;
-  article_id: number;
   intelligence_type: string;
   value: string;
   confidence: number;
   evidence?: string;
+  ioc_type?: string;
   mitre_id?: string;
+  mitre_name?: string;
+  mitre_url?: string;
+  mitre_framework?: string;
   meta?: Record<string, any>;
   is_reviewed?: boolean;
   is_false_positive?: boolean;
   notes?: string;
   created_at?: string;
-  article_title?: string;
-  article_url?: string;
-  article_published_at?: string;
-  article_source_name?: string;
+  article?: ArticleInfo | null;
+  hunt?: any;
 }
 
 interface IntelSummary {
   intelligence_by_type: Record<string, number>;
   top_mitre_techniques: { mitre_id: string; name?: string; count: number }[];
+  articles_with_intel_by_status?: Record<string, number>;
   total_intelligence: number;
+  active_watchlist_keywords?: string[];
 }
 
-type TabType = 'overview' | 'iocs' | 'ttps' | 'threat_actors';
+interface MitreMatrixData {
+  framework: string;
+  tactics: Record<string, { mitre_id: string; count: number; article_count: number; url: string }[]>;
+  total_techniques: number;
+}
+
+interface CorrelationData {
+  shared_iocs: { value: string; ioc_type: string; article_count: number; article_titles: string[]; article_ids: number[] }[];
+  clusters: { articles: { id: number; title: string }[]; shared_iocs: string[] }[];
+  total_shared_iocs: number;
+  total_clusters: number;
+}
+
+type PanelType = 'command_center' | 'ioc_explorer' | 'mitre_matrix' | 'threat_actors' | 'correlation' | 'ai_analysis';
 type TimeRange = '24h' | '7d' | '30d' | '90d' | 'all';
+type SourceCategory = 'all' | 'open_source' | 'external' | 'internal';
+
+// ======================== CONSTANTS ========================
 
 const IOC_TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  ip: Globe,
-  domain: Globe,
-  url: ExternalLink,
-  hash_md5: Hash,
-  hash_sha1: Hash,
-  hash_sha256: Hash,
-  email: Mail,
-  cve: AlertTriangle,
-  registry_key: FileText,
-  file_path: FileText,
+  ip: Globe, domain: Globe, url: ExternalLink, hash_md5: Hash, hash_sha1: Hash,
+  hash_sha256: Hash, email: Mail, cve: AlertTriangle, registry_key: FileText, file_path: FileText,
 };
 
 const IOC_TYPE_COLORS: Record<string, string> = {
-  ip: 'bg-blue-500/10 text-blue-600',
-  domain: 'bg-cyan-500/10 text-cyan-600',
-  url: 'bg-purple-500/10 text-purple-600',
-  hash_md5: 'bg-orange-500/10 text-orange-600',
-  hash_sha1: 'bg-orange-500/10 text-orange-600',
-  hash_sha256: 'bg-red-500/10 text-red-600',
-  email: 'bg-pink-500/10 text-pink-600',
-  cve: 'bg-red-600/10 text-red-700',
-  registry_key: 'bg-amber-500/10 text-amber-600',
-  file_path: 'bg-gray-500/10 text-gray-600',
+  ip: 'bg-blue-500/10 text-blue-600', domain: 'bg-cyan-500/10 text-cyan-600',
+  url: 'bg-purple-500/10 text-purple-600', hash_md5: 'bg-orange-500/10 text-orange-600',
+  hash_sha1: 'bg-orange-500/10 text-orange-600', hash_sha256: 'bg-red-500/10 text-red-600',
+  email: 'bg-pink-500/10 text-pink-600', cve: 'bg-red-600/10 text-red-700',
+  registry_key: 'bg-amber-500/10 text-amber-600', file_path: 'bg-gray-500/10 text-gray-600',
 };
 
 const TIME_RANGES: { value: TimeRange; label: string }[] = [
-  { value: '24h', label: '24h' },
-  { value: '7d', label: '7d' },
-  { value: '30d', label: '30d' },
-  { value: '90d', label: '90d' },
+  { value: '24h', label: '24h' }, { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' }, { value: '90d', label: '90d' },
   { value: 'all', label: 'All' },
 ];
 
-// ---- Component ----
+const SOURCE_CATEGORIES: { value: SourceCategory; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: 'all', label: 'All Sources', icon: Database },
+  { value: 'open_source', label: 'Open Source', icon: Globe },
+  { value: 'external', label: 'External TI', icon: Radar },
+  { value: 'internal', label: 'Internal', icon: Shield },
+];
+
+const PANELS: { key: PanelType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { key: 'command_center', label: 'Command Center', icon: Target },
+  { key: 'ioc_explorer', label: 'IOC Explorer', icon: Shield },
+  { key: 'mitre_matrix', label: 'MITRE ATT&CK', icon: Grid3X3 },
+  { key: 'threat_actors', label: 'Threat Actors', icon: Users },
+  { key: 'correlation', label: 'Correlation', icon: Link2 },
+  { key: 'ai_analysis', label: 'AI Analysis', icon: Brain },
+];
+
+const MITRE_TACTIC_ORDER = [
+  'Reconnaissance', 'Resource Development', 'Initial Access', 'Execution',
+  'Persistence', 'Privilege Escalation', 'Defense Evasion', 'Credential Access',
+  'Discovery', 'Lateral Movement', 'Collection', 'Command and Control',
+  'Exfiltration', 'Impact', 'Other',
+];
+
+const ATLAS_TACTIC_ORDER = [
+  'Reconnaissance', 'Resource Development', 'ML Model Access', 'Initial Access',
+  'Execution', 'Persistence', 'Defense Evasion', 'Discovery',
+  'Collection', 'ML Attack Staging', 'Exfiltration', 'Impact', 'Other',
+];
+
+// ======================== HELPERS ========================
+
+function getConfidenceColor(confidence: number) {
+  if (confidence >= 80) return 'text-green-600 bg-green-500/10';
+  if (confidence >= 60) return 'text-yellow-600 bg-yellow-500/10';
+  return 'text-red-600 bg-red-500/10';
+}
+
+function getMitreHeatColor(count: number) {
+  if (count === 0) return 'bg-muted/30 text-muted-foreground';
+  if (count <= 2) return 'bg-blue-500/20 text-blue-700';
+  if (count <= 5) return 'bg-yellow-500/20 text-yellow-700';
+  if (count <= 10) return 'bg-orange-500/20 text-orange-700';
+  return 'bg-red-500/20 text-red-700';
+}
+
+function getSourceCategory(item: IntelItem): string {
+  return item.meta?.source_category || 'open_source';
+}
+
+// ======================== COMPONENT ========================
 
 export default function ThreatIntelligence() {
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  // View state
+  const [activePanel, setActivePanel] = useState<PanelType>('command_center');
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [sourceCategory, setSourceCategory] = useState<SourceCategory>('all');
 
-  // Summary data
+  // Data
   const [summary, setSummary] = useState<IntelSummary | null>(null);
-
-  // Intelligence list
   const [items, setItems] = useState<IntelItem[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [iocTypeFilter, setIocTypeFilter] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [mitreMatrix, setMitreMatrix] = useState<MitreMatrixData | null>(null);
+  const [correlationData, setCorrelationData] = useState<CorrelationData | null>(null);
+  const [landscapeSummary, setLandscapeSummary] = useState('');
 
-  // Detail
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [iocTypeFilter, setIocTypeFilter] = useState('');
+  const [intelTypeFilter, setIntelTypeFilter] = useState('');
+
+  // UI state
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState('');
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  // Manual IOC form
+  const [manualForm, setManualForm] = useState({ value: '', intelligence_type: 'IOC', ioc_type: 'ip', confidence: 70, evidence: '', notes: '' });
+  const [importText, setImportText] = useState('');
+
+  // Refs
+  const mitreFramework = useRef<'attack' | 'atlas'>('attack');
+
+  // ---- Data fetching ----
+
+  const setLoadingKey = (key: string, val: boolean) => setLoading(prev => ({ ...prev, [key]: val }));
 
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await articlesAPI.getIntelligenceSummary({ time_range: timeRange }) as any;
-      const data = res?.data || res;
-      setSummary(data);
-    } catch (err: any) {
-      console.error('Failed to load intelligence summary:', err);
-    }
-  }, [timeRange]);
-
-  const fetchItems = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      const intelType = activeTab === 'iocs' ? 'IOC'
-        : activeTab === 'ttps' ? 'TTP'
-        : activeTab === 'threat_actors' ? 'THREAT_ACTOR'
-        : undefined;
-
-      const res = await articlesAPI.getAllIntelligence({
-        page: currentPage,
-        page_size: 50,
-        intel_type: intelType,
-        ioc_type: iocTypeFilter || undefined,
+      setLoadingKey('summary', true);
+      const res = await articlesAPI.getIntelligenceSummary({
+        time_range: timeRange,
+        source_category: sourceCategory !== 'all' ? sourceCategory : undefined,
       }) as any;
+      setSummary(res?.data || res);
+    } catch { /* silent */ } finally {
+      setLoadingKey('summary', false);
+    }
+  }, [timeRange, sourceCategory]);
 
+  const fetchItems = useCallback(async (page?: number) => {
+    try {
+      setLoadingKey('items', true);
+      setError('');
+      const p = page ?? currentPage;
+      const res = await articlesAPI.getAllIntelligence({
+        page: p,
+        page_size: 50,
+        intel_type: intelTypeFilter || undefined,
+        ioc_type: iocTypeFilter || undefined,
+        source_category: sourceCategory !== 'all' ? sourceCategory : undefined,
+      }) as any;
       const data = res?.data || res;
       setItems(data?.items || []);
       setTotalItems(data?.total || 0);
     } catch (err: any) {
       setError(err.message || 'Failed to load intelligence');
     } finally {
-      setLoading(false);
+      setLoadingKey('items', false);
     }
-  }, [activeTab, currentPage, iocTypeFilter, timeRange]);
+  }, [currentPage, intelTypeFilter, iocTypeFilter, sourceCategory]);
+
+  const fetchMitreMatrix = useCallback(async () => {
+    try {
+      setLoadingKey('mitre', true);
+      const res = await articlesAPI.getMitreMatrix(mitreFramework.current) as any;
+      setMitreMatrix(res?.data || res);
+    } catch { /* silent */ } finally {
+      setLoadingKey('mitre', false);
+    }
+  }, []);
+
+  const fetchCorrelation = useCallback(async () => {
+    try {
+      setLoadingKey('correlation', true);
+      const res = await articlesAPI.getCorrelation({ time_range: timeRange }) as any;
+      setCorrelationData(res?.data || res);
+    } catch { /* silent */ } finally {
+      setLoadingKey('correlation', false);
+    }
+  }, [timeRange]);
+
+  const fetchLandscape = useCallback(async (focus?: string) => {
+    try {
+      setLoadingKey('landscape', true);
+      setError('');
+      const res = await articlesAPI.getAILandscape({ time_range: timeRange, focus_area: focus }) as any;
+      const data = res?.data || res;
+      setLandscapeSummary(data?.summary || 'No summary generated.');
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || 'Failed to generate landscape summary.';
+      setError(detail);
+    } finally {
+      setLoadingKey('landscape', false);
+    }
+  }, [timeRange]);
+
+  // ---- Effects ----
+
+  useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
   useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
-
-  useEffect(() => {
-    if (activeTab !== 'overview') {
+    if (activePanel === 'ioc_explorer' || activePanel === 'threat_actors') {
       setCurrentPage(1);
-      fetchItems();
+      const type = activePanel === 'threat_actors' ? 'THREAT_ACTOR' : '';
+      setIntelTypeFilter(type);
     }
-  }, [activeTab, iocTypeFilter, timeRange]);
+  }, [activePanel]);
 
   useEffect(() => {
-    if (activeTab !== 'overview') {
+    if (activePanel === 'ioc_explorer' || activePanel === 'threat_actors') {
+      fetchItems(1);
+    }
+  }, [intelTypeFilter, iocTypeFilter, sourceCategory]);
+
+  useEffect(() => {
+    if (activePanel === 'ioc_explorer' || activePanel === 'threat_actors') {
       fetchItems();
     }
   }, [currentPage]);
 
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 80) return 'text-green-600 bg-green-500/10';
-    if (confidence >= 60) return 'text-yellow-600 bg-yellow-500/10';
-    return 'text-red-600 bg-red-500/10';
+  useEffect(() => {
+    if (activePanel === 'mitre_matrix') fetchMitreMatrix();
+  }, [activePanel]);
+
+  useEffect(() => {
+    if (activePanel === 'correlation') fetchCorrelation();
+  }, [activePanel, fetchCorrelation]);
+
+  // ---- Actions ----
+
+  const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
+
+  const toggleSelection = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const selectAll = () => {
+    if (selectedIds.size === filteredItems.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(filteredItems.map(i => i.id)));
   };
+
+  const handleBulkReview = async (isFP: boolean) => {
+    try {
+      await articlesAPI.batchReviewIntelligence({
+        intel_ids: Array.from(selectedIds),
+        is_reviewed: !isFP,
+        is_false_positive: isFP,
+      });
+      setSelectedIds(new Set());
+      fetchItems();
+    } catch { /* silent */ }
+  };
+
+  const handleSubmitManualIOC = async () => {
+    if (!manualForm.value.trim()) return;
+    try {
+      setLoadingKey('submit', true);
+      await articlesAPI.submitManualIOC({
+        value: manualForm.value.trim(),
+        intelligence_type: manualForm.intelligence_type,
+        ioc_type: manualForm.ioc_type,
+        confidence: manualForm.confidence,
+        evidence: manualForm.evidence || undefined,
+        notes: manualForm.notes || undefined,
+        source_category: 'internal',
+      });
+      setShowAddModal(false);
+      setManualForm({ value: '', intelligence_type: 'IOC', ioc_type: 'ip', confidence: 70, evidence: '', notes: '' });
+      fetchItems();
+      fetchSummary();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Failed to submit indicator');
+    } finally {
+      setLoadingKey('submit', false);
+    }
+  };
+
+  const handleBulkImport = async () => {
+    if (!importText.trim()) return;
+    try {
+      setLoadingKey('import', true);
+      const lines = importText.trim().split('\n').filter(Boolean);
+      const importItems = lines.map(line => {
+        const parts = line.split(',').map(s => s.trim());
+        return {
+          value: parts[0],
+          intelligence_type: 'IOC' as const,
+          ioc_type: parts[1] || 'ip',
+          confidence: parseInt(parts[2]) || 70,
+        };
+      });
+      const res = await articlesAPI.bulkImportIOCs(importItems) as any;
+      const data = res?.data || res;
+      setError(`Imported: ${data?.imported || 0}, Skipped: ${data?.skipped || 0}`);
+      setShowImportModal(false);
+      setImportText('');
+      fetchItems();
+      fetchSummary();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Bulk import failed');
+    } finally {
+      setLoadingKey('import', false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const header = 'Type,Value,Confidence,MITRE_ID,Source,Created';
+    const rows = filteredItems.map(i =>
+      [i.ioc_type || i.intelligence_type, `"${i.value}"`, i.confidence, i.mitre_id || '', getSourceCategory(i), i.created_at || ''].join(',')
+    );
+    const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `intelligence-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+
+  // ---- Filtered items ----
 
   const filteredItems = searchQuery
-    ? items.filter((i) =>
+    ? items.filter(i =>
         i.value.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (i.mitre_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (i.article_title || '').toLowerCase().includes(searchQuery.toLowerCase())
+        (i.article?.title || '').toLowerCase().includes(searchQuery.toLowerCase())
       )
     : items;
 
-  const tabs = [
-    { key: 'overview' as const, label: 'Overview', icon: Target },
-    { key: 'iocs' as const, label: `IOCs${summary ? ` (${summary.intelligence_by_type?.IOC || 0})` : ''}`, icon: Shield },
-    { key: 'ttps' as const, label: `TTPs${summary ? ` (${summary.intelligence_by_type?.TTP || 0})` : ''}`, icon: Crosshair },
-    { key: 'threat_actors' as const, label: `Threat Actors${summary ? ` (${summary.intelligence_by_type?.THREAT_ACTOR || 0})` : ''}`, icon: AlertTriangle },
-  ];
+  // ---- Render helpers ----
+
+  const Spinner = () => (
+    <div className="flex justify-center py-12">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+    </div>
+  );
+
+  const EmptyState = ({ message, sub }: { message: string; sub?: string }) => (
+    <div className="text-center py-12 border border-dashed border-border rounded-lg">
+      <Shield className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+      <p className="text-muted-foreground">{message}</p>
+      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+    </div>
+  );
+
+  // ======================== RENDER ========================
 
   return (
     <div className="space-y-4 pb-8">
-      {/* Header */}
+      {/* ====== HEADER ====== */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Target className="w-7 h-7" />
-            Threat Intelligence
+            Threat Intelligence Center
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Extracted IOCs, TTPs, and Threat Actor intelligence from all articles
+            Unified intelligence from open sources, external feeds, and internal submissions
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Time Range */}
           <div className="flex bg-muted rounded-lg p-0.5">
-            {TIME_RANGES.map((tr) => (
-              <button
-                key={tr.value}
-                onClick={() => setTimeRange(tr.value)}
-                className={cn(
-                  'px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors',
-                  timeRange === tr.value
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {tr.label}
-              </button>
+            {TIME_RANGES.map(tr => (
+              <button key={tr.value} onClick={() => setTimeRange(tr.value)}
+                className={cn('px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors',
+                  timeRange === tr.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                )}>{tr.label}</button>
             ))}
           </div>
-          <button
-            onClick={() => { fetchSummary(); if (activeTab !== 'overview') fetchItems(); }}
-            className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground"
-          >
+          <button onClick={() => { fetchSummary(); fetchItems(); }}
+            className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground">
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-border">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
+      {/* ====== SOURCE SEGMENT FILTER ====== */}
+      <div className="flex items-center gap-1">
+        {SOURCE_CATEGORIES.map(sc => {
+          const Icon = sc.icon;
           return (
-            <button
-              key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setIocTypeFilter(''); setSearchQuery(''); }}
-              className={cn(
-                'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
-                activeTab === tab.key
-                  ? 'border-primary text-primary'
+            <button key={sc.value} onClick={() => setSourceCategory(sc.value)}
+              className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-colors border',
+                sourceCategory === sc.value
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-card text-muted-foreground border-border hover:text-foreground hover:border-primary/40'
+              )}>
+              <Icon className="w-3.5 h-3.5" />
+              {sc.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ====== PANEL NAVIGATION ====== */}
+      <div className="flex gap-1 border-b border-border pb-0">
+        {PANELS.map(panel => {
+          const Icon = panel.icon;
+          return (
+            <button key={panel.key}
+              onClick={() => { setActivePanel(panel.key); setSearchQuery(''); setIocTypeFilter(''); setSelectedIds(new Set()); setExpandedItemId(null); }}
+              className={cn('flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium rounded-t-lg transition-colors border-b-2',
+                activePanel === panel.key
+                  ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              {tab.label}
+              )}>
+              <Icon className="w-3.5 h-3.5" />
+              {panel.label}
             </button>
           );
         })}
@@ -254,284 +471,728 @@ export default function ThreatIntelligence() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-600">
-          {error}
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-600 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      {/* ====== OVERVIEW TAB ====== */}
-      {activeTab === 'overview' && summary && (
-        <div className="space-y-6">
+      {/* ============================================================ */}
+      {/* PANEL 1: COMMAND CENTER                                       */}
+      {/* ============================================================ */}
+      {activePanel === 'command_center' && (
+        <div className="space-y-5">
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <button
-              onClick={() => setActiveTab('iocs')}
-              className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors text-left"
-            >
-              <p className="text-sm text-muted-foreground">IOCs</p>
-              <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-                <Shield className="w-5 h-5 text-red-600" />
-                {summary.intelligence_by_type?.IOC || 0}
-              </p>
-            </button>
-            <button
-              onClick={() => setActiveTab('ttps')}
-              className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors text-left"
-            >
-              <p className="text-sm text-muted-foreground">TTPs</p>
-              <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-                <Crosshair className="w-5 h-5 text-orange-600" />
-                {summary.intelligence_by_type?.TTP || 0}
-              </p>
-            </button>
-            <button
-              onClick={() => setActiveTab('threat_actors')}
-              className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors text-left"
-            >
-              <p className="text-sm text-muted-foreground">Threat Actors</p>
-              <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                {summary.intelligence_by_type?.THREAT_ACTOR || 0}
-              </p>
-            </button>
-            <div className="bg-card border border-border rounded-lg p-4">
-              <p className="text-sm text-muted-foreground">Total Intelligence</p>
-              <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-                <Target className="w-5 h-5 text-primary" />
-                {summary.total_intelligence || 0}
-              </p>
-            </div>
-          </div>
-
-          {/* Top MITRE Techniques */}
-          {summary.top_mitre_techniques && summary.top_mitre_techniques.length > 0 && (
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Top MITRE ATT&CK Techniques</h3>
-              <div className="space-y-2">
-                {summary.top_mitre_techniques.slice(0, 10).map((t, i) => {
-                  const maxCount = summary.top_mitre_techniques[0].count;
-                  const barWidth = maxCount > 0 ? (t.count / maxCount) * 100 : 0;
-                  return (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className="text-xs font-mono text-primary w-24 flex-shrink-0">{t.mitre_id}</span>
-                      <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary/30 rounded-full flex items-center px-2"
-                          style={{ width: `${Math.max(barWidth, 5)}%` }}
-                        >
-                          <span className="text-[10px] font-medium text-foreground whitespace-nowrap">{t.name || t.mitre_id}</span>
-                        </div>
-                      </div>
-                      <span className="text-xs text-muted-foreground w-8 text-right">{t.count}</span>
-                    </div>
-                  );
-                })}
+          {summary ? (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <button onClick={() => { setActivePanel('ioc_explorer'); setIntelTypeFilter('IOC'); }}
+                  className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-all text-left group">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-muted-foreground font-medium">IOCs</p>
+                    <Shield className="w-4 h-4 text-red-500 opacity-60 group-hover:opacity-100" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{summary.intelligence_by_type?.IOC || 0}</p>
+                </button>
+                <button onClick={() => { setActivePanel('ioc_explorer'); setIntelTypeFilter('TTP'); }}
+                  className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-all text-left group">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-muted-foreground font-medium">TTPs</p>
+                    <Crosshair className="w-4 h-4 text-orange-500 opacity-60 group-hover:opacity-100" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{summary.intelligence_by_type?.TTP || 0}</p>
+                </button>
+                <button onClick={() => setActivePanel('threat_actors')}
+                  className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-all text-left group">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-muted-foreground font-medium">Threat Actors</p>
+                    <Users className="w-4 h-4 text-yellow-500 opacity-60 group-hover:opacity-100" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{summary.intelligence_by_type?.THREAT_ACTOR || 0}</p>
+                </button>
+                <button onClick={() => setActivePanel('mitre_matrix')}
+                  className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-all text-left group">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-muted-foreground font-medium">MITRE Techniques</p>
+                    <Grid3X3 className="w-4 h-4 text-blue-500 opacity-60 group-hover:opacity-100" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{summary.top_mitre_techniques?.length || 0}</p>
+                </button>
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-muted-foreground font-medium">Total Intelligence</p>
+                    <Target className="w-4 h-4 text-primary opacity-60" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{summary.total_intelligence || 0}</p>
+                </div>
               </div>
-            </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Top MITRE Techniques */}
+                {summary.top_mitre_techniques && summary.top_mitre_techniques.length > 0 && (
+                  <div className="bg-card border border-border rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-primary" />
+                      Top MITRE ATT&CK Techniques
+                    </h3>
+                    <div className="space-y-1.5">
+                      {summary.top_mitre_techniques.slice(0, 10).map((t, i) => {
+                        const maxCount = summary.top_mitre_techniques[0].count;
+                        const barWidth = maxCount > 0 ? (t.count / maxCount) * 100 : 0;
+                        return (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono text-primary w-20 flex-shrink-0">{t.mitre_id}</span>
+                            <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-primary/25 rounded-full flex items-center px-2"
+                                style={{ width: `${Math.max(barWidth, 8)}%` }}>
+                                <span className="text-[9px] font-medium text-foreground whitespace-nowrap truncate">{t.name || t.mitre_id}</span>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground w-6 text-right font-medium">{t.count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Active Watchlist Keywords */}
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-primary" />
+                    Active Watchlist Keywords
+                  </h3>
+                  {summary.active_watchlist_keywords && summary.active_watchlist_keywords.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {summary.active_watchlist_keywords.map((kw, i) => (
+                        <span key={i} className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded-full">
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No active watchlist keywords configured</p>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <Spinner />
           )}
         </div>
       )}
 
-      {activeTab === 'overview' && !summary && (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-        </div>
-      )}
-
-      {/* ====== IOCs / TTPs / THREAT ACTORS TABS ====== */}
-      {activeTab !== 'overview' && (
-        <div className="space-y-4">
+      {/* ============================================================ */}
+      {/* PANEL 2: IOC EXPLORER                                         */}
+      {/* ============================================================ */}
+      {activePanel === 'ioc_explorer' && (
+        <div className="space-y-3">
           {/* Toolbar */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search indicators..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
+              <input type="text" placeholder="Search indicators, MITRE IDs, articles..."
+                value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
 
-            {/* IOC Type Filter (only for IOCs tab) */}
-            {activeTab === 'iocs' && (
+            {/* Intel Type Filter */}
+            <div className="flex bg-muted rounded-lg p-0.5">
+              {[{ v: '', l: 'All' }, { v: 'IOC', l: 'IOCs' }, { v: 'TTP', l: 'TTPs' }, { v: 'THREAT_ACTOR', l: 'Actors' }].map(t => (
+                <button key={t.v} onClick={() => { setIntelTypeFilter(t.v); setCurrentPage(1); }}
+                  className={cn('px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors',
+                    intelTypeFilter === t.v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  )}>{t.l}</button>
+              ))}
+            </div>
+
+            {/* IOC Type Filter (when viewing IOCs) */}
+            {(!intelTypeFilter || intelTypeFilter === 'IOC') && (
               <div className="flex bg-muted rounded-lg p-0.5">
-                {['', 'ip', 'domain', 'hash_sha256', 'cve', 'email', 'url'].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => { setIocTypeFilter(t); setCurrentPage(1); }}
-                    className={cn(
-                      'px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors',
-                      iocTypeFilter === t
-                        ? 'bg-card text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    {t || 'All'}
-                  </button>
+                {['', 'ip', 'domain', 'hash_sha256', 'cve', 'email', 'url'].map(t => (
+                  <button key={t} onClick={() => { setIocTypeFilter(t); setCurrentPage(1); }}
+                    className={cn('px-2 py-1.5 text-[10px] font-medium rounded-md transition-colors',
+                      iocTypeFilter === t ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    )}>{t || 'All'}</button>
                 ))}
               </div>
             )}
 
-            <span className="text-xs text-muted-foreground ml-auto">
-              {totalItems} total
-            </span>
+            <div className="flex items-center gap-1 ml-auto">
+              <button onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90">
+                <Plus className="w-3.5 h-3.5" /> Add IOC
+              </button>
+              <button onClick={() => setShowImportModal(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-secondary text-foreground rounded-lg border border-border hover:bg-secondary/80">
+                <Upload className="w-3.5 h-3.5" /> Import
+              </button>
+              <button onClick={handleExportCSV}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-secondary text-foreground rounded-lg border border-border hover:bg-secondary/80">
+                <Download className="w-3.5 h-3.5" /> Export
+              </button>
+              <span className="text-xs text-muted-foreground ml-2">{totalItems} total</span>
+            </div>
           </div>
 
-          {/* List */}
-          {loading && items.length === 0 ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          {/* Bulk Action Bar */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg p-2.5">
+              <span className="text-xs font-medium text-foreground">{selectedIds.size} selected</span>
+              <button onClick={() => handleBulkReview(false)}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-green-500/10 text-green-600 rounded hover:bg-green-500/20">
+                <CheckCircle className="w-3 h-3" /> Mark Reviewed
+              </button>
+              <button onClick={() => handleBulkReview(true)}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-red-500/10 text-red-600 rounded hover:bg-red-500/20">
+                <XCircle className="w-3 h-3" /> Mark False Positive
+              </button>
+              <button onClick={() => setSelectedIds(new Set())}
+                className="ml-auto text-xs text-muted-foreground hover:text-foreground">Clear</button>
             </div>
-          ) : filteredItems.length === 0 ? (
-            <div className="text-center py-12 border border-dashed border-border rounded-lg">
-              <Shield className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-muted-foreground">No intelligence found</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Extract intelligence from articles to populate this view
-              </p>
-            </div>
+          )}
+
+          {/* Table */}
+          {loading.items && items.length === 0 ? <Spinner /> : filteredItems.length === 0 ? (
+            <EmptyState message="No intelligence found" sub="Extract intelligence from articles or submit indicators manually" />
           ) : (
-            <div className="space-y-1.5">
-              {filteredItems.map((item) => {
-                const isExpanded = expandedItemId === item.id;
-                const iocType = item.meta?.type || item.intelligence_type?.toLowerCase();
-                const TypeIcon = IOC_TYPE_ICONS[iocType] || Shield;
-                const typeColor = IOC_TYPE_COLORS[iocType] || 'bg-gray-500/10 text-gray-600';
+            <>
+              {/* Table Header */}
+              <div className="flex items-center gap-3 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b border-border">
+                <input type="checkbox" checked={selectedIds.size === filteredItems.length && filteredItems.length > 0}
+                  onChange={selectAll} className="rounded border-border" />
+                <span className="w-16">Type</span>
+                <span className="flex-1">Value</span>
+                <span className="w-14 text-center">Conf.</span>
+                <span className="w-16">Source</span>
+                <span className="w-32">Article</span>
+                <span className="w-16 text-right">Date</span>
+              </div>
 
-                return (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      'bg-card border rounded-lg overflow-hidden transition-colors',
-                      item.is_false_positive ? 'border-red-500/30 opacity-60' : 'border-border hover:border-primary/30'
-                    )}
-                  >
-                    {/* Main Row */}
-                    <div
-                      className="p-3 flex items-center gap-3 cursor-pointer"
-                      onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      )}
+              {/* Rows */}
+              <div className="space-y-0.5">
+                {filteredItems.map(item => {
+                  const isExpanded = expandedItemId === item.id;
+                  const iocType = item.ioc_type || item.meta?.type || item.intelligence_type?.toLowerCase();
+                  const TypeIcon = IOC_TYPE_ICONS[iocType] || Shield;
+                  const typeColor = IOC_TYPE_COLORS[iocType] || 'bg-gray-500/10 text-gray-600';
+                  const srcCat = getSourceCategory(item);
 
-                      {/* Icon + Value */}
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-1', typeColor)}>
+                  return (
+                    <div key={item.id} className={cn('bg-card border rounded-lg overflow-hidden transition-colors',
+                      item.is_false_positive ? 'border-red-500/30 opacity-50' : 'border-border hover:border-primary/30',
+                      selectedIds.has(item.id) && 'ring-1 ring-primary/40'
+                    )}>
+                      <div className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
+                        onClick={() => setExpandedItemId(isExpanded ? null : item.id)}>
+                        <input type="checkbox" checked={selectedIds.has(item.id)}
+                          onChange={e => { e.stopPropagation(); toggleSelection(item.id); }}
+                          onClick={e => e.stopPropagation()} className="rounded border-border" />
+                        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5 w-16 justify-center flex-shrink-0', typeColor)}>
                           <TypeIcon className="w-3 h-3" />
-                          {iocType?.toUpperCase()}
+                          {(iocType || '').toUpperCase().slice(0, 8)}
                         </span>
-                        <span className="font-mono text-sm text-foreground truncate">
-                          {item.mitre_id ? `${item.mitre_id} — ` : ''}{item.value}
+                        <span className="font-mono text-xs text-foreground truncate flex-1 flex items-center gap-1">
+                          {item.mitre_id ? <span className="text-primary font-semibold">{item.mitre_id}</span> : null}
+                          {item.mitre_id ? ' — ' : ''}{item.value}
+                          {item.is_reviewed && <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0" />}
+                          {item.is_false_positive && <XCircle className="w-3 h-3 text-red-600 flex-shrink-0" />}
                         </span>
-                        {item.is_reviewed && (
-                          <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
-                        )}
-                        {item.is_false_positive && (
-                          <XCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
-                        )}
-                      </div>
-
-                      {/* Confidence + Article */}
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium', getConfidenceColor(item.confidence))}>
+                        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium w-14 text-center flex-shrink-0', getConfidenceColor(item.confidence))}>
                           {item.confidence}%
                         </span>
-                        {item.article_source_name && (
-                          <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                            {item.article_source_name}
-                          </span>
-                        )}
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded w-16 text-center flex-shrink-0',
+                          srcCat === 'internal' ? 'bg-blue-500/10 text-blue-600' :
+                          srcCat === 'external' ? 'bg-purple-500/10 text-purple-600' :
+                          'bg-gray-500/10 text-gray-500'
+                        )}>
+                          {srcCat === 'open_source' ? 'OSINT' : srcCat.toUpperCase().slice(0, 8)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground truncate w-32 flex-shrink-0">
+                          {item.article?.title || '—'}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground w-16 text-right flex-shrink-0">
                           {item.created_at ? formatRelativeTime(item.created_at) : ''}
                         </span>
                       </div>
-                    </div>
 
-                    {/* Expanded Detail */}
-                    {isExpanded && (
-                      <div className="border-t border-border p-4 bg-muted/30 space-y-3">
-                        {/* Evidence */}
-                        {item.evidence && (
-                          <div>
-                            <p className="text-xs font-semibold text-foreground mb-1">Evidence</p>
-                            <p className="text-xs text-muted-foreground bg-background border border-border rounded p-2">
-                              {item.evidence}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Linked Article */}
-                        {item.article_title && (
-                          <div>
-                            <p className="text-xs font-semibold text-foreground mb-1">Source Article</p>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setSelectedArticleId(String(item.article_id)); }}
-                              className="text-xs text-primary hover:underline flex items-center gap-1"
-                            >
-                              <FileText className="w-3 h-3" />
-                              {item.article_title}
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 pt-2 border-t border-border">
-                          <button
-                            onClick={() => copyToClipboard(item.value)}
-                            className="flex items-center gap-1 px-2 py-1 text-xs bg-secondary text-foreground rounded hover:bg-secondary/80"
-                          >
-                            <Copy className="w-3 h-3" />
-                            Copy Value
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setSelectedArticleId(String(item.article_id)); }}
-                            className="flex items-center gap-1 px-2 py-1 text-xs bg-secondary text-foreground rounded hover:bg-secondary/80"
-                          >
-                            <Eye className="w-3 h-3" />
-                            View Article
-                          </button>
-                          {item.meta?.type && (
-                            <span className="text-[10px] text-muted-foreground ml-auto">
-                              Meta: {JSON.stringify(item.meta)}
-                            </span>
+                      {isExpanded && (
+                        <div className="border-t border-border p-4 bg-muted/30 space-y-3">
+                          {item.evidence && (
+                            <div>
+                              <p className="text-xs font-semibold text-foreground mb-1">Evidence</p>
+                              <p className="text-xs text-muted-foreground bg-background border border-border rounded p-2">{item.evidence}</p>
+                            </div>
                           )}
+                          {item.article?.title && (
+                            <div>
+                              <p className="text-xs font-semibold text-foreground mb-1">Source Article</p>
+                              <button onClick={e => { e.stopPropagation(); setSelectedArticleId(String(item.article!.id)); }}
+                                className="text-xs text-primary hover:underline flex items-center gap-1">
+                                <FileText className="w-3 h-3" />{item.article.title}
+                                {item.article.is_high_priority && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                              </button>
+                            </div>
+                          )}
+                          {item.mitre_url && (
+                            <div>
+                              <p className="text-xs font-semibold text-foreground mb-1">MITRE Reference</p>
+                              <a href={item.mitre_url} target="_blank" rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline flex items-center gap-1">
+                                <ExternalLink className="w-3 h-3" />
+                                {item.mitre_id}: {item.mitre_name || 'View on MITRE'}
+                              </a>
+                            </div>
+                          )}
+                          {item.notes && (
+                            <div>
+                              <p className="text-xs font-semibold text-foreground mb-1">Notes</p>
+                              <p className="text-xs text-muted-foreground">{item.notes}</p>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 pt-2 border-t border-border">
+                            <button onClick={() => copyToClipboard(item.value)}
+                              className="flex items-center gap-1 px-2 py-1 text-xs bg-secondary text-foreground rounded hover:bg-secondary/80">
+                              <Copy className="w-3 h-3" /> Copy
+                            </button>
+                            {item.article && (
+                              <button onClick={e => { e.stopPropagation(); setSelectedArticleId(String(item.article!.id)); }}
+                                className="flex items-center gap-1 px-2 py-1 text-xs bg-secondary text-foreground rounded hover:bg-secondary/80">
+                                <Eye className="w-3 h-3" /> View Article
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination */}
+              {totalItems > 50 && (
+                <div className="flex items-center justify-center gap-2 pt-4">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-xs bg-muted text-foreground rounded hover:bg-accent disabled:opacity-50">Previous</button>
+                  <span className="text-xs text-muted-foreground">Page {currentPage} of {Math.ceil(totalItems / 50)}</span>
+                  <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage * 50 >= totalItems}
+                    className="px-3 py-1.5 text-xs bg-muted text-foreground rounded hover:bg-accent disabled:opacity-50">Next</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PANEL 3: MITRE ATT&CK MATRIX                                 */}
+      {/* ============================================================ */}
+      {activePanel === 'mitre_matrix' && (
+        <div className="space-y-4">
+          {/* Framework toggle */}
+          <div className="flex items-center gap-2">
+            <div className="flex bg-muted rounded-lg p-0.5">
+              {(['attack', 'atlas'] as const).map(fw => (
+                <button key={fw} onClick={() => { mitreFramework.current = fw; fetchMitreMatrix(); }}
+                  className={cn('px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                    mitreFramework.current === fw ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  )}>MITRE {fw === 'attack' ? 'ATT&CK' : 'ATLAS'}</button>
+              ))}
+            </div>
+            {mitreMatrix && (
+              <span className="text-xs text-muted-foreground">{mitreMatrix.total_techniques} unique techniques detected</span>
+            )}
+          </div>
+
+          {loading.mitre ? <Spinner /> : !mitreMatrix || Object.keys(mitreMatrix.tactics).length === 0 ? (
+            <EmptyState message="No MITRE techniques detected" sub="Extract intelligence from articles to populate the matrix" />
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="flex gap-1 min-w-max pb-4">
+                {(mitreFramework.current === 'atlas' ? ATLAS_TACTIC_ORDER : MITRE_TACTIC_ORDER)
+                  .filter(t => mitreMatrix.tactics[t]?.length > 0).map(tactic => (
+                  <div key={tactic} className="w-40 flex-shrink-0">
+                    <div className="bg-primary/10 text-primary text-[10px] font-semibold px-2 py-2 rounded-t-lg text-center border border-border border-b-0">
+                      {tactic}
+                    </div>
+                    <div className="border border-border rounded-b-lg bg-card overflow-hidden divide-y divide-border">
+                      {(mitreMatrix.tactics[tactic] || []).map((tech: any) => (
+                        <a key={tech.mitre_id} href={tech.url} target="_blank" rel="noopener noreferrer"
+                          className={cn('block px-2 py-1.5 hover:brightness-110 transition-all', getMitreHeatColor(tech.count))}
+                          title={tech.name || tech.mitre_id}>
+                          <p className="text-[10px] font-mono font-semibold">{tech.mitre_id}</p>
+                          {tech.name && <p className="text-[9px] text-foreground/70 truncate">{tech.name}</p>}
+                          <p className="text-[9px] text-right font-medium">{tech.count} hits · {tech.article_count} art.</p>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Legend */}
+          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+            <span>Heat scale:</span>
+            <span className={cn('px-2 py-0.5 rounded', getMitreHeatColor(1))}>1-2</span>
+            <span className={cn('px-2 py-0.5 rounded', getMitreHeatColor(3))}>3-5</span>
+            <span className={cn('px-2 py-0.5 rounded', getMitreHeatColor(6))}>6-10</span>
+            <span className={cn('px-2 py-0.5 rounded', getMitreHeatColor(11))}>10+</span>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PANEL 4: THREAT ACTORS                                        */}
+      {/* ============================================================ */}
+      {activePanel === 'threat_actors' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+              <input type="text" placeholder="Search threat actors..."
+                value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
+            </div>
+            <span className="text-xs text-muted-foreground ml-auto">{totalItems} references</span>
+          </div>
+
+          {loading.items && items.length === 0 ? <Spinner /> : filteredItems.length === 0 ? (
+            <EmptyState message="No threat actors found" sub="Threat actors are extracted from article analysis" />
+          ) : (
+            <>
+              {/* Group by actor name */}
+              {(() => {
+                const grouped = new Map<string, { items: IntelItem[]; totalConfidence: number }>();
+                filteredItems.forEach(item => {
+                  const key = item.value;
+                  const existing = grouped.get(key) || { items: [], totalConfidence: 0 };
+                  existing.items.push(item);
+                  existing.totalConfidence += item.confidence;
+                  grouped.set(key, existing);
+                });
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Array.from(grouped.entries())
+                      .sort((a, b) => b[1].items.length - a[1].items.length)
+                      .map(([actor, data]) => {
+                        const avgConf = Math.round(data.totalConfidence / data.items.length);
+                        const articles = new Set(data.items.map(i => i.article?.title).filter(Boolean));
+                        const attribution = data.items[0]?.meta?.attribution || data.items[0]?.evidence?.split('.')[0] || '';
+
+                        return (
+                          <div key={actor} className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-colors">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <Users className="w-5 h-5 text-yellow-500" />
+                                <h3 className="text-sm font-bold text-foreground">{actor}</h3>
+                              </div>
+                              <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium', getConfidenceColor(avgConf))}>
+                                {avgConf}%
+                              </span>
+                            </div>
+                            {attribution && <p className="text-[10px] text-muted-foreground mb-2 line-clamp-2">{attribution}</p>}
+                            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                              <span>{data.items.length} references</span>
+                              <span>{articles.size} articles</span>
+                            </div>
+                            {articles.size > 0 && (
+                              <div className="mt-2 pt-2 border-t border-border">
+                                {Array.from(articles).slice(0, 2).map((title, i) => (
+                                  <p key={i} className="text-[10px] text-muted-foreground truncate">{title}</p>
+                                ))}
+                                {articles.size > 2 && (
+                                  <p className="text-[10px] text-primary">+{articles.size - 2} more</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
                 );
-              })}
-            </div>
-          )}
+              })()}
 
-          {/* Pagination */}
-          {totalItems > 50 && (
-            <div className="flex items-center justify-center gap-2 pt-4">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-xs bg-muted text-foreground rounded hover:bg-accent disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="text-xs text-muted-foreground">
-                Page {currentPage} of {Math.ceil(totalItems / 50)}
-              </span>
-              <button
-                onClick={() => setCurrentPage((p) => p + 1)}
-                disabled={currentPage * 50 >= totalItems}
-                className="px-3 py-1.5 text-xs bg-muted text-foreground rounded hover:bg-accent disabled:opacity-50"
-              >
-                Next
-              </button>
+              {totalItems > 50 && (
+                <div className="flex items-center justify-center gap-2 pt-4">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-xs bg-muted text-foreground rounded hover:bg-accent disabled:opacity-50">Previous</button>
+                  <span className="text-xs text-muted-foreground">Page {currentPage} of {Math.ceil(totalItems / 50)}</span>
+                  <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage * 50 >= totalItems}
+                    className="px-3 py-1.5 text-xs bg-muted text-foreground rounded hover:bg-accent disabled:opacity-50">Next</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PANEL 5: CORRELATION                                          */}
+      {/* ============================================================ */}
+      {activePanel === 'correlation' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-primary" /> Cross-Source Correlation
+            </h3>
+            <button onClick={fetchCorrelation} disabled={loading.correlation}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
+              {loading.correlation ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Analyze
+            </button>
+          </div>
+
+          {loading.correlation ? <Spinner /> : !correlationData ? (
+            <EmptyState message="Run correlation analysis" sub="Click Analyze to find shared indicators across articles" />
+          ) : (
+            <div className="space-y-6">
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-card border border-border rounded-lg p-4">
+                  <p className="text-xs text-muted-foreground">Shared IOCs</p>
+                  <p className="text-xl font-bold text-foreground">{correlationData.total_shared_iocs}</p>
+                  <p className="text-[10px] text-muted-foreground">IOCs appearing in 2+ articles</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-4">
+                  <p className="text-xs text-muted-foreground">Article Clusters</p>
+                  <p className="text-xl font-bold text-foreground">{correlationData.total_clusters}</p>
+                  <p className="text-[10px] text-muted-foreground">Groups of articles sharing indicators</p>
+                </div>
+              </div>
+
+              {/* Shared IOCs */}
+              {correlationData.shared_iocs.length > 0 && (
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <h4 className="text-xs font-semibold text-foreground mb-3">Shared Indicators</h4>
+                  <div className="space-y-2">
+                    {correlationData.shared_iocs.slice(0, 20).map((ioc, i) => (
+                      <div key={i} className="flex items-start gap-3 p-2 bg-muted/30 rounded-lg">
+                        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0',
+                          IOC_TYPE_COLORS[ioc.ioc_type] || 'bg-gray-500/10 text-gray-600')}>
+                          {ioc.ioc_type.toUpperCase()}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono text-xs text-foreground truncate">{ioc.value}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Found in {ioc.article_count} articles: {ioc.article_titles.slice(0, 3).join(' | ')}
+                            {ioc.article_count > 3 && ` +${ioc.article_count - 3} more`}
+                          </p>
+                        </div>
+                        <button onClick={() => copyToClipboard(ioc.value)}
+                          className="text-muted-foreground hover:text-foreground">
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Clusters */}
+              {correlationData.clusters.length > 0 && (
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <h4 className="text-xs font-semibold text-foreground mb-3">Article Clusters</h4>
+                  <div className="space-y-3">
+                    {correlationData.clusters.map((cluster, i) => (
+                      <div key={i} className="p-3 bg-muted/30 rounded-lg">
+                        <p className="text-xs font-medium text-foreground mb-1">
+                          Cluster {i + 1}: {cluster.articles.length} articles share {cluster.shared_iocs.length} IOCs
+                        </p>
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {cluster.shared_iocs.slice(0, 5).map((ioc, j) => (
+                            <span key={j} className="font-mono text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded">{ioc}</span>
+                          ))}
+                        </div>
+                        <div className="space-y-0.5">
+                          {cluster.articles.map(a => (
+                            <button key={a.id} onClick={() => setSelectedArticleId(String(a.id))}
+                              className="block text-[10px] text-primary hover:underline truncate max-w-full text-left">
+                              {a.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {correlationData.shared_iocs.length === 0 && correlationData.clusters.length === 0 && (
+                <EmptyState message="No correlations found" sub={`No shared indicators detected in the ${timeRange} time range`} />
+              )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PANEL 6: AI ANALYSIS                                          */}
+      {/* ============================================================ */}
+      {activePanel === 'ai_analysis' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Brain className="w-4 h-4 text-primary" /> AI Threat Landscape Analysis
+            </h3>
+            <div className="flex items-center gap-2">
+              <button onClick={() => fetchLandscape()} disabled={loading.landscape}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
+                {loading.landscape ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                Generate Analysis
+              </button>
+            </div>
+          </div>
+
+          {/* Focus Areas */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-muted-foreground mr-1">Focus:</span>
+            {['All', 'Ransomware', 'APT', 'Vulnerabilities', 'Phishing', 'Supply Chain'].map(focus => (
+              <button key={focus}
+                onClick={() => fetchLandscape(focus === 'All' ? undefined : focus.toLowerCase())}
+                disabled={loading.landscape}
+                className="px-2.5 py-1 text-[10px] font-medium bg-secondary text-foreground rounded-full border border-border hover:bg-secondary/80 disabled:opacity-50">
+                {focus}
+              </button>
+            ))}
+          </div>
+
+          {loading.landscape ? <Spinner /> : landscapeSummary ? (
+            <div className="bg-card border border-border rounded-xl p-5">
+              <div className="prose prose-sm max-w-none text-sm text-foreground leading-relaxed"
+                dangerouslySetInnerHTML={{
+                  __html: landscapeSummary
+                    .replace(/^### (.+)$/gm, '<h4 class="font-semibold text-foreground mt-4 mb-1">$1</h4>')
+                    .replace(/^## (.+)$/gm, '<h3 class="font-bold text-foreground mt-5 mb-2">$1</h3>')
+                    .replace(/^# (.+)$/gm, '<h2 class="font-bold text-foreground text-lg mt-5 mb-2">$1</h2>')
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                    .replace(/`([^`]+)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-xs font-mono">$1</code>')
+                    .replace(/^[\-\*] (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
+                    .replace(/^\d+\.\s+(.+)$/gm, '<li class="ml-4 list-decimal">$1</li>')
+                    .replace(/\n\n/g, '<br/><br/>')
+                    .replace(/\n/g, '<br/>')
+                }} />
+            </div>
+          ) : (
+            <EmptyState message="No analysis generated yet"
+              sub="Click 'Generate Analysis' to create an AI-powered threat landscape brief" />
+          )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODALS                                                        */}
+      {/* ============================================================ */}
+
+      {/* Add IOC Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowAddModal(false)}>
+          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Add Intelligence Indicator
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-foreground block mb-1">Value *</label>
+                <input type="text" value={manualForm.value}
+                  onChange={e => setManualForm(f => ({ ...f, value: e.target.value }))}
+                  placeholder="e.g., 192.168.1.100, evil.com, CVE-2024-1234..."
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-foreground block mb-1">Type</label>
+                  <select value={manualForm.intelligence_type}
+                    onChange={e => setManualForm(f => ({ ...f, intelligence_type: e.target.value }))}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                    <option value="IOC">IOC</option>
+                    <option value="TTP">TTP</option>
+                    <option value="THREAT_ACTOR">Threat Actor</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-foreground block mb-1">IOC Type</label>
+                  <select value={manualForm.ioc_type}
+                    onChange={e => setManualForm(f => ({ ...f, ioc_type: e.target.value }))}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                    <option value="ip">IP</option>
+                    <option value="domain">Domain</option>
+                    <option value="url">URL</option>
+                    <option value="hash_md5">Hash (MD5)</option>
+                    <option value="hash_sha1">Hash (SHA1)</option>
+                    <option value="hash_sha256">Hash (SHA256)</option>
+                    <option value="email">Email</option>
+                    <option value="cve">CVE</option>
+                    <option value="file_path">File Path</option>
+                    <option value="registry_key">Registry Key</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground block mb-1">Confidence ({manualForm.confidence}%)</label>
+                <input type="range" min="0" max="100" value={manualForm.confidence}
+                  onChange={e => setManualForm(f => ({ ...f, confidence: parseInt(e.target.value) }))}
+                  className="w-full" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground block mb-1">Evidence / Context</label>
+                <textarea value={manualForm.evidence}
+                  onChange={e => setManualForm(f => ({ ...f, evidence: e.target.value }))}
+                  placeholder="Describe where this indicator was found or why it's relevant..."
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none h-20" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground block mb-1">Notes</label>
+                <input type="text" value={manualForm.notes}
+                  onChange={e => setManualForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Additional notes..."
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+              <button onClick={handleSubmitManualIOC} disabled={!manualForm.value.trim() || loading.submit}
+                className="flex items-center gap-1 px-4 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
+                {loading.submit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowImportModal(false)}>
+          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-lg shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
+              <Upload className="w-4 h-4" /> Bulk Import IOCs
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Paste one indicator per line. Format: <code className="bg-muted px-1 rounded">value,type,confidence</code>
+              <br />Example: <code className="bg-muted px-1 rounded">192.168.1.1,ip,80</code>
+            </p>
+            <textarea value={importText}
+              onChange={e => setImportText(e.target.value)}
+              placeholder="192.168.1.100,ip,85&#10;evil-domain.com,domain,70&#10;abc123def456...,hash_sha256,90"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none h-48" />
+            <div className="flex justify-between items-center mt-4">
+              <span className="text-xs text-muted-foreground">{importText.split('\n').filter(Boolean).length} lines</span>
+              <div className="flex gap-2">
+                <button onClick={() => setShowImportModal(false)}
+                  className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+                <button onClick={handleBulkImport} disabled={!importText.trim() || loading.import}
+                  className="flex items-center gap-1 px-4 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
+                  {loading.import ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  Import
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

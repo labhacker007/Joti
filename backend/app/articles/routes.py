@@ -17,6 +17,7 @@ from app.audit.manager import AuditManager
 from app.core.logging import logger
 from typing import Optional, List
 from datetime import datetime
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
@@ -1371,6 +1372,7 @@ def get_intelligence_summary(
     status_filter: Optional[str] = Query(None, description="Filter by article status"),
     intel_type: Optional[str] = Query(None, description="IOC, TTP, or ATLAS"),
     time_range: Optional[str] = Query(None, description="Time range: 1h, 6h, 12h, 24h, 7d, 30d, 90d, all"),
+    source_category: Optional[str] = Query(None, description="Filter by source: open_source, external, internal"),
     current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
@@ -1378,7 +1380,7 @@ def get_intelligence_summary(
     from sqlalchemy import func
     from app.models import ExtractedIntelligenceType, WatchListKeyword
     from datetime import datetime, timedelta
-    
+
     # Calculate start date based on time_range
     start_date = None
     if time_range and time_range != "all":
@@ -1397,16 +1399,28 @@ def get_intelligence_summary(
             start_date = now - timedelta(days=30)
         elif time_range == "90d":
             start_date = now - timedelta(days=90)
-    
+
     # Base query
     query = db.query(ExtractedIntelligence).join(Article)
-    
+
     if start_date:
         query = query.filter(Article.created_at >= start_date)
-    
+
     if status_filter:
         query = query.filter(Article.status == status_filter)
-    
+
+    # Source category filter — existing records without source_category in meta are "open_source"
+    if source_category and source_category != "all":
+        if source_category == "open_source":
+            query = query.filter(
+                (ExtractedIntelligence.meta.op('->>')('source_category') == None) |
+                (ExtractedIntelligence.meta.op('->>')('source_category') == 'open_source')
+            )
+        else:
+            query = query.filter(
+                ExtractedIntelligence.meta.op('->>')('source_category') == source_category
+            )
+
     if intel_type:
         try:
             intel_enum = ExtractedIntelligenceType[intel_type.upper()]
@@ -1474,24 +1488,37 @@ def get_all_intelligence(
     with_hunts_only: bool = Query(False, description="Only show intel from hunt results"),
     article_id: Optional[int] = Query(None, description="Filter by specific article ID"),
     ioc_type: Optional[str] = Query(None, description="Filter by IOC subtype (ip, domain, hash, email, etc.)"),
+    source_category: Optional[str] = Query(None, description="Filter by source: open_source, external, internal"),
     current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get all extracted intelligence with article context, hunt info, and MITRE mapping."""
     from app.models import Hunt, HuntExecution, HuntTriggerType, ExtractedIntelligenceType, WatchListKeyword
-    
+
     # Build query
     query = db.query(ExtractedIntelligence).join(Article).options(
         joinedload(ExtractedIntelligence.article).joinedload(Article.feed_source)
     )
-    
+
     # Filter by specific article
     if article_id:
         query = query.filter(ExtractedIntelligence.article_id == article_id)
-    
+
     if status_filter:
         query = query.filter(Article.status == status_filter)
-    
+
+    # Source category filter
+    if source_category and source_category != "all":
+        if source_category == "open_source":
+            query = query.filter(
+                (ExtractedIntelligence.meta.op('->>')('source_category') == None) |
+                (ExtractedIntelligence.meta.op('->>')('source_category') == 'open_source')
+            )
+        else:
+            query = query.filter(
+                ExtractedIntelligence.meta.op('->>')('source_category') == source_category
+            )
+
     if intel_type:
         try:
             intel_enum = ExtractedIntelligenceType[intel_type.upper()]
@@ -1588,7 +1615,7 @@ def get_all_intelligence(
         })
     
     return {
-        "intelligence": results,
+        "items": results,
         "total": total,
         "page": page,
         "page_size": page_size
@@ -1624,42 +1651,38 @@ def get_mitre_matrix(
     
     results = query.group_by(ExtractedIntelligence.mitre_id).all()
     
-    # Build matrix data
+    # Build matrix data using accurate technique-to-tactic mapping
+    from app.extraction.mitre_data import get_attack_tactic, get_attack_name, get_atlas_tactic, get_atlas_name
+
     matrix = {}
     for mitre_id, count, article_ids in results:
         if not mitre_id:
             continue
-        
-        # Parse tactic from technique ID
-        tactic = "Other"
-        if mitre_id.startswith("T1"):
-            technique_num = int(mitre_id[1:5]) if mitre_id[1:5].isdigit() else 0
-            if technique_num < 200:
-                tactic = "Initial Access"
-            elif technique_num < 300:
-                tactic = "Execution"
-            elif technique_num < 400:
-                tactic = "Persistence"
-            elif technique_num < 500:
-                tactic = "Privilege Escalation"
-            elif technique_num < 600:
-                tactic = "Defense Evasion"
-            elif technique_num < 700:
-                tactic = "Credential Access"
-            elif technique_num < 800:
-                tactic = "Discovery"
-            else:
-                tactic = "Other"
-        
-        if tactic not in matrix:
-            matrix[tactic] = []
-        
-        matrix[tactic].append({
-            "technique_id": mitre_id,
-            "count": count,
-            "article_count": len(set(article_ids)) if article_ids else 0,
-            "url": f"https://attack.mitre.org/techniques/{mitre_id}/" if framework == "attack" else f"https://atlas.mitre.org/techniques/{mitre_id}"
-        })
+
+        # Get accurate tactic(s) from the data map
+        if framework == "attack":
+            tactics = get_attack_tactic(mitre_id)
+            name = get_attack_name(mitre_id)
+            url = f"https://attack.mitre.org/techniques/{mitre_id.replace('.', '/')}/"
+        else:
+            tactics = get_atlas_tactic(mitre_id)
+            name = get_atlas_name(mitre_id)
+            url = f"https://atlas.mitre.org/techniques/{mitre_id}"
+
+        article_count = len(set(article_ids)) if article_ids else 0
+
+        # A technique can belong to multiple tactics — add to each
+        for tactic in tactics:
+            if tactic not in matrix:
+                matrix[tactic] = []
+
+            matrix[tactic].append({
+                "mitre_id": mitre_id,
+                "name": name,
+                "count": count,
+                "article_count": article_count,
+                "url": url,
+            })
     
     return {
         "framework": framework,
@@ -1669,9 +1692,403 @@ def get_mitre_matrix(
     }
 
 
-# ============ MANUAL GENAI ENDPOINTS ============
+# ============ INTELLIGENCE MANAGEMENT ENDPOINTS ============
 
-from pydantic import BaseModel
+class ManualIntelligenceRequest(BaseModel):
+    value: str
+    intelligence_type: str = "IOC"  # IOC, TTP, THREAT_ACTOR
+    ioc_type: Optional[str] = None  # ip, domain, hash_sha256, cve, email, url, etc.
+    confidence: int = 70
+    mitre_id: Optional[str] = None
+    evidence: Optional[str] = None
+    notes: Optional[str] = None
+    source_category: str = "internal"
+
+class BulkImportRequest(BaseModel):
+    items: List[ManualIntelligenceRequest]
+
+class AILandscapeRequest(BaseModel):
+    time_range: str = "7d"
+    focus_area: Optional[str] = None  # e.g. "ransomware", "apt", "vulnerabilities"
+
+class AICorrelateRequest(BaseModel):
+    intel_ids: Optional[List[int]] = None
+    time_range: str = "7d"
+
+
+def _get_or_create_internal_article(db: Session) -> Article:
+    """Get or create the pseudo-article for internal intelligence submissions."""
+    internal_article = db.query(Article).filter(
+        Article.external_id == "__internal_intelligence__"
+    ).first()
+    if not internal_article:
+        # Need a feed source — find or create an internal one
+        internal_source = db.query(FeedSource).filter(
+            FeedSource.name == "Internal Intelligence"
+        ).first()
+        if not internal_source:
+            internal_source = FeedSource(
+                name="Internal Intelligence",
+                url="internal://manual",
+                feed_type="internal",
+                enabled=True,
+            )
+            db.add(internal_source)
+            db.flush()
+
+        internal_article = Article(
+            title="Internal Intelligence Submissions",
+            url="internal://intelligence",
+            external_id="__internal_intelligence__",
+            source_id=internal_source.id,
+            status=ArticleStatus.REVIEWED,
+            summary="Container for manually submitted intelligence indicators.",
+            created_at=datetime.utcnow(),
+        )
+        db.add(internal_article)
+        db.commit()
+        db.refresh(internal_article)
+    return internal_article
+
+
+@router.post("/intelligence/manual")
+def submit_manual_intelligence(
+    request: ManualIntelligenceRequest,
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
+    db: Session = Depends(get_db)
+):
+    """Submit a manual intelligence indicator (IOC, TTP, or Threat Actor)."""
+    from app.models import ExtractedIntelligenceType
+
+    # Validate intelligence type
+    try:
+        intel_type = ExtractedIntelligenceType[request.intelligence_type.upper()]
+    except KeyError:
+        raise HTTPException(status_code=400, detail=f"Invalid intelligence_type: {request.intelligence_type}")
+
+    internal_article = _get_or_create_internal_article(db)
+
+    # Check for duplicates
+    existing = db.query(ExtractedIntelligence).filter(
+        ExtractedIntelligence.article_id == internal_article.id,
+        ExtractedIntelligence.value == request.value,
+        ExtractedIntelligence.intelligence_type == intel_type,
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Indicator already exists: {request.value}")
+
+    meta = {
+        "source_category": request.source_category,
+        "submitted_by": current_user.id,
+        "submitted_by_username": current_user.username,
+    }
+    if request.ioc_type:
+        meta["type"] = request.ioc_type
+        meta["ioc_type"] = request.ioc_type
+
+    intel = ExtractedIntelligence(
+        article_id=internal_article.id,
+        intelligence_type=intel_type,
+        value=request.value,
+        confidence=request.confidence,
+        evidence=request.evidence or f"Manually submitted by {current_user.username}",
+        mitre_id=request.mitre_id,
+        meta=meta,
+        notes=request.notes,
+        created_at=datetime.utcnow(),
+    )
+    db.add(intel)
+    db.commit()
+    db.refresh(intel)
+
+    return {
+        "id": intel.id,
+        "value": intel.value,
+        "intelligence_type": intel.intelligence_type.value,
+        "confidence": intel.confidence,
+        "source_category": request.source_category,
+        "created_at": intel.created_at.isoformat(),
+    }
+
+
+@router.post("/intelligence/bulk-import")
+def bulk_import_intelligence(
+    request: BulkImportRequest,
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
+    db: Session = Depends(get_db)
+):
+    """Bulk import intelligence indicators (max 500 per batch)."""
+    from app.models import ExtractedIntelligenceType
+
+    if len(request.items) > 500:
+        raise HTTPException(status_code=400, detail="Maximum 500 items per batch")
+
+    internal_article = _get_or_create_internal_article(db)
+
+    imported = 0
+    skipped = 0
+    errors = []
+
+    for i, item in enumerate(request.items):
+        try:
+            intel_type = ExtractedIntelligenceType[item.intelligence_type.upper()]
+        except KeyError:
+            errors.append({"index": i, "value": item.value, "error": f"Invalid type: {item.intelligence_type}"})
+            continue
+
+        # Deduplicate
+        existing = db.query(ExtractedIntelligence).filter(
+            ExtractedIntelligence.article_id == internal_article.id,
+            ExtractedIntelligence.value == item.value,
+            ExtractedIntelligence.intelligence_type == intel_type,
+        ).first()
+
+        if existing:
+            skipped += 1
+            continue
+
+        meta = {
+            "source_category": item.source_category or "internal",
+            "submitted_by": current_user.id,
+        }
+        if item.ioc_type:
+            meta["type"] = item.ioc_type
+            meta["ioc_type"] = item.ioc_type
+
+        intel = ExtractedIntelligence(
+            article_id=internal_article.id,
+            intelligence_type=intel_type,
+            value=item.value,
+            confidence=item.confidence,
+            evidence=item.evidence or f"Bulk import by {current_user.username}",
+            mitre_id=item.mitre_id,
+            meta=meta,
+            notes=item.notes,
+            created_at=datetime.utcnow(),
+        )
+        db.add(intel)
+        imported += 1
+
+    db.commit()
+
+    return {
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors,
+        "total_submitted": len(request.items),
+    }
+
+
+@router.post("/intelligence/ai-landscape")
+async def get_ai_landscape_summary(
+    request: AILandscapeRequest,
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
+    db: Session = Depends(get_db)
+):
+    """Generate AI-powered threat landscape summary based on current intelligence."""
+    from sqlalchemy import func
+    from app.models import ExtractedIntelligenceType
+    from app.genai.provider import get_model_manager
+    from datetime import timedelta
+
+    # Calculate time range
+    now = datetime.utcnow()
+    time_map = {"1h": 1/24, "24h": 1, "7d": 7, "30d": 30, "90d": 90}
+    days = time_map.get(request.time_range, 7)
+    start_date = now - timedelta(days=days)
+
+    # Gather intelligence stats
+    base_query = db.query(ExtractedIntelligence).join(Article).filter(
+        ExtractedIntelligence.created_at >= start_date
+    )
+
+    type_counts = db.query(
+        ExtractedIntelligence.intelligence_type,
+        func.count(ExtractedIntelligence.id)
+    ).join(Article).filter(
+        ExtractedIntelligence.created_at >= start_date
+    ).group_by(ExtractedIntelligence.intelligence_type).all()
+
+    top_iocs = db.query(
+        ExtractedIntelligence.value,
+        ExtractedIntelligence.meta,
+        func.count(ExtractedIntelligence.id).label("count")
+    ).filter(
+        ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.IOC,
+        ExtractedIntelligence.created_at >= start_date,
+    ).group_by(
+        ExtractedIntelligence.value, ExtractedIntelligence.meta
+    ).order_by(desc("count")).limit(10).all()
+
+    top_ttps = db.query(
+        ExtractedIntelligence.mitre_id,
+        ExtractedIntelligence.value,
+        func.count(ExtractedIntelligence.id).label("count")
+    ).filter(
+        ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.TTP,
+        ExtractedIntelligence.created_at >= start_date,
+    ).group_by(
+        ExtractedIntelligence.mitre_id, ExtractedIntelligence.value
+    ).order_by(desc("count")).limit(10).all()
+
+    threat_actors = db.query(
+        ExtractedIntelligence.value,
+        func.count(ExtractedIntelligence.id).label("count")
+    ).filter(
+        ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.THREAT_ACTOR,
+        ExtractedIntelligence.created_at >= start_date,
+    ).group_by(ExtractedIntelligence.value).order_by(desc("count")).limit(10).all()
+
+    # Recent article titles
+    recent_articles = db.query(Article.title).filter(
+        Article.created_at >= start_date
+    ).order_by(desc(Article.created_at)).limit(20).all()
+
+    # Build context for GenAI
+    stats_text = "\n".join([f"- {t.value if hasattr(t, 'value') else t}: {c}" for t, c in type_counts])
+    iocs_text = "\n".join([f"- {v} (type: {(m or {}).get('type', 'unknown')}, seen {c}x)" for v, m, c in top_iocs])
+    ttps_text = "\n".join([f"- {mid or 'N/A'}: {v} (seen {c}x)" for mid, v, c in top_ttps])
+    actors_text = "\n".join([f"- {v} ({c} references)" for v, c in threat_actors])
+    articles_text = "\n".join([f"- {t[0]}" for t in recent_articles])
+
+    context = f"""Intelligence Summary for the past {request.time_range}:
+
+Intelligence Counts by Type:
+{stats_text or 'No data'}
+
+Top IOCs:
+{iocs_text or 'None found'}
+
+Top MITRE ATT&CK Techniques:
+{ttps_text or 'None found'}
+
+Active Threat Actors:
+{actors_text or 'None found'}
+
+Recent Article Titles:
+{articles_text or 'No articles'}"""
+
+    if request.focus_area:
+        context += f"\n\nFocus Area: {request.focus_area}"
+
+    try:
+        model_manager = get_model_manager()
+        primary_model = model_manager.get_primary_model()
+
+        result = await model_manager.generate_with_fallback(
+            system_prompt="""You are a senior threat intelligence analyst writing a threat landscape brief for a SOC team.
+Based on the intelligence data provided, write a concise but comprehensive threat landscape summary covering:
+1. Current threat posture and key trends
+2. Most significant indicators and their implications
+3. Active threat actors and their TTPs
+4. Priority recommendations for the SOC team
+
+Format as markdown with clear sections. Be actionable and specific.""",
+            user_prompt=f"Generate a threat landscape brief based on this intelligence data:\n\n{context}",
+            preferred_model=primary_model,
+        )
+
+        summary = result.get("response", "")
+        model_used = result.get("model_used", primary_model)
+
+        return {
+            "summary": summary,
+            "model_used": model_used,
+            "time_range": request.time_range,
+            "stats": {
+                "total_iocs": sum(c for t, c in type_counts if (t.value if hasattr(t, 'value') else t) == "IOC"),
+                "total_ttps": sum(c for t, c in type_counts if (t.value if hasattr(t, 'value') else t) == "TTP"),
+                "total_actors": sum(c for t, c in type_counts if (t.value if hasattr(t, 'value') else t) == "THREAT_ACTOR"),
+                "total_articles": len(recent_articles),
+            }
+        }
+    except Exception as e:
+        logger.error("ai_landscape_failed", error=str(e))
+        raise HTTPException(
+            status_code=503,
+            detail=f"AI landscape generation failed: {str(e)}. Ensure a GenAI provider is configured."
+        )
+
+
+@router.post("/intelligence/ai-correlate")
+def get_correlation_insights(
+    request: AICorrelateRequest,
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
+    db: Session = Depends(get_db)
+):
+    """Find correlations across intelligence — shared IOCs between articles, clusters of related indicators."""
+    from sqlalchemy import func
+    from app.models import ExtractedIntelligenceType
+    from datetime import timedelta
+
+    now = datetime.utcnow()
+    time_map = {"24h": 1, "7d": 7, "30d": 30, "90d": 90}
+    days = time_map.get(request.time_range, 7)
+    start_date = now - timedelta(days=days)
+
+    # Find IOCs that appear in 2+ articles
+    shared_iocs = db.query(
+        ExtractedIntelligence.value,
+        ExtractedIntelligence.meta,
+        func.count(func.distinct(ExtractedIntelligence.article_id)).label("article_count"),
+        func.array_agg(func.distinct(Article.title)).label("article_titles"),
+        func.array_agg(func.distinct(Article.id)).label("article_ids"),
+    ).join(Article).filter(
+        ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.IOC,
+        ExtractedIntelligence.created_at >= start_date,
+    ).group_by(
+        ExtractedIntelligence.value, ExtractedIntelligence.meta
+    ).having(
+        func.count(func.distinct(ExtractedIntelligence.article_id)) >= 2
+    ).order_by(desc("article_count")).limit(50).all()
+
+    # Find article clusters — articles that share 2+ IOC values
+    article_ioc_map = {}
+    for ioc_value, meta, article_count, article_titles, article_ids in shared_iocs:
+        for aid, atitle in zip(article_ids or [], article_titles or []):
+            if aid not in article_ioc_map:
+                article_ioc_map[aid] = {"title": atitle, "shared_iocs": set()}
+            article_ioc_map[aid]["shared_iocs"].add(ioc_value)
+
+    # Build clusters: group articles that share IOCs
+    clusters = []
+    seen = set()
+    for aid, info in article_ioc_map.items():
+        if aid in seen:
+            continue
+        cluster = {"articles": [{"id": aid, "title": info["title"]}], "shared_iocs": list(info["shared_iocs"])}
+        seen.add(aid)
+        for other_aid, other_info in article_ioc_map.items():
+            if other_aid in seen:
+                continue
+            overlap = info["shared_iocs"] & other_info["shared_iocs"]
+            if len(overlap) >= 2:
+                cluster["articles"].append({"id": other_aid, "title": other_info["title"]})
+                cluster["shared_iocs"] = list(set(cluster["shared_iocs"]) | overlap)
+                seen.add(other_aid)
+        if len(cluster["articles"]) >= 2:
+            clusters.append(cluster)
+
+    return {
+        "shared_iocs": [
+            {
+                "value": value,
+                "ioc_type": (meta or {}).get("type", "unknown"),
+                "article_count": ac,
+                "article_titles": titles[:5] if titles else [],
+                "article_ids": ids[:5] if ids else [],
+            }
+            for value, meta, ac, titles, ids in shared_iocs
+        ],
+        "clusters": clusters[:20],
+        "time_range": request.time_range,
+        "total_shared_iocs": len(shared_iocs),
+        "total_clusters": len(clusters),
+    }
+
+
+# ============ MANUAL GENAI ENDPOINTS ============
 
 class GenAIExtractionRequest(BaseModel):
     use_genai: bool = True  # If false, use regex only

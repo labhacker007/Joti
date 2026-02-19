@@ -121,7 +121,12 @@ function ProtectedRoute({
 
   // Main permission check effect - runs on mount and when auth state changes
   useEffect(() => {
-    if (!mounted || !accessToken) {
+    // Wait for client-side mount before doing anything — avoids a race where
+    // loading & hasAccess get set to false before the permissions fetch starts,
+    // which would trigger an immediate redirect to /unauthorized.
+    if (!mounted) return;
+
+    if (!accessToken) {
       setLoading(false);
       setHasAccess(false);
       return;

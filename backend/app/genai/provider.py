@@ -268,7 +268,7 @@ class OllamaProvider(BaseGenAIProvider):
     """
     
     def __init__(self, base_url: str = None, model: str = None):
-        self.base_url = base_url or settings.OLLAMA_BASE_URL or "http://localhost:11434"
+        self.base_url = base_url or settings.OLLAMA_BASE_URL or "http://host.docker.internal:11434"
         self.model = model or settings.OLLAMA_MODEL or "llama3:latest"
         try:
             from app.core.ssrf import SSRFPolicy, validate_outbound_url
@@ -495,7 +495,7 @@ class GenAIModelManager:
                         "type": "local",
                         "status": "available",
                         "description": f"Local Ollama model ({model.get('size', 'unknown')})",
-                        "base_url": settings.OLLAMA_BASE_URL or "http://localhost:11434",
+                        "base_url": settings.OLLAMA_BASE_URL or "http://host.docker.internal:11434",
                         "is_free": True
                     })
         
@@ -518,7 +518,7 @@ class GenAIModelManager:
         """Check for available Ollama models."""
         import httpx
         
-        base_url = settings.OLLAMA_BASE_URL or "http://localhost:11434"
+        base_url = settings.OLLAMA_BASE_URL or "http://host.docker.internal:11434"
         
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:

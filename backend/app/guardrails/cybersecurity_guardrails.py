@@ -44,31 +44,124 @@ class GuardrailResult:
 # ==============================================================================
 
 def check_prompt_injection(user_input: str) -> GuardrailResult:
-    """Detect common prompt injection patterns in user inputs."""
-    injection_patterns = [
-        r"ignore\s+(all\s+)?previous\s+instructions",
-        r"disregard\s+(all\s+)?above",
-        r"you\s+are\s+now\s+(?:a|an)\s+(?:different|new)",
-        r"system\s*:\s*you\s+are",
-        r"forget\s+(everything|all)\s+(you|that)",
-        r"pretend\s+you\s+are",
-        r"act\s+as\s+(?:if|though)\s+you",
-        r"override\s+(?:your|all)\s+(?:instructions|rules)",
-        r"\[SYSTEM\]",
-        r"<\|im_start\|>",
-    ]
+    """Detect prompt injection using comprehensive attack catalog (51 attack vectors)."""
+    from app.guardrails.genai_attack_catalog import match_input_attack
 
-    text_lower = user_input.lower()
-    for pattern in injection_patterns:
-        if re.search(pattern, text_lower):
-            return GuardrailResult(
-                passed=False,
-                guardrail_name="anti_prompt_injection",
-                message=f"Potential prompt injection detected",
-                action=GuardrailAction.REJECT
-            )
+    match = match_input_attack(user_input)
+    if match:
+        return GuardrailResult(
+            passed=False,
+            guardrail_name="anti_prompt_injection",
+            message=f"Blocked: {match['attack_name']} ({match['attack_id']}, {match['category']}, severity={match['severity']})",
+            action=GuardrailAction.REJECT
+        )
 
     return GuardrailResult(passed=True, guardrail_name="anti_prompt_injection")
+
+
+def check_token_smuggling(text: str) -> GuardrailResult:
+    """Detect zero-width characters, Unicode homoglyphs, and invisible characters."""
+    # Zero-width characters
+    zw_pattern = re.compile(r"[\u200b\u200c\u200d\u2060\ufeff]")
+    if zw_pattern.search(text):
+        return GuardrailResult(
+            passed=False,
+            guardrail_name="token_smuggling",
+            message="Zero-width or invisible Unicode characters detected",
+            action=GuardrailAction.WARN
+        )
+
+    # Invisible/control characters
+    invisible_pattern = re.compile(
+        r"[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e"
+        r"\u202a-\u202e\u2066-\u206f\ufff0-\ufff8]"
+    )
+    if invisible_pattern.search(text):
+        return GuardrailResult(
+            passed=False,
+            guardrail_name="token_smuggling",
+            message="Invisible control characters detected in input",
+            action=GuardrailAction.WARN
+        )
+
+    return GuardrailResult(passed=True, guardrail_name="token_smuggling")
+
+
+def check_encoding_attacks(text: str) -> GuardrailResult:
+    """Detect base64, hex, or other encoded instruction payloads."""
+    # Long base64 strings (potential encoded instructions)
+    if re.search(r"(?:decode|base64)\s*:?\s*[A-Za-z0-9+/=]{30,}", text, re.IGNORECASE):
+        return GuardrailResult(
+            passed=False,
+            guardrail_name="encoding_attack",
+            message="Potential base64-encoded instructions detected",
+            action=GuardrailAction.WARN
+        )
+
+    # Hex sequences
+    if re.search(r"\\x[0-9a-fA-F]{2}(?:\\x[0-9a-fA-F]{2}){5,}", text):
+        return GuardrailResult(
+            passed=False,
+            guardrail_name="encoding_attack",
+            message="Hex-encoded content detected",
+            action=GuardrailAction.WARN
+        )
+
+    return GuardrailResult(passed=True, guardrail_name="encoding_attack")
+
+
+def check_output_html_injection(output: str) -> GuardrailResult:
+    """Detect HTML/script injection in model output."""
+    dangerous_patterns = [
+        r"<script[\s>]", r"javascript\s*:", r"on(?:load|error|click)\s*=",
+        r"<iframe[\s>]", r"<object[\s>]", r"<embed[\s>]",
+    ]
+    for pattern in dangerous_patterns:
+        if re.search(pattern, output, re.IGNORECASE):
+            return GuardrailResult(
+                passed=False,
+                guardrail_name="output_injection",
+                message="HTML/script injection detected in model output",
+                action=GuardrailAction.REJECT
+            )
+    return GuardrailResult(passed=True, guardrail_name="output_injection")
+
+
+def check_ioc_grounding(output: str, source_content: str) -> GuardrailResult:
+    """Verify extracted IOCs are actually present in the source content."""
+    # Extract IPs from output
+    output_ips = set(re.findall(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", output))
+    source_ips = set(re.findall(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", source_content))
+    # Also check defanged forms in source
+    defanged_source = source_content.replace("[.]", ".").replace("[dot]", ".")
+    source_ips_defanged = set(re.findall(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", defanged_source))
+    all_source_ips = source_ips | source_ips_defanged
+    # Filter out common non-IOC IPs
+    noise = {"0.0.0.0", "127.0.0.1", "255.255.255.255", "8.8.8.8", "1.1.1.1"}
+    fabricated_ips = (output_ips - all_source_ips) - noise
+    if fabricated_ips:
+        return GuardrailResult(
+            passed=False,
+            guardrail_name="ioc_grounding",
+            message=f"Potentially fabricated IPs not in source: {', '.join(list(fabricated_ips)[:5])}",
+            action=GuardrailAction.WARN
+        )
+    return GuardrailResult(passed=True, guardrail_name="ioc_grounding")
+
+
+def check_mitre_id_validity(output: str) -> GuardrailResult:
+    """Verify MITRE technique IDs reference real techniques."""
+    from app.extraction.mitre_data import is_valid_technique_id
+    ids = re.findall(r"(?:T\d{4}(?:\.\d{3})?|AML\.T\d{4}(?:\.\d{3})?)", output)
+    invalid = [mid for mid in ids if not is_valid_technique_id(mid)]
+    if invalid:
+        return GuardrailResult(
+            passed=False,
+            guardrail_name="mitre_id_validity",
+            message=f"Invalid MITRE technique IDs: {', '.join(invalid[:5])}",
+            action=GuardrailAction.WARN
+        )
+    return GuardrailResult(passed=True, guardrail_name="mitre_id_validity")
 
 
 def check_output_grounding(output: str, source_content: str) -> GuardrailResult:
@@ -297,11 +390,23 @@ class CybersecurityGuardrailEngine:
         if not self.enabled:
             return results
 
-        # Anti-prompt injection
+        # Anti-prompt injection (uses 51-attack catalog)
         result = check_prompt_injection(user_input)
         if not result.passed:
             self.violations.append(result.to_dict())
         results.append(result)
+
+        # Token smuggling (zero-width chars, homoglyphs)
+        ts_result = check_token_smuggling(user_input)
+        if not ts_result.passed:
+            self.violations.append(ts_result.to_dict())
+        results.append(ts_result)
+
+        # Encoding attacks (base64, hex)
+        ea_result = check_encoding_attacks(user_input)
+        if not ea_result.passed:
+            self.violations.append(ea_result.to_dict())
+        results.append(ea_result)
 
         return results
 
@@ -330,12 +435,29 @@ class CybersecurityGuardrailEngine:
             self.violations.append(pii_result.to_dict())
         results.append(pii_result)
 
-        # Data grounding check (if source content available)
+        # HTML/script injection in output
+        html_result = check_output_html_injection(output)
+        if not html_result.passed:
+            self.violations.append(html_result.to_dict())
+        results.append(html_result)
+
+        # MITRE ID validity check
+        mitre_result = check_mitre_id_validity(output)
+        if not mitre_result.passed:
+            self.violations.append(mitre_result.to_dict())
+        results.append(mitre_result)
+
+        # Data grounding checks (if source content available)
         if source_content:
             grounding_result = check_output_grounding(output, source_content)
             if not grounding_result.passed:
                 self.violations.append(grounding_result.to_dict())
             results.append(grounding_result)
+
+            ioc_ground_result = check_ioc_grounding(output, source_content)
+            if not ioc_ground_result.passed:
+                self.violations.append(ioc_ground_result.to_dict())
+            results.append(ioc_ground_result)
 
         # Function-specific checks
         if output_type == "executive_summary":

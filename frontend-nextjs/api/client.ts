@@ -491,10 +491,11 @@ export const articlesAPI = {
   /**
    * Intelligence summary dashboard
    */
-  getIntelligenceSummary: async (params?: { intel_type?: string; time_range?: string }) => {
+  getIntelligenceSummary: async (params?: { intel_type?: string; time_range?: string; source_category?: string }) => {
     const query = new URLSearchParams();
     if (params?.intel_type) query.append('intel_type', params.intel_type);
     if (params?.time_range) query.append('time_range', params.time_range);
+    if (params?.source_category) query.append('source_category', params.source_category);
     const qs = query.toString();
     return get(`/articles/intelligence/summary${qs ? '?' + qs : ''}`);
   },
@@ -509,6 +510,7 @@ export const articlesAPI = {
     ioc_type?: string;
     article_id?: string;
     mitre_framework?: string;
+    source_category?: string;
   }) => {
     const query = new URLSearchParams();
     if (params?.page) query.append('page', String(params.page));
@@ -517,6 +519,7 @@ export const articlesAPI = {
     if (params?.ioc_type) query.append('ioc_type', params.ioc_type);
     if (params?.article_id) query.append('article_id', params.article_id);
     if (params?.mitre_framework) query.append('mitre_framework', params.mitre_framework);
+    if (params?.source_category) query.append('source_category', params.source_category);
     const qs = query.toString();
     return get(`/articles/intelligence/all${qs ? '?' + qs : ''}`);
   },
@@ -540,6 +543,64 @@ export const articlesAPI = {
    */
   reviewIntelligence: async (intelId: number, data: { is_reviewed?: boolean; is_false_positive?: boolean; notes?: string }) => {
     return post(`/articles/intelligence/${intelId}/review`, data);
+  },
+
+  /**
+   * Submit a manual intelligence indicator
+   */
+  submitManualIOC: async (data: {
+    value: string;
+    intelligence_type?: string;
+    ioc_type?: string;
+    confidence?: number;
+    mitre_id?: string;
+    evidence?: string;
+    notes?: string;
+    source_category?: string;
+  }) => {
+    return post('/articles/intelligence/manual', data);
+  },
+
+  /**
+   * Bulk import intelligence indicators
+   */
+  bulkImportIOCs: async (items: Array<{
+    value: string;
+    intelligence_type?: string;
+    ioc_type?: string;
+    confidence?: number;
+    mitre_id?: string;
+    notes?: string;
+  }>) => {
+    return post('/articles/intelligence/bulk-import', { items });
+  },
+
+  /**
+   * Generate AI threat landscape summary
+   */
+  getAILandscape: async (params?: { time_range?: string; focus_area?: string }) => {
+    return post('/articles/intelligence/ai-landscape', params || {});
+  },
+
+  /**
+   * Get correlation insights across intelligence
+   */
+  getCorrelation: async (params?: { intel_ids?: number[]; time_range?: string }) => {
+    return post('/articles/intelligence/ai-correlate', params || {});
+  },
+
+  /**
+   * Batch review intelligence items
+   */
+  batchReviewIntelligence: async (data: { intel_ids: number[]; is_reviewed?: boolean; is_false_positive?: boolean }) => {
+    return post('/articles/intelligence/batch-review', data);
+  },
+
+  /**
+   * Batch delete intelligence items
+   */
+  batchDeleteIntelligence: async (data: { intel_ids: number[] }) => {
+    return del('/articles/intelligence/batch', { data });
   },
 };
 
@@ -1053,6 +1114,16 @@ export const guardrailsAPI = {
   },
   test: async (data: { guardrail_type: string; config: Record<string, any>; test_input: string }) => {
     return post('/admin/genai-guardrails/test', data);
+  },
+  exportAll: async () => {
+    return get('/admin/genai-guardrails/export');
+  },
+  importBulk: async (data: any, overwrite?: boolean) => {
+    const qs = overwrite ? '?overwrite=true' : '';
+    return post(`/admin/genai-guardrails/import${qs}`, data);
+  },
+  seedCatalog: async () => {
+    return post('/admin/genai-guardrails/seed-catalog', {});
   },
 };
 
