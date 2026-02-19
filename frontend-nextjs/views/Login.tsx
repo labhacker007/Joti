@@ -306,20 +306,20 @@ export default function Login() {
         {/* Content over animation */}
         <div className="relative z-10 flex flex-col justify-center items-center min-h-[280px] md:min-h-screen px-8 py-12 md:py-0">
           {/* Branding */}
-          <div className="mb-8 md:mb-12 text-center">
-            <div className="inline-flex items-center gap-3 mb-3">
+          <div className="mb-8 md:mb-12 text-center flex flex-col items-center">
+            <div className="flex items-center gap-3 mb-4">
               <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center backdrop-blur-sm"
+                className="w-14 h-14 rounded-xl flex items-center justify-center backdrop-blur-sm"
                 style={{ backgroundColor: `${dt.colors.primary}20`, border: `1px solid ${dt.colors.primary}30` }}
               >
-                <Shield className="w-7 h-7" style={{ color: dt.colors.primary }} />
+                <Crosshair className="w-8 h-8" style={{ color: dt.colors.primary }} />
               </div>
               <div className="text-left">
                 <h1
                   className="text-3xl md:text-4xl font-bold tracking-tight"
                   style={{ color: dt.leftTextPrimary }}
                 >
-                  Joti
+                  J.O.T.I
                 </h1>
                 <p
                   className="text-xs tracking-widest uppercase"
@@ -329,6 +329,12 @@ export default function Login() {
                 </p>
               </div>
             </div>
+            <p
+              className="text-[11px] leading-relaxed max-w-xs text-center opacity-75"
+              style={{ color: dt.leftTextSecondary }}
+            >
+              News &amp; Feed Aggregator &middot; AI-Powered Summary &middot; IOC Extraction &amp; TTP Mapping &middot; Hunt Query Builder
+            </p>
           </div>
 
           {/* News Ticker / Feature Showcase */}
@@ -442,7 +448,7 @@ export default function Login() {
             </div>
 
             <p className="text-[10px] mt-4 text-center" style={{ color: dt.leftTextMuted }}>
-              Built for SOC teams, threat researchers & security analysts
+              Built for Cyber Security Teams
             </p>
           </div>
         </div>
@@ -593,10 +599,6 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Footer */}
-          <p className="mt-7 text-center text-[11px]" style={{ color: dt.textMuted }}>
-            Joti &middot; Threat Intelligence Platform
-          </p>
         </div>
       </div>
     </div>

@@ -316,7 +316,7 @@ class GuardrailValidator:
 
 @router.get("/types", response_model=List[GuardrailTypeInfo])
 async def list_guardrail_types(
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     List all available guardrail types.
@@ -338,7 +338,7 @@ async def list_guardrail_types(
 @router.post("/test", response_model=GuardrailTestResponse)
 async def test_guardrail(
     payload: GuardrailTestRequest,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Test guardrail against sample input.
@@ -364,7 +364,7 @@ async def test_guardrail(
 async def validate_input(
     payload: GuardrailValidationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Validate input against all active guardrails for a prompt.
@@ -435,7 +435,7 @@ async def list_guardrails(
     guardrail_type: Optional[str] = Query(None, description="Filter by type"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     List all guardrails with optional filters.
@@ -463,7 +463,7 @@ async def list_guardrails(
 async def create_guardrail(
     payload: GuardrailCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Create a new guardrail.
@@ -508,7 +508,7 @@ async def create_guardrail(
 async def get_guardrail(
     guardrail_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Get specific guardrail by ID.
@@ -531,7 +531,7 @@ async def update_guardrail(
     guardrail_id: int,
     payload: GuardrailUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Update guardrail.
@@ -566,7 +566,7 @@ async def update_guardrail(
 async def delete_guardrail(
     guardrail_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Delete guardrail.
@@ -595,7 +595,7 @@ async def delete_guardrail(
 async def list_prompt_guardrails(
     prompt_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     List all guardrails for a specific prompt.
@@ -636,7 +636,7 @@ async def attach_guardrail_to_prompt(
     prompt_id: int,
     payload: PromptGuardrailCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Attach guardrail to prompt.
@@ -698,7 +698,7 @@ async def detach_guardrail_from_prompt(
     prompt_id: int,
     prompt_guardrail_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Detach guardrail from prompt.

@@ -14,6 +14,7 @@ import time
 
 from app.core.database import get_db
 from app.auth.dependencies import get_current_user, require_permission
+from app.auth.rbac import Permission
 from app.models import User
 from app.genai.config_manager import GenAIConfigManager
 from app.genai.provider import GenAIProvider
@@ -66,7 +67,7 @@ class TestResponse(BaseModel):
 @router.post("/single")
 async def test_single_model(
     request: TestRequest,
-    current_user: User = Depends(require_permission("test:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """
@@ -311,7 +312,7 @@ async def test_single_model(
 @router.post("/compare")
 async def compare_models(
     request: ComparisonRequest,
-    current_user: User = Depends(require_permission("test:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """
@@ -611,7 +612,7 @@ async def compare_models(
 async def get_test_history(
     limit: int = 50,
     use_case: Optional[str] = None,
-    current_user: User = Depends(require_permission("view:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Get test history for analysis."""

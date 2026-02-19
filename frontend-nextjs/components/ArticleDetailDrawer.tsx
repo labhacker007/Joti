@@ -17,6 +17,8 @@ import {
   AlertTriangle,
   FileDown,
   Search,
+  Users,
+  Link2,
 } from 'lucide-react';
 import { articlesAPI, get } from '@/api/client';
 import { formatRelativeTime, cn } from '@/lib/utils';
@@ -86,6 +88,18 @@ function getIocColor(type?: string) {
   return IOC_TYPE_COLORS[upper] || { bg: 'bg-blue-500/10', text: 'text-blue-600', border: 'border-blue-500/30' };
 }
 
+interface SimilarArticle {
+  id: number;
+  title: string;
+  summary?: string;
+  published_at?: string;
+  source_name?: string;
+  url?: string;
+  is_high_priority?: boolean;
+  match_score: number;
+  match_reasons: string[];
+}
+
 export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkToggle }: Props) {
   const [article, setArticle] = useState<ArticleDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,8 +107,10 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
   const [extracting, setExtracting] = useState(false);
   const [showTechnical, setShowTechnical] = useState(false);
   const [showIntel, setShowIntel] = useState(true);
+  const [showRelated, setShowRelated] = useState(false);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [similarArticles, setSimilarArticles] = useState<SimilarArticle[]>([]);
 
   useEffect(() => {
     if (articleId) {
@@ -107,10 +123,16 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
   const fetchArticleDetail = async (id: string) => {
     setLoading(true);
     setError('');
+    setSimilarArticles([]);
     try {
       const response = (await articlesAPI.getArticleDetail(id)) as any;
       const data = response.data || response;
       setArticle(data);
+      // Fetch similar articles in background
+      articlesAPI.getSimilarArticles(id).then((res: any) => {
+        const similar = (res?.similar || res?.data?.similar || []) as SimilarArticle[];
+        setSimilarArticles(similar);
+      }).catch(() => {/* silently ignore */});
     } catch (err: any) {
       setError(err.message || 'Failed to load article');
     } finally {
@@ -180,6 +202,7 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
 
   const iocs = article?.extracted_intelligence?.filter((i) => i.intelligence_type === 'IOC') || [];
   const ttps = article?.extracted_intelligence?.filter((i) => i.intelligence_type === 'TTP' || i.intelligence_type === 'ATLAS') || [];
+  const threatActors = article?.extracted_intelligence?.filter((i) => i.intelligence_type === 'THREAT_ACTOR') || [];
 
   return (
     <>
@@ -250,6 +273,17 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : error && !article ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+            <p className="text-sm text-red-600">{error}</p>
+            <button
+              onClick={() => articleId && fetchArticleDetail(articleId)}
+              className="px-4 py-2 text-xs font-medium bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
+            >
+              Retry
+            </button>
           </div>
         ) : article ? (
           <div className="p-4 space-y-5">
@@ -359,7 +393,7 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
             )}
 
             {/* Intelligence Section - color-coded */}
-            {(iocs.length > 0 || ttps.length > 0) && (
+            {(iocs.length > 0 || ttps.length > 0 || threatActors.length > 0) && (
               <div className="border border-border rounded-lg">
                 <button
                   onClick={() => setShowIntel(!showIntel)}
@@ -369,7 +403,7 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
                     <Shield className="w-4 h-4 text-primary" />
                     Extracted Intelligence
                     <span className="text-xs text-muted-foreground">
-                      ({iocs.length} IOCs, {ttps.length} TTPs)
+                      ({iocs.length} IOCs · {ttps.length} TTPs{threatActors.length > 0 ? ` · ${threatActors.length} Actors` : ''})
                     </span>
                   </span>
                   {showIntel ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -448,6 +482,84 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
                         </div>
                       </div>
                     )}
+
+                    {/* Threat Actors */}
+                    {threatActors.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5" />
+                          Threat Actors
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {threatActors.map((actor) => (
+                            <span
+                              key={actor.id}
+                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border bg-purple-500/10 text-purple-600 border-purple-500/30"
+                              title={`Confidence: ${actor.confidence}%`}
+                            >
+                              <Users className="w-3 h-3 opacity-70" />
+                              <span className="text-[11px] font-medium">{actor.value}</span>
+                              <span className="opacity-50 text-[10px]">{actor.confidence}%</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Related Articles */}
+            {similarArticles.length > 0 && (
+              <div className="border border-border rounded-lg">
+                <button
+                  onClick={() => setShowRelated(!showRelated)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
+                >
+                  <span className="font-medium text-sm flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-primary" />
+                    Related Articles
+                    <span className="text-xs text-muted-foreground">({similarArticles.length})</span>
+                  </span>
+                  {showRelated ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+                {showRelated && (
+                  <div className="border-t border-border divide-y divide-border">
+                    {similarArticles.map((sim) => (
+                      <div key={sim.id} className="p-3 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <button
+                            className="text-sm font-medium text-left text-foreground hover:text-primary line-clamp-2 transition-colors"
+                            onClick={() => {
+                              // Switch to this article in the drawer
+                              setArticle(null);
+                              fetchArticleDetail(String(sim.id));
+                            }}
+                          >
+                            {sim.title}
+                          </button>
+                          {sim.is_high_priority && (
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />
+                          )}
+                        </div>
+                        {sim.source_name && (
+                          <p className="text-xs text-muted-foreground mt-1">{sim.source_name}</p>
+                        )}
+                        {sim.match_reasons.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {sim.match_reasons.map((reason, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-primary/10 text-primary border border-primary/20"
+                              >
+                                {reason}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

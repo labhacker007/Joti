@@ -14,10 +14,10 @@ from app.auth.dependencies import get_current_user, require_permission
 from app.auth.rbac import Permission
 
 # Helper to get permission value
-MANAGE_USERS = Permission.MANAGE_USERS.value
-MANAGE_CONNECTORS = Permission.MANAGE_CONNECTORS.value
-VIEW_AUDIT_LOGS = Permission.VIEW_AUDIT_LOGS.value
-MANAGE_RBAC = Permission.MANAGE_RBAC.value
+MANAGE_USERS = Permission.USERS_MANAGE.value
+MANAGE_CONNECTORS = Permission.ADMIN_SYSTEM.value
+VIEW_AUDIT_LOGS = Permission.AUDIT_READ.value
+MANAGE_RBAC = Permission.ADMIN_RBAC.value
 from app.models import User, ConnectorConfig, FeedSource, SystemConfiguration, UserRole, AuditEventType
 from app.automation.scheduler import hunt_scheduler
 from app.audit.manager import AuditManager
@@ -2781,32 +2781,27 @@ These guardrails are automatically included in every GenAI prompt to ensure:
 @router.get("/rbac/permissions", summary="Get all available permissions")
 def get_all_permissions(
     current_user: User = Depends(require_permission(MANAGE_RBAC)),
-    db: Session = Depends(get_db)
 ):
-    """Get list of all available permissions in the system."""
-    from app.admin.rbac_service import RBACService
-    
-    try:
-        permissions = RBACService.get_all_permissions()
-        return {"permissions": permissions}
-    except Exception as e:
-        logger.error("failed_to_get_permissions", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get permissions"
-        )
+    """Get all 12 canonical permissions with labels, descriptions, and groups."""
+    from app.auth.unified_permissions import get_all_permissions_list
+    return {"permissions": get_all_permissions_list()}
 
 
-@router.get("/rbac/roles", summary="Get all roles")
+@router.get("/rbac/roles", summary="Get all roles with permissions")
 def get_all_roles(
     current_user: User = Depends(require_permission(MANAGE_RBAC)),
     db: Session = Depends(get_db)
 ):
-    """Get list of all roles in the system."""
+    """Get all roles with their current permission sets and metadata."""
     from app.admin.rbac_service import RBACService
-    
+
     try:
         roles = RBACService.get_all_roles()
+        # Enrich with live DB permissions (overrides code defaults if set)
+        for role in roles:
+            db_perms = RBACService.get_role_permissions(db, role["key"])
+            if db_perms:
+                role["permissions"] = db_perms
         return {"roles": roles}
     except Exception as e:
         logger.error("failed_to_get_roles", error=str(e))
@@ -2823,10 +2818,9 @@ def get_permission_matrix(
 ):
     """Get the full permission matrix (roles x permissions)."""
     from app.admin.rbac_service import RBACService
-    
+
     try:
-        matrix = RBACService.get_permission_matrix(db)
-        return matrix
+        return RBACService.get_permission_matrix(db)
     except Exception as e:
         logger.error("failed_to_get_permission_matrix", error=str(e))
         raise HTTPException(
@@ -3024,295 +3018,7 @@ def remove_user_permission_override(
         )
 
 
-# =============================================================================
-# Page-Level RBAC Management
-# =============================================================================
-
-@router.get("/rbac/pages", summary="Get all page definitions")
-def get_page_definitions(
-    current_user: User = Depends(require_permission(MANAGE_RBAC)),
-    db: Session = Depends(get_db)
-):
-    """Get all page definitions with permissions."""
-    from app.auth.page_permissions import get_all_page_definitions
-    
-    try:
-        pages = get_all_page_definitions()
-        return {
-            "pages": [p.dict() for p in pages]
-        }
-    except Exception as e:
-        logger.error("failed_to_get_page_definitions", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get page definitions"
-        )
-
-
-@router.get("/rbac/pages/role/{role}", summary="Get page access for role")
-def get_role_page_access(
-    role: str,
-    current_user: User = Depends(require_permission(MANAGE_RBAC)),
-    db: Session = Depends(get_db)
-):
-    """Get which pages and permissions a role has access to.
-    
-    Uses the page registry for UI visibility and the RBAC service for persisted role permissions.
-    """
-    from app.admin.rbac_service import RBACService
-    from app.auth.page_permissions import get_all_page_definitions, DEFAULT_ROLE_PAGE_PERMISSIONS
-    from app.auth.rbac import get_user_permissions
-    
-    try:
-        # Validate role
-        try:
-            role_enum = UserRole(role)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
-
-        # Prefer persisted role permissions if available; otherwise fall back to code defaults.
-        persisted = RBACService.get_role_permissions(db, role)
-        if any(str(p).startswith("page:") for p in persisted):
-            effective_page_permissions = set([p for p in persisted if str(p).startswith("page:")])
-        else:
-            effective_page_permissions = set(DEFAULT_ROLE_PAGE_PERMISSIONS.get(role, []))
-
-        page_defs = get_all_page_definitions()
-        page_access = []
-        for page in page_defs:
-            granted = [p for p in page.permissions if p in effective_page_permissions]
-            page_access.append(
-                {
-                    "page_key": page.page_key,
-                    "page_name": page.page_name,
-                    "page_path": page.page_path,
-                    "category": page.category,
-                    "has_access": len(granted) > 0,
-                    "granted_permissions": granted,
-                    "all_permissions": page.permissions,
-                }
-            )
-        
-        api_permissions = get_user_permissions(role_enum)
-        return {
-            "role": role,
-            "pages": page_access,
-            "api_permissions": api_permissions
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("failed_to_get_role_page_access", role=role, error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get role page access"
-        )
-
-
-class UpdatePageAccessRequest(BaseModel):
-    permissions: List[str] = Field(..., description="List of permission keys to grant")
-
-
-@router.put("/rbac/pages/{page_key}/role/{role}", summary="Update page access for role")
-def update_page_access(
-    page_key: str,
-    role: str,
-    request: UpdatePageAccessRequest,
-    current_user: User = Depends(require_permission(MANAGE_RBAC)),
-    db: Session = Depends(get_db)
-):
-    """Update page access permissions for a specific role."""
-    from app.admin.rbac_service import RBACService
-    from app.auth.page_permissions import get_all_page_definitions
-    
-    try:
-        # Validate role
-        try:
-            UserRole(role)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
-        
-        # Validate page exists
-        all_pages = get_all_page_definitions()
-        page = next((p for p in all_pages if p.page_key == page_key), None)
-        if not page:
-            raise HTTPException(status_code=404, detail=f"Page {page_key} not found")
-        
-        # Validate permissions belong to this page
-        for perm in request.permissions:
-            if perm not in page.permissions:
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"Permission {perm} is not valid for page {page_key}"
-                )
-        
-        # Get current role permissions
-        current_permissions = RBACService.get_role_permissions(db, role)
-        
-        # Remove all permissions from this page and add the new ones
-        other_permissions = [p for p in current_permissions if p not in page.permissions]
-        new_permissions = other_permissions + request.permissions
-        
-        # Update role permissions
-        result = RBACService.update_role_permissions(
-            db=db,
-            role=role,
-            permissions=new_permissions,
-            admin_id=current_user.id
-        )
-        
-        # Log audit event
-        AuditManager.log_event(
-            db=db,
-            user_id=current_user.id,
-            event_type=AuditEventType.SYSTEM_CONFIG,
-            action=f"Updated page access for {page_key} for role {role}",
-            resource_type="page_access",
-            details={"page_key": page_key, "permissions": request.permissions}
-        )
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": f"Updated access for {page_key}",
-            "page_key": page_key,
-            "role": role,
-            "permissions": request.permissions
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("failed_to_update_page_access", page_key=page_key, role=role, error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update page access"
-        )
-
-
-# =============================================================================
-# Comprehensive RBAC - All Permissions & Functional Areas
-# =============================================================================
-
-@router.get("/rbac/comprehensive/permissions", summary="Get all comprehensive permissions")
-def get_comprehensive_permissions(
-    current_user: User = Depends(require_permission(MANAGE_RBAC)),
-    db: Session = Depends(get_db)
-):
-    """Get all permissions across all functional areas."""
-    from app.auth.comprehensive_permissions import get_all_permissions
-    
-    try:
-        permissions = get_all_permissions()
-        return {"permissions": permissions}
-    except Exception as e:
-        logger.error("failed_to_get_comprehensive_permissions", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get permissions"
-        )
-
-
-@router.get("/rbac/comprehensive/areas", summary="Get all functional areas")
-def get_functional_areas(
-    current_user: User = Depends(require_permission(MANAGE_RBAC)),
-    db: Session = Depends(get_db)
-):
-    """Get all functional areas with their permissions."""
-    from app.auth.comprehensive_permissions import get_all_functional_areas
-    
-    try:
-        areas = get_all_functional_areas()
-        return {"areas": areas}
-    except Exception as e:
-        logger.error("failed_to_get_functional_areas", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get functional areas"
-        )
-
-
-@router.get("/rbac/comprehensive/role/{role}", summary="Get role permissions (comprehensive)")
-def get_comprehensive_role_permissions(
-    role: str,
-    current_user: User = Depends(require_permission(MANAGE_RBAC)),
-    db: Session = Depends(get_db)
-):
-    """Get all permissions for a role from comprehensive system."""
-    from app.admin.rbac_service import RBACService
-    
-    try:
-        # Validate role
-        try:
-            UserRole(role)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
-        
-        permissions = RBACService.get_role_permissions(db, role)
-        return {"role": role, "permissions": permissions}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("failed_to_get_comprehensive_role_permissions", role=role, error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get role permissions"
-        )
-
-
-class UpdateComprehensivePermissionsRequest(BaseModel):
-    permissions: List[str] = Field(..., description="Complete list of permissions for the role")
-
-
-@router.put("/rbac/comprehensive/role/{role}", summary="Update role permissions (comprehensive)")
-def update_comprehensive_role_permissions(
-    role: str,
-    request: UpdateComprehensivePermissionsRequest,
-    current_user: User = Depends(require_permission(MANAGE_RBAC)),
-    db: Session = Depends(get_db)
-):
-    """Update all permissions for a role in comprehensive system."""
-    from app.admin.rbac_service import RBACService
-    
-    try:
-        # Validate role
-        try:
-            UserRole(role)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
-        
-        result = RBACService.update_role_permissions(
-            db=db,
-            role=role,
-            permissions=request.permissions,
-            admin_id=current_user.id
-        )
-        
-        # Log audit event
-        AuditManager.log_event(
-            db=db,
-            user_id=current_user.id,
-            event_type=AuditEventType.SYSTEM_CONFIG,
-            action=f"Updated comprehensive permissions for {role}",
-            resource_type="role_permissions",
-            details={
-                "permission_count": len(request.permissions),
-                "permissions": request.permissions
-            }
-        )
-        db.commit()
-        
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("failed_to_update_comprehensive_role_permissions", role=role, error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update role permissions"
-        )
-
-
-## Duplicate route removed - using the one defined earlier in this file
+# (Page-level and comprehensive RBAC endpoints removed — superseded by unified 12-permission system)
 
 
 # ============================================

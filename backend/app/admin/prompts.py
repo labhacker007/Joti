@@ -150,7 +150,7 @@ async def list_prompts(
     function_type: Optional[str] = Query(None, description="Filter by function type"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     List all prompt templates with optional filters.
@@ -178,7 +178,7 @@ async def list_prompts(
 async def create_prompt(
     payload: PromptCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Create a new prompt template with variables.
@@ -246,7 +246,7 @@ async def create_prompt(
 async def get_prompt(
     prompt_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Get specific prompt template by ID.
@@ -271,7 +271,7 @@ async def update_prompt(
     prompt_id: int,
     payload: PromptUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Update prompt template.
@@ -323,7 +323,7 @@ async def update_prompt(
 async def delete_prompt(
     prompt_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Delete prompt template.
@@ -354,7 +354,7 @@ async def delete_prompt(
 async def list_prompt_variables(
     prompt_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     List all variables for a specific prompt.
@@ -377,7 +377,7 @@ async def add_prompt_variable(
     prompt_id: int,
     payload: PromptVariableCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Add a new variable to a prompt.
@@ -434,7 +434,7 @@ async def update_prompt_variable(
     variable_id: int,
     payload: PromptVariableUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Update a prompt variable.
@@ -472,7 +472,7 @@ async def delete_prompt_variable(
     prompt_id: int,
     variable_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Delete a prompt variable.
@@ -505,7 +505,7 @@ async def delete_prompt_variable(
 @router.post("/preview", response_model=PromptPreviewResponse)
 async def preview_prompt(
     payload: PromptPreviewRequest,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Preview a prompt template with variable substitution.
@@ -533,7 +533,7 @@ async def preview_prompt(
 async def list_prompt_versions(
     prompt_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     List all versions of a prompt (same name, different versions).

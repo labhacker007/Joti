@@ -111,38 +111,83 @@ def seed_database():
                 db.add(source)
                 print(f"✓ Added feed source: {source_data['name']}")
         
-        # Add default watchlist keywords
+        # Add default watchlist keywords (50 categorized cybersecurity keywords)
         default_keywords = [
-            "ransomware",
-            "malware",
-            "zero-day",
-            "critical vulnerability",
-            "data breach",
-            "APT",
-            "supply chain attack",
-            "phishing",
-            "exploitation",
-            "remote code execution",
-            "privilege escalation",
-            "SQL injection",
-            "cross-site scripting",
-            "denial of service",
-            "credential theft",
-            "backdoor",
-            "trojan",
-            "botnet",
-            "advanced persistent threat",
-            "state-sponsored"
+            # Malware
+            ("ransomware", "Malware"),
+            ("trojan", "Malware"),
+            ("botnet", "Malware"),
+            ("wiper malware", "Malware"),
+            ("infostealer", "Malware"),
+            ("rootkit", "Malware"),
+            ("RAT remote access trojan", "Malware"),
+            # Threat Actor
+            ("state-sponsored", "Threat Actor"),
+            ("Lazarus Group", "Threat Actor"),
+            ("Fancy Bear", "Threat Actor"),
+            ("Cozy Bear", "Threat Actor"),
+            ("Volt Typhoon", "Threat Actor"),
+            ("Scattered Spider", "Threat Actor"),
+            # APT Group
+            ("advanced persistent threat", "APT Group"),
+            ("APT28", "APT Group"),
+            ("APT29", "APT Group"),
+            ("APT41", "APT Group"),
+            ("Kimsuky", "APT Group"),
+            # Vulnerability
+            ("critical vulnerability", "Vulnerability"),
+            ("remote code execution", "Vulnerability"),
+            ("privilege escalation", "Vulnerability"),
+            ("authentication bypass", "Vulnerability"),
+            ("server-side request forgery", "Vulnerability"),
+            # CVE
+            ("zero-day", "CVE"),
+            ("CVE-2024", "CVE"),
+            ("CVE-2025", "CVE"),
+            ("CVE-2026", "CVE"),
+            # Exploit
+            ("exploitation", "Exploit"),
+            ("proof of concept exploit", "Exploit"),
+            ("exploit kit", "Exploit"),
+            # Attack Type
+            ("SQL injection", "Attack Type"),
+            ("cross-site scripting", "Attack Type"),
+            ("denial of service", "Attack Type"),
+            ("credential theft", "Attack Type"),
+            ("brute force attack", "Attack Type"),
+            # TTP
+            ("lateral movement", "TTP"),
+            ("command and control", "TTP"),
+            ("data exfiltration", "TTP"),
+            ("defense evasion", "TTP"),
+            ("persistence mechanism", "TTP"),
+            # Ransomware
+            ("LockBit", "Ransomware"),
+            ("BlackCat ALPHV", "Ransomware"),
+            ("Cl0p", "Ransomware"),
+            ("double extortion", "Ransomware"),
+            # Supply Chain
+            ("supply chain attack", "Supply Chain"),
+            ("software supply chain compromise", "Supply Chain"),
+            # Phishing
+            ("phishing", "Phishing"),
+            ("spear phishing", "Phishing"),
+            ("business email compromise", "Phishing"),
+            # C2 Infrastructure
+            ("backdoor", "C2 Infrastructure"),
+            ("Cobalt Strike", "C2 Infrastructure"),
+            # Data Exfiltration
+            ("data breach", "Data Exfiltration"),
         ]
-        
-        for keyword in default_keywords:
+
+        for keyword, category in default_keywords:
             existing = db.query(WatchListKeyword).filter(
                 WatchListKeyword.keyword == keyword
             ).first()
             if not existing:
-                wl = WatchListKeyword(keyword=keyword, is_active=True)
+                wl = WatchListKeyword(keyword=keyword, category=category, is_active=True)
                 db.add(wl)
-                print(f"✓ Added watchlist keyword: {keyword}")
+                print(f"✓ Added watchlist keyword: {keyword} [{category}]")
         
         # Add default connectors (stubs)
         connectors = [

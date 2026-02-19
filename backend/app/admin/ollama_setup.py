@@ -178,7 +178,7 @@ def get_installed_models() -> List[str]:
 
 @router.get("/status", response_model=OllamaStatus)
 async def get_ollama_status(
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Check Ollama installation and service status.
@@ -212,7 +212,7 @@ async def get_ollama_status(
 
 @router.post("/install", response_model=InstallResponse)
 async def install_ollama(
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     One-click Ollama installation (Linux only).
@@ -261,7 +261,7 @@ async def install_ollama(
 @router.post("/pull/{model_name}", response_model=PullProgress)
 async def pull_model(
     model_name: str,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Pull an Ollama model from the registry.
@@ -329,7 +329,7 @@ async def pull_model(
 
 @router.get("/models", response_model=List[str])
 async def list_models(
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     List all installed Ollama models.
@@ -349,7 +349,7 @@ async def list_models(
 @router.delete("/models/{model_name}")
 async def delete_model(
     model_name: str,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Remove an installed Ollama model.
@@ -391,7 +391,7 @@ async def delete_model(
 
 @router.get("/recommended-models")
 async def get_recommended_models(
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Get list of recommended models for different use cases.
@@ -441,7 +441,7 @@ async def get_recommended_models(
 
 @router.post("/test-connection")
 async def test_ollama_connection(
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_TEST.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Test connection to Ollama API.

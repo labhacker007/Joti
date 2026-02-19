@@ -17,6 +17,7 @@ import {
 import { watchlistAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store';
 
 const CATEGORIES = [
   'TTP', 'Threat Actor', 'Attack Type', 'Vulnerability', 'Malware',
@@ -66,6 +67,8 @@ interface PersonalKeyword {
 }
 
 export default function Watchlist() {
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'ADMIN';
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -223,7 +226,7 @@ export default function Watchlist() {
               activeTab === 'global' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            Global
+            Org
           </button>
           <button
             onClick={() => setActiveTab('personal')}
@@ -249,27 +252,31 @@ export default function Watchlist() {
           />
         </div>
 
-        {/* Add button */}
-        <button
-          onClick={() => setShowAddPanel(!showAddPanel)}
-          className={cn(
-            'p-1.5 rounded-md transition-colors shrink-0',
-            showAddPanel ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-          )}
-          title="Add keyword"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
+        {/* Add button — admins on global tab, anyone on personal tab */}
+        {(activeTab === 'personal' || isAdmin) && (
+          <button
+            onClick={() => setShowAddPanel(!showAddPanel)}
+            className={cn(
+              'p-1.5 rounded-md transition-colors shrink-0',
+              showAddPanel ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            )}
+            title="Add keyword"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        )}
 
-        {/* Refresh */}
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 shrink-0"
-          title="Refresh matches"
-        >
-          <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
-        </button>
+        {/* Refresh — admin only */}
+        {isAdmin && (
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 shrink-0"
+            title="Refresh matches"
+          >
+            <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
+          </button>
+        )}
       </div>
 
       {/* ── Add Keyword Panel ── */}
@@ -384,53 +391,64 @@ export default function Watchlist() {
                               !item.is_active && 'opacity-50'
                             )}
                           >
-                            {/* Toggle */}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleToggle(item.id, item.is_active); }}
-                              className={cn(
-                                'relative inline-flex h-4 w-7 items-center rounded-full transition-colors flex-shrink-0',
+                            {/* Toggle — admin only */}
+                            {isAdmin ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleToggle(item.id, item.is_active); }}
+                                className={cn(
+                                  'relative inline-flex h-4 w-7 items-center rounded-full transition-colors flex-shrink-0',
+                                  item.is_active ? 'bg-primary' : 'bg-muted-foreground/30'
+                                )}
+                              >
+                                <span className={cn(
+                                  'inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm',
+                                  item.is_active ? 'translate-x-3.5' : 'translate-x-0.5'
+                                )} />
+                              </button>
+                            ) : (
+                              <div className={cn(
+                                'w-2 h-2 rounded-full flex-shrink-0',
                                 item.is_active ? 'bg-primary' : 'bg-muted-foreground/30'
-                              )}
-                            >
-                              <span className={cn(
-                                'inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm',
-                                item.is_active ? 'translate-x-3.5' : 'translate-x-0.5'
                               )} />
-                            </button>
+                            )}
 
                             <span className="text-xs text-foreground font-medium truncate flex-1 min-w-0">
                               {item.keyword}
                             </span>
 
-                            {/* Edit category */}
-                            {editingCategory === item.id ? (
-                              <select
-                                autoFocus
-                                value={item.category || ''}
-                                onChange={(e) => handleCategoryChange(item.id, e.target.value)}
-                                onBlur={() => setEditingCategory(null)}
-                                className="px-1.5 py-0.5 bg-background border border-input rounded text-[10px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary flex-shrink-0"
-                              >
-                                <option value="">Ungrouped</option>
-                                {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                              </select>
-                            ) : (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setEditingCategory(item.id); }}
-                                className="p-0.5 text-muted-foreground hover:text-foreground rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                title="Change category"
-                              >
-                                <Pencil className="w-3 h-3" />
-                              </button>
-                            )}
+                            {/* Edit category — admin only */}
+                            {isAdmin && (
+                              <>
+                                {editingCategory === item.id ? (
+                                  <select
+                                    autoFocus
+                                    value={item.category || ''}
+                                    onChange={(e) => handleCategoryChange(item.id, e.target.value)}
+                                    onBlur={() => setEditingCategory(null)}
+                                    className="px-1.5 py-0.5 bg-background border border-input rounded text-[10px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary flex-shrink-0"
+                                  >
+                                    <option value="">Ungrouped</option>
+                                    {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                                  </select>
+                                ) : (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setEditingCategory(item.id); }}
+                                    className="p-0.5 text-muted-foreground hover:text-foreground rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                    title="Change category"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                )}
 
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                              className="p-0.5 text-muted-foreground hover:text-red-600 rounded hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                              title="Remove"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                                  className="p-0.5 text-muted-foreground hover:text-red-600 rounded hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                  title="Remove"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         ))}
                       </div>

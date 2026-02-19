@@ -8,18 +8,18 @@ def login_admin(client):
 
 
 def test_admin_errors_do_not_leak_exception_details(client, monkeypatch):
+    """Verify that backend errors don't expose internal exception details."""
     token = login_admin(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    import app.auth.page_permissions as page_permissions
+    import app.auth.unified_permissions as unified_permissions
 
     def _boom():
         raise Exception("TOP_SECRET_EXCEPTION_DETAIL")
 
-    monkeypatch.setattr(page_permissions, "get_all_page_definitions", _boom)
+    monkeypatch.setattr(unified_permissions, "get_all_roles_permissions", _boom)
 
-    r = client.get("/admin/rbac/pages", headers=headers)
+    r = client.get("/admin/rbac/roles", headers=headers)
     assert r.status_code == 500
     assert "TOP_SECRET_EXCEPTION_DETAIL" not in r.text
-    assert r.json()["detail"] == "Failed to get page definitions"
-
+    assert r.json()["detail"] == "Failed to get roles"

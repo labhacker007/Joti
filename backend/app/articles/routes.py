@@ -211,7 +211,7 @@ def list_articles(
     watchlist_only: bool = Query(False, description="Filter watchlist matches only"),
     bookmarked_only: bool = Query(False, description="Filter bookmarked articles only"),
     time_range: Optional[str] = Query(None, description="Time range filter: 24h, 7d, 30d, all"),
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get paginated list of articles with optional filters.
@@ -331,7 +331,7 @@ def list_articles(
 
 @router.get("/counts")
 def get_article_counts(
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get counts of articles by category for badge display.
@@ -399,7 +399,7 @@ def get_triage_queue(
     high_priority_only: bool = Query(False),
     source_id: Optional[int] = Query(None),
     read_filter: Optional[bool] = Query(None, description="Filter by read/unread status"),
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get articles for triage with pagination and filters including hunt status and read/unread."""
@@ -496,7 +496,7 @@ def mark_all_as_read(
 @router.get("/{article_id}", response_model=ArticleResponse)
 def get_article(
     article_id: int,
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get a specific article with all details including extracted intelligence. Auto-marks as read."""
@@ -517,7 +517,7 @@ def get_article(
 def update_article_analysis(
     article_id: int,
     update: ArticleAnalysisUpdate,
-    current_user: User = Depends(require_permission(Permission.ANALYZE_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Add executive and technical summaries."""
@@ -544,7 +544,7 @@ def update_article_analysis(
 @router.get("/{article_id}/intelligence", response_model=list)
 def get_article_intelligence(
     article_id: int,
-    current_user: User = Depends(require_permission(Permission.READ_INTELLIGENCE.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get all extracted intelligence for an article."""
@@ -645,7 +645,7 @@ def update_status(
     article_id: int,
     update: ArticleStatusUpdate,
     request: Request,
-    current_user: User = Depends(require_permission(Permission.TRIAGE_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Update article status and optionally add GenAI analysis remarks.
@@ -754,6 +754,96 @@ def update_status(
     return article_to_response(article, current_user.id, db)
 
 
+# ============ SIMILAR ARTICLES ENDPOINT ============
+
+@router.get("/{article_id}/similar")
+def get_similar_articles(
+    article_id: int,
+    limit: int = Query(5, ge=1, le=10),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
+    db: Session = Depends(get_db)
+):
+    """Get articles similar to the given article based on shared IOCs, TTPs, or threat actors."""
+    from sqlalchemy import func
+    from app.models import ExtractedIntelligenceType as EIT
+
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    # Get all intel for this article
+    this_intel = db.query(ExtractedIntelligence).filter(
+        ExtractedIntelligence.article_id == article_id
+    ).all()
+
+    if not this_intel:
+        return {"similar": [], "article_id": article_id}
+
+    # Build lookup sets by type
+    this_ioc_values = {i.value for i in this_intel if i.intelligence_type == EIT.IOC}
+    this_ttp_values = {i.value for i in this_intel if i.intelligence_type == EIT.TTP}
+    this_actor_values = {i.value for i in this_intel if i.intelligence_type == EIT.THREAT_ACTOR}
+    this_values = {i.value for i in this_intel}
+
+    if not this_values:
+        return {"similar": [], "article_id": article_id}
+
+    # Find other articles sharing intel values
+    matches = (
+        db.query(ExtractedIntelligence.article_id, ExtractedIntelligence.value, ExtractedIntelligence.intelligence_type)
+        .filter(
+            ExtractedIntelligence.article_id != article_id,
+            ExtractedIntelligence.value.in_(this_values)
+        )
+        .all()
+    )
+
+    # Score each candidate article
+    scores: dict = {}
+    reasons: dict = {}
+    for row in matches:
+        aid = row.article_id
+        val = row.value
+        itype = row.intelligence_type
+        if aid not in scores:
+            scores[aid] = 0
+            reasons[aid] = []
+        if itype == EIT.THREAT_ACTOR and val in this_actor_values:
+            scores[aid] += 10
+            reasons[aid].append(f"Threat actor: {val}")
+        elif itype == EIT.TTP and val in this_ttp_values:
+            scores[aid] += 5
+            reasons[aid].append(f"TTP: {val}")
+        elif itype == EIT.IOC and val in this_ioc_values:
+            scores[aid] += 3
+            reasons[aid].append(f"IOC: {val}")
+
+    # Sort by score descending and take top N
+    top_ids = sorted(scores, key=lambda x: scores[x], reverse=True)[:limit]
+
+    if not top_ids:
+        return {"similar": [], "article_id": article_id}
+
+    similar_articles = db.query(Article).filter(Article.id.in_(top_ids)).all()
+
+    result = []
+    for a in similar_articles:
+        result.append({
+            "id": a.id,
+            "title": a.title,
+            "summary": (a.summary or "")[:200],
+            "published_at": a.published_at.isoformat() if a.published_at else None,
+            "source_name": a.feed_source.name if a.feed_source else None,
+            "url": a.url,
+            "is_high_priority": a.is_high_priority,
+            "match_score": scores.get(a.id, 0),
+            "match_reasons": list(dict.fromkeys(reasons.get(a.id, [])))[:3],
+        })
+
+    result.sort(key=lambda x: x["match_score"], reverse=True)
+    return {"similar": result, "article_id": article_id}
+
+
 # ============ COMMENTS ENDPOINTS ============
 
 from app.articles.schemas import CommentCreate, CommentUpdate, CommentResponse, ArticleCommentsResponse
@@ -763,7 +853,7 @@ from app.models import ArticleComment
 @router.get("/{article_id}/comments", response_model=ArticleCommentsResponse)
 def get_article_comments(
     article_id: int,
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get all comments for an article."""
@@ -798,7 +888,7 @@ def get_article_comments(
 def create_comment(
     article_id: int,
     comment_data: CommentCreate,
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Add a comment to an article."""
@@ -918,7 +1008,7 @@ from datetime import datetime
 def assign_article(
     article_id: int,
     request: ArticleAssignRequest,
-    current_user: User = Depends(require_permission(Permission.TRIAGE_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Assign an article to an analyst.
@@ -968,7 +1058,7 @@ def assign_article(
 @router.post("/{article_id}/claim")
 def claim_article(
     article_id: int,
-    current_user: User = Depends(require_permission(Permission.TRIAGE_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Claim an article for the current user."""
@@ -1004,7 +1094,7 @@ def claim_article(
 def detect_duplicates(
     days: int = Query(7, ge=1, le=30, description="Number of days to look back"),
     similarity_threshold: float = Query(0.5, ge=0.1, le=1.0, description="Title similarity threshold"),
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Detect potential duplicate articles based on title similarity and publishing date.
@@ -1127,7 +1217,7 @@ def get_unassigned_articles(
     page_size: int = Query(20, ge=1, le=100),
     status_filter: Optional[str] = None,
     high_priority_only: bool = False,
-    current_user: User = Depends(require_permission(Permission.TRIAGE_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Get articles that haven't been assigned to anyone."""
@@ -1162,7 +1252,7 @@ def get_intelligence_summary(
     status_filter: Optional[str] = Query(None, description="Filter by article status"),
     intel_type: Optional[str] = Query(None, description="IOC, TTP, or ATLAS"),
     time_range: Optional[str] = Query(None, description="Time range: 1h, 6h, 12h, 24h, 7d, 30d, 90d, all"),
-    current_user: User = Depends(require_permission(Permission.READ_INTELLIGENCE.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get summary of all extracted intelligence across articles with optional time filtering."""
@@ -1265,7 +1355,7 @@ def get_all_intelligence(
     with_hunts_only: bool = Query(False, description="Only show intel from hunt results"),
     article_id: Optional[int] = Query(None, description="Filter by specific article ID"),
     ioc_type: Optional[str] = Query(None, description="Filter by IOC subtype (ip, domain, hash, email, etc.)"),
-    current_user: User = Depends(require_permission(Permission.READ_INTELLIGENCE.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get all extracted intelligence with article context, hunt info, and MITRE mapping."""
@@ -1390,7 +1480,7 @@ def get_all_intelligence(
 def get_mitre_matrix(
     framework: str = Query("attack", description="attack or atlas"),
     status_filter: Optional[str] = Query(None),
-    current_user: User = Depends(require_permission(Permission.READ_INTELLIGENCE.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get intelligence mapped to MITRE ATT&CK or ATLAS matrix format."""
@@ -1476,7 +1566,7 @@ class GenAIExtractionRequest(BaseModel):
 async def extract_article_intelligence(
     article_id: int,
     request: GenAIExtractionRequest = GenAIExtractionRequest(),
-    current_user: User = Depends(require_permission(Permission.EXTRACT_INTELLIGENCE.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Manually extract IOCs and TTPs from an article.
@@ -1674,7 +1764,7 @@ class SummarizationRequest(BaseModel):
 async def summarize_article(
     article_id: int,
     request: SummarizationRequest = SummarizationRequest(),
-    current_user: User = Depends(require_permission(Permission.ANALYZE_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Generate executive and technical summaries for an article using GenAI."""
@@ -1764,7 +1854,7 @@ Be thorough and technical, suitable for SOC analysts and threat hunters.""",
 @router.delete("/intelligence/{intel_id}", summary="Delete a specific intelligence item")
 def delete_intelligence_item(
     intel_id: int,
-    current_user: User = Depends(require_permission(Permission.EXTRACT_INTELLIGENCE.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Delete a specific extracted intelligence item (IOC, TTP, or ATLAS)."""
@@ -1814,7 +1904,7 @@ class IntelligenceUpdateRequest(BaseModel):
 def update_intelligence_item(
     intel_id: int,
     request: IntelligenceUpdateRequest,
-    current_user: User = Depends(require_permission(Permission.EXTRACT_INTELLIGENCE.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Update a specific extracted intelligence item (IOC or TTP).
@@ -1899,7 +1989,7 @@ def update_intelligence_item(
 @router.delete("/intelligence/batch", summary="Delete multiple intelligence items")
 def delete_intelligence_batch(
     intel_ids: List[int] = Query(..., description="List of intelligence IDs to delete"),
-    current_user: User = Depends(require_permission(Permission.EXTRACT_INTELLIGENCE.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Delete multiple intelligence items at once."""
@@ -1930,7 +2020,7 @@ def delete_intelligence_batch(
 @router.delete("/{article_id}/intelligence/all", summary="Delete all intelligence for an article")
 def delete_all_article_intelligence(
     article_id: int,
-    current_user: User = Depends(require_permission(Permission.EXTRACT_INTELLIGENCE.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Delete all extracted intelligence for a specific article."""
@@ -1974,7 +2064,7 @@ class IntelligenceReviewRequest(BaseModel):
 async def review_intelligence_item(
     intel_id: int,
     request: IntelligenceReviewRequest,
-    current_user: User = Depends(require_permission(Permission.ANALYZE_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Mark an extracted intelligence item as reviewed (approved or false positive)."""
@@ -2027,7 +2117,7 @@ class BatchReviewRequest(BaseModel):
 @router.post("/intelligence/batch-review", summary="Review multiple intelligence items")
 async def review_intelligence_batch(
     request: BatchReviewRequest,
-    current_user: User = Depends(require_permission(Permission.ANALYZE_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
     """Mark multiple intelligence items as reviewed at once."""
@@ -2079,7 +2169,7 @@ async def export_article_pdf(
     article_id: int,
     include_intelligence: bool = Query(True, description="Include extracted IOCs and TTPs"),
     include_summaries: bool = Query(True, description="Include executive and technical summaries"),
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Export a single article as a professionally formatted PDF.
@@ -2371,7 +2461,7 @@ async def export_article_html(
     article_id: int,
     include_intelligence: bool = Query(True, description="Include extracted IOCs and TTPs"),
     include_summaries: bool = Query(True, description="Include executive and technical summaries"),
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Export a single article as a professionally formatted HTML document.
@@ -2685,7 +2775,7 @@ def _generate_article_html(article: Article, intel_list: list, include_summaries
 @router.get("/{article_id}/export/csv", summary="Export article IOCs as CSV")
 async def export_article_csv(
     article_id: int,
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Export extracted IOCs and TTPs from an article as CSV.
@@ -2749,7 +2839,7 @@ async def export_article_csv(
 @router.post("/{article_id}/fetch-image", summary="Fetch image for article")
 async def fetch_article_image(
     article_id: int,
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Fetch and update the image for an article that doesn't have one.
@@ -2800,7 +2890,7 @@ async def fetch_article_image(
 @router.post("/batch-fetch-images", summary="Fetch images for multiple articles")
 async def batch_fetch_images(
     limit: int = Query(50, ge=1, le=200, description="Maximum articles to process"),
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Fetch images for articles that don't have them.

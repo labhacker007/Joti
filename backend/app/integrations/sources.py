@@ -173,6 +173,20 @@ def _persist_extracted_intelligence(
         )
         db.add(intel)
 
+    for actor in extracted.get("threat_actors", []):
+        actor_value = actor.get("value")
+        if not actor_value:
+            continue
+        intel = ExtractedIntelligence(
+            article_id=article_id,
+            intelligence_type=ExtractedIntelligenceType.THREAT_ACTOR,
+            value=actor_value,
+            confidence=actor.get("confidence", 75),
+            evidence=actor.get("evidence"),
+            meta={"attribution": actor.get("attribution", "Unknown"), "source": method}
+        )
+        db.add(intel)
+
 
 def _generate_article_summaries(
     article: Article,
@@ -506,7 +520,7 @@ def ingest_feed_sync(db: Session, source: FeedSource) -> IngestionResult:
 @router.post("/", response_model=FeedSourceResponse)
 def create_feed_source(
     request: FeedSourceCreateRequest,
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Create a new feed source."""
@@ -534,7 +548,7 @@ def create_feed_source(
 
 @router.get("/", response_model=List[FeedSourceResponse])
 def list_feed_sources(
-    current_user: User = Depends(require_permission(Permission.READ_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """List all feed sources with article statistics."""
@@ -545,7 +559,7 @@ def list_feed_sources(
 @router.get("/{source_id}", response_model=FeedSourceResponse)
 def get_feed_source(
     source_id: int,
-    current_user: User = Depends(require_permission(Permission.READ_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get a specific feed source with statistics."""
@@ -560,7 +574,7 @@ def get_feed_source(
 def update_feed_source(
     source_id: int,
     request: FeedSourceUpdateRequest,
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Update a feed source."""
@@ -591,7 +605,7 @@ def update_feed_source(
 def delete_feed_source(
     source_id: int,
     delete_articles: bool = False,
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Delete a feed source and optionally its articles."""
@@ -621,7 +635,7 @@ def delete_feed_source(
 @router.post("/{source_id}/ingest", response_model=IngestionResult)
 def trigger_feed_ingestion(
     source_id: int,
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Trigger immediate ingestion for a feed source (synchronous)."""
@@ -642,7 +656,7 @@ def trigger_feed_ingestion(
 
 @router.post("/ingest-all")
 def trigger_all_ingestion(
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Trigger ingestion for all active feed sources."""
@@ -680,7 +694,7 @@ def trigger_all_ingestion(
 @router.post("/custom/ingest", response_model=CustomFeedIngestResponse, summary="Ingest a custom document or webpage")
 def ingest_custom_feed(
     payload: CustomFeedIngestRequest,
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Ingest a standalone document (PDF/Word/HTML) and auto-run GenAI analysis."""
@@ -974,7 +988,7 @@ def upload_custom_document(
 @router.get("/stats/summary")
 def get_sources_summary(
     time_range: Optional[str] = None,  # e.g., "24h", "7d", "30d", "all"
-    current_user: User = Depends(require_permission(Permission.READ_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get summary statistics for all sources with optional time filtering."""

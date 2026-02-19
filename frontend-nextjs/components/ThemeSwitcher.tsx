@@ -62,7 +62,6 @@ interface ThemeSwitcherProps {
   selectedTheme: ThemeType;
   onThemeChange: (theme: ThemeType) => void;
   className?: string;
-  compact?: boolean;
 }
 
 const THEME_ORDER: ThemeType[] = ['command-center', 'daylight', 'midnight', 'aurora', 'red-alert', 'matrix'];
@@ -71,7 +70,6 @@ export function ThemeSwitcher({
   selectedTheme,
   onThemeChange,
   className = '',
-  compact = false,
 }: ThemeSwitcherProps) {
   const handleCycleTheme = () => {
     const currentIndex = THEME_ORDER.indexOf(selectedTheme);
@@ -84,9 +82,7 @@ export function ThemeSwitcher({
   return (
     <button
       onClick={handleCycleTheme}
-      className={`group flex items-center gap-2 rounded-lg backdrop-blur-md bg-secondary/80 hover:bg-secondary border border-border hover:border-border/80 transition-all duration-200 ${
-        compact ? 'p-2' : 'px-3 py-2'
-      } ${className}`}
+      className={`group flex items-center justify-center rounded-md hover:bg-secondary/60 transition-all duration-200 p-1.5 ${className}`}
       title={`Theme: ${currentConfig.name} — click to switch`}
     >
       <div
@@ -95,14 +91,6 @@ export function ThemeSwitcher({
       >
         {currentConfig.icon}
       </div>
-      {!compact && (
-        <span
-          className="text-xs font-medium"
-          style={{ color: currentConfig.accentColor }}
-        >
-          {currentConfig.name}
-        </span>
-      )}
     </button>
   );
 }

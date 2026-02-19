@@ -57,7 +57,7 @@ def _skill_to_response(skill: Skill) -> SkillResponse:
 
 @router.get("/", response_model=List[SkillResponse])
 def list_skills(
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value)),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db),
 ):
     """List all GenAI skills."""
@@ -68,7 +68,7 @@ def list_skills(
 @router.get("/{skill_id}", response_model=SkillResponse)
 def get_skill(
     skill_id: int,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value)),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db),
 ):
     """Get a specific skill by ID."""
@@ -81,7 +81,7 @@ def get_skill(
 @router.post("/", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)
 def create_skill(
     payload: SkillCreate,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value)),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db),
 ):
     """Create a new GenAI skill."""
@@ -104,7 +104,7 @@ def create_skill(
 def update_skill(
     skill_id: int,
     payload: SkillUpdate,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value)),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db),
 ):
     """Update an existing GenAI skill."""
@@ -125,7 +125,7 @@ def update_skill(
 @router.delete("/{skill_id}")
 def delete_skill(
     skill_id: int,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value)),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db),
 ):
     """Delete a GenAI skill."""

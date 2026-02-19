@@ -333,7 +333,7 @@ def get_system_settings(
 def update_system_settings(
     settings: SystemRefreshSettings,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value))
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value))
 ):
     """Update system-wide default refresh settings (admin only)."""
     # Validate
@@ -419,7 +419,7 @@ def update_source_settings(
     source_id: int,
     settings: SourceRefreshSettings,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value))
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value))
 ):
     """Update refresh settings for a specific source (admin only)."""
     source = db.query(FeedSource).filter(FeedSource.id == source_id).first()
@@ -648,7 +648,7 @@ def get_dashboard_system_settings(
 def update_dashboard_system_settings(
     settings: DashboardSettings,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value))
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value))
 ):
     """Update system-wide dashboard settings (admin only)."""
     # Validate time range

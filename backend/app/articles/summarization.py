@@ -191,7 +191,7 @@ async def list_available_models(
 @router.post("/models/set-primary")
 async def set_primary_model(
     model_id: str,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """Set the primary GenAI model (admin only)."""
     try:

@@ -346,7 +346,7 @@ def get_role_description(role: UserRole) -> str:
 
 @router.get("/", response_model=List[UserResponse])
 def list_users(
-    current_user: User = Depends(require_permission(Permission.MANAGE_USERS.value)),
+    current_user: User = Depends(require_permission(Permission.USERS_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """List all users (admin only)."""
@@ -357,7 +357,7 @@ def list_users(
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
     user_data: AdminUserCreate,
-    current_user: User = Depends(require_permission(Permission.MANAGE_USERS.value)),
+    current_user: User = Depends(require_permission(Permission.USERS_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Create a new user (admin only)."""
@@ -427,7 +427,7 @@ def create_user(
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(
     user_id: int,
-    current_user: User = Depends(require_permission(Permission.MANAGE_USERS.value)),
+    current_user: User = Depends(require_permission(Permission.USERS_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Get a specific user by ID (admin only)."""
@@ -444,7 +444,7 @@ def get_user(
 def update_user(
     user_id: int,
     user_update: UserUpdate,
-    current_user: User = Depends(require_permission(Permission.MANAGE_USERS.value)),
+    current_user: User = Depends(require_permission(Permission.USERS_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Update user details (admin only)."""
@@ -544,7 +544,7 @@ def update_user(
 @router.delete("/{user_id}")
 def delete_user(
     user_id: int,
-    current_user: User = Depends(require_permission(Permission.MANAGE_USERS.value)),
+    current_user: User = Depends(require_permission(Permission.USERS_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Delete a user (admin only)."""

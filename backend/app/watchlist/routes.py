@@ -83,7 +83,7 @@ class WatchlistKeywordResponse(BaseModel):
 
 @router.get("/", response_model=list[WatchlistKeywordResponse])
 def list_keywords(
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """List all watchlist keywords."""
@@ -94,7 +94,7 @@ def list_keywords(
 @router.post("/", response_model=WatchlistKeywordResponse, status_code=status.HTTP_201_CREATED)
 def create_keyword(
     payload: WatchlistKeywordCreate,
-    current_user: User = Depends(require_permission(Permission.MANAGE_WATCHLISTS.value)),
+    current_user: User = Depends(require_permission(Permission.WATCHLIST_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Add a new keyword to the watchlist. Immediately applies to all articles."""
@@ -142,7 +142,7 @@ def update_keyword(
     keyword_id: int,
     update: WatchlistKeywordUpdate,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(require_permission(Permission.MANAGE_WATCHLISTS.value)),
+    current_user: User = Depends(require_permission(Permission.WATCHLIST_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Update a watchlist keyword (toggle active status). Re-applies to all articles."""
@@ -183,7 +183,7 @@ def update_keyword(
 @router.delete("/{keyword_id}")
 def delete_keyword(
     keyword_id: int,
-    current_user: User = Depends(require_permission(Permission.MANAGE_WATCHLISTS.value)),
+    current_user: User = Depends(require_permission(Permission.WATCHLIST_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Remove a keyword from the watchlist. Updates affected articles."""
@@ -219,7 +219,7 @@ def delete_keyword(
 
 @router.post("/refresh")
 def refresh_watchlist_matches(
-    current_user: User = Depends(require_permission(Permission.MANAGE_WATCHLISTS.value)),
+    current_user: User = Depends(require_permission(Permission.WATCHLIST_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Manually refresh watchlist matches for all articles.
@@ -245,7 +245,7 @@ def refresh_watchlist_matches(
 
 @router.get("/categories")
 def list_categories(
-    current_user: User = Depends(require_permission(Permission.READ_ARTICLES.value)),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """List predefined and in-use categories for watchlist keywords."""

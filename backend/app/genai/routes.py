@@ -6,6 +6,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.core.database import get_db
 from app.auth.dependencies import get_current_user, require_permission
+from app.auth.rbac import Permission
 from app.models import User
 from app.core.logging import logger
 from app.genai.config_manager import GenAIConfigManager
@@ -825,7 +826,7 @@ async def get_available_models_admin(
     is_free: Optional[bool] = None,
     is_local: Optional[bool] = None,
     use_case: Optional[str] = None,
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Get all available models (enabled only) - Admin alias."""
@@ -841,7 +842,7 @@ async def get_available_models_admin(
 
 @router.get("/admin/models/all")
 async def get_all_models(
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Get all registered models (including disabled) - Admin only."""
@@ -876,7 +877,7 @@ async def get_all_models(
 @router.post("/admin/models/register")
 async def register_model(
     model_data: ModelRegistryCreate,
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Register a new model - Admin only."""
@@ -920,7 +921,7 @@ async def register_model(
 
 @router.post("/admin/models/deduplicate")
 async def deduplicate_models(
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """
@@ -1001,7 +1002,7 @@ async def deduplicate_models(
 
 @router.post("/admin/models/sync")
 async def sync_models_with_providers(
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """
@@ -1151,7 +1152,7 @@ async def sync_models_with_providers(
 @router.patch("/admin/models/{model_id}/toggle")
 async def toggle_model(
     model_id: int,
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Enable/disable a model - Admin only."""
@@ -1196,7 +1197,7 @@ async def get_configs(
     config_type: Optional[str] = None,
     use_case: Optional[str] = None,
     is_active: Optional[bool] = None,
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Get all configurations."""
@@ -1240,7 +1241,7 @@ async def get_configs(
 @router.post("/admin/configs")
 async def create_config(
     config_data: ModelConfigCreate,
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Create new configuration - Admin only."""
@@ -1291,7 +1292,7 @@ async def create_config(
 async def update_config(
     config_id: int,
     config_data: ModelConfigUpdate,
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Update configuration - Admin only."""
@@ -1338,7 +1339,7 @@ async def update_config(
 @router.delete("/admin/configs/{config_id}")
 async def delete_config(
     config_id: int,
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Soft delete configuration - Admin only."""
@@ -1382,7 +1383,7 @@ async def delete_config(
 @router.get("/admin/quotas")
 async def get_quotas(
     quota_type: Optional[str] = None,
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Get all quotas - Admin only."""
@@ -1421,7 +1422,7 @@ async def get_quotas(
 @router.post("/admin/quotas")
 async def create_quota(
     quota_data: QuotaCreate,
-    current_user: User = Depends(require_permission("manage:genai")),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value)),
     db: Session = Depends(get_db)
 ):
     """Create usage quota - Admin only."""
@@ -1473,7 +1474,7 @@ async def get_usage_stats(
     end_date: Optional[datetime] = None,
     user_id: Optional[int] = None,
     use_case: Optional[str] = None,
-    current_user: User = Depends(require_permission("view:analytics")),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get usage statistics."""

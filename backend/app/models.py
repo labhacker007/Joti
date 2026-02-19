@@ -42,6 +42,7 @@ class ExtractedIntelligenceType(str, Enum):
     IOA = "IOA"  # Indicator of Attack
     TTP = "TTP"  # MITRE ATT&CK
     ATLAS = "ATLAS"  # MITRE ATLAS
+    THREAT_ACTOR = "THREAT_ACTOR"  # Named threat actor / APT group
 
 
 class AuditEventType(str, Enum):

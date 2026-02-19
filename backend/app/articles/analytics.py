@@ -39,7 +39,7 @@ def get_my_analytics(
 def get_user_analytics(
     user_id: int,
     time_range: str = Query("30d"),
-    current_user: User = Depends(require_permission(Permission.MANAGE_USERS.value)),
+    current_user: User = Depends(require_permission(Permission.USERS_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Admin: get analytics for a specific user."""
@@ -52,7 +52,7 @@ def get_user_analytics(
 @router.get("/admin/overview")
 def get_admin_overview(
     time_range: str = Query("30d"),
-    current_user: User = Depends(require_permission(Permission.MANAGE_USERS.value)),
+    current_user: User = Depends(require_permission(Permission.USERS_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Admin: get platform-wide analytics overview."""
@@ -164,7 +164,7 @@ def export_analytics(
     start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     user_id: Optional[int] = Query(None),
-    current_user: User = Depends(require_permission(Permission.MANAGE_USERS.value)),
+    current_user: User = Depends(require_permission(Permission.USERS_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Admin: export analytics data as JSON (for CSV conversion on frontend)."""

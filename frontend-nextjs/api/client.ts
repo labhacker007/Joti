@@ -446,6 +446,13 @@ export const articlesAPI = {
   getTrending: async () => {
     return get('/articles/trending');
   },
+
+  /**
+   * Get similar articles based on shared IOCs, TTPs, and threat actors
+   */
+  getSimilarArticles: async (id: string, limit = 5) => {
+    return get(`/articles/${id}/similar?limit=${limit}`);
+  },
 };
 
 // ============================================
@@ -695,48 +702,17 @@ export const adminAPI = {
 // ============================================
 
 export const rbacAPI = {
-  getPermissions: async () => {
-    return get('/admin/rbac/permissions');
-  },
-  getRoles: async () => {
-    return get('/admin/rbac/roles');
-  },
-  getMatrix: async () => {
-    return get('/admin/rbac/matrix');
-  },
-  updateRolePermissions: async (role: string, permissions: string[]) => {
-    return put(`/admin/rbac/roles/${role}/permissions`, { permissions });
-  },
-  getComprehensivePermissions: async () => {
-    return get('/admin/rbac/comprehensive/permissions');
-  },
-  getComprehensiveAreas: async () => {
-    return get('/admin/rbac/comprehensive/areas');
-  },
-  getComprehensiveRole: async (role: string) => {
-    return get(`/admin/rbac/comprehensive/role/${role}`);
-  },
-  updateComprehensiveRole: async (role: string, permissions: any) => {
-    return put(`/admin/rbac/comprehensive/role/${role}`, permissions);
-  },
-  getUserOverrides: async (userId: string) => {
-    return get(`/admin/rbac/users/${userId}/permissions`);
-  },
-  setUserOverride: async (userId: string, data: any) => {
-    return post(`/admin/rbac/users/${userId}/permissions`, data);
-  },
-  removeUserOverride: async (userId: string, permission: string) => {
-    return del(`/admin/rbac/users/${userId}/permissions/${permission}`);
-  },
-  getPages: async () => {
-    return get('/admin/rbac/pages');
-  },
-  getRolePageAccess: async (role: string) => {
-    return get(`/admin/rbac/pages/role/${role}`);
-  },
-  updatePageAccess: async (pageKey: string, role: string, data: any) => {
-    return put(`/admin/rbac/pages/${pageKey}/role/${role}`, data);
-  },
+  getPermissions: async () => get('/admin/rbac/permissions'),
+  getRoles: async () => get('/admin/rbac/roles'),
+  getMatrix: async () => get('/admin/rbac/matrix'),
+  updateRolePermissions: async (role: string, permissions: string[]) =>
+    put(`/admin/rbac/roles/${role}/permissions`, { permissions }),
+  getUserOverrides: async (userId: string) =>
+    get(`/admin/rbac/users/${userId}/permissions`),
+  setUserOverride: async (userId: string, data: { permission: string; granted: boolean; reason?: string }) =>
+    post(`/admin/rbac/users/${userId}/permissions`, data),
+  removeUserOverride: async (userId: string, permission: string) =>
+    del(`/admin/rbac/users/${userId}/permissions/${permission}`),
 };
 
 // ============================================

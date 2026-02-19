@@ -26,7 +26,7 @@ class DefaultFeedSourceResponse(BaseModel):
 
 @router.get("/", response_model=List[DefaultFeedSourceResponse])
 def list_default_feeds(
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """List all default feed sources (admin only)."""
@@ -48,7 +48,7 @@ def list_default_feeds(
 @router.post("/{source_id}", status_code=status.HTTP_201_CREATED)
 def add_default_feed(
     source_id: int,
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Mark a feed source as default for new users."""
@@ -84,7 +84,7 @@ def add_default_feed(
 @router.delete("/{source_id}")
 def remove_default_feed(
     source_id: int,
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Remove default feed marking."""
@@ -104,7 +104,7 @@ def remove_default_feed(
 
 @router.get("/stats")
 def get_default_feeds_stats(
-    current_user: User = Depends(require_permission(Permission.MANAGE_SOURCES.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
     db: Session = Depends(get_db)
 ):
     """Get statistics about default feeds."""

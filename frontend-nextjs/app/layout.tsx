@@ -8,7 +8,7 @@ import MainLayout from "@/components/MainLayout";
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "Joti - Threat Intelligence Platform",
+  title: "J.O.T.I - Threat Intelligence Platform",
   description: "Advanced threat intelligence and security monitoring platform",
 };
 

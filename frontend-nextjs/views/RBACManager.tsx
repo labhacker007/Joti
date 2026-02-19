@@ -1,56 +1,508 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Shield,
+  ShieldCheck,
   AlertCircle,
-  CheckCircle,
-  Save,
+  CheckCircle2,
   RefreshCw,
   Users,
   Lock,
-  Key,
+  Eye,
+  Database,
+  Cpu,
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Check,
 } from 'lucide-react';
 import { rbacAPI, usersAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
 import { cn } from '@/lib/utils';
 
-interface RoleInfo {
-  role: string;
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Permission {
+  key: string;
+  label: string;
+  description: string;
+  group: string;
+}
+
+interface RoleData {
+  key: string;
+  label: string;
+  description: string;
+  color: string;
   permissions: string[];
 }
 
-interface PermissionInfo {
-  name: string;
-  description?: string;
-  category?: string;
-}
-
 interface UserInfo {
-  id: string;
+  id: number;
   username: string;
   email: string;
   role: string;
 }
 
-interface UserOverride {
+interface Override {
+  id: number;
   permission: string;
   granted: boolean;
   reason?: string;
+  created_at?: string;
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PERMISSION_GROUPS: Record<string, { label: string; icon: React.ReactNode }> = {
+  'Core Access': {
+    label: 'Core Access',
+    icon: <Eye className="w-3.5 h-3.5" />,
+  },
+  'Sources & Feeds': {
+    label: 'Sources & Feeds',
+    icon: <Database className="w-3.5 h-3.5" />,
+  },
+  Administration: {
+    label: 'Administration',
+    icon: <Settings className="w-3.5 h-3.5" />,
+  },
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  red: 'border-red-500/30 bg-red-500/5',
+  blue: 'border-blue-500/30 bg-blue-500/5',
+  emerald: 'border-emerald-500/30 bg-emerald-500/5',
+  purple: 'border-purple-500/30 bg-purple-500/5',
+  amber: 'border-amber-500/30 bg-amber-500/5',
+  slate: 'border-slate-500/30 bg-slate-500/5',
+};
+
+const ROLE_BADGE_COLORS: Record<string, string> = {
+  red: 'bg-red-500/15 text-red-400 ring-red-500/20',
+  blue: 'bg-blue-500/15 text-blue-400 ring-blue-500/20',
+  emerald: 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/20',
+  purple: 'bg-purple-500/15 text-purple-400 ring-purple-500/20',
+  amber: 'bg-amber-500/15 text-amber-400 ring-amber-500/20',
+  slate: 'bg-slate-500/15 text-slate-400 ring-slate-500/20',
+};
+
+// ─── Role Card ────────────────────────────────────────────────────────────────
+
+interface RoleCardProps {
+  role: RoleData;
+  allPermissions: Permission[];
+  pendingPerms: string[];
+  onToggle: (perm: string) => void;
+  onSave: () => void;
+  onReset: () => void;
+  saving: boolean;
+  isDirty: boolean;
+}
+
+function RoleCard({
+  role,
+  allPermissions,
+  pendingPerms,
+  onToggle,
+  onSave,
+  onReset,
+  saving,
+  isDirty,
+}: RoleCardProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const groups = Object.keys(PERMISSION_GROUPS);
+  const cardBorder = ROLE_COLORS[role.color] || ROLE_COLORS.slate;
+  const badgeColor = ROLE_BADGE_COLORS[role.color] || ROLE_BADGE_COLORS.slate;
+
+  return (
+    <div className={cn('rounded-xl border-2 transition-all duration-200', cardBorder)}>
+      {/* Card header */}
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="w-4 h-4 text-current opacity-70" />
+              <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full ring-1', badgeColor)}>
+                {role.label}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{role.description}</p>
+          </div>
+          <div className="text-right shrink-0 ml-3">
+            <div className="text-lg font-bold text-foreground">{pendingPerms.length}</div>
+            <div className="text-[10px] text-muted-foreground">/ {allPermissions.length} perms</div>
+          </div>
+        </div>
+
+        {/* Permission pill summary */}
+        {!expanded && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {pendingPerms.slice(0, 4).map((p) => (
+              <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-foreground/10 text-muted-foreground font-mono">
+                {p}
+              </span>
+            ))}
+            {pendingPerms.length > 4 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-foreground/10 text-muted-foreground">
+                +{pendingPerms.length - 4} more
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Expand button */}
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 w-full flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors py-1 rounded-lg hover:bg-foreground/5"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="w-3.5 h-3.5" /> Collapse
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-3.5 h-3.5" /> Edit permissions
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Expanded permission editor */}
+      {expanded && (
+        <div className="border-t border-border/50 p-4 space-y-4">
+          {groups.map((groupName) => {
+            const groupPerms = allPermissions.filter((p) => p.group === groupName);
+            if (!groupPerms.length) return null;
+            const groupMeta = PERMISSION_GROUPS[groupName];
+            return (
+              <div key={groupName}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-muted-foreground">{groupMeta.icon}</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {groupMeta.label}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {groupPerms.map((perm) => {
+                    const active = pendingPerms.includes(perm.key);
+                    return (
+                      <button
+                        key={perm.key}
+                        onClick={() => onToggle(perm.key)}
+                        className={cn(
+                          'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all duration-150 text-xs group',
+                          active
+                            ? 'bg-foreground/10 text-foreground'
+                            : 'hover:bg-foreground/5 text-muted-foreground'
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'w-4 h-4 rounded flex items-center justify-center shrink-0 transition-colors',
+                            active
+                              ? 'bg-green-500 text-white'
+                              : 'border border-border group-hover:border-foreground/50'
+                          )}
+                        >
+                          {active && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-mono text-[11px] truncate">{perm.key}</div>
+                          <div className="text-[10px] text-muted-foreground truncate">{perm.label}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Save/Reset footer */}
+          <div className="flex gap-2 pt-2 border-t border-border/50">
+            <button
+              onClick={onReset}
+              disabled={!isDirty || saving}
+              className="flex-1 py-1.5 text-xs rounded-lg border border-border hover:bg-foreground/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Reset
+            </button>
+            <button
+              onClick={onSave}
+              disabled={!isDirty || saving}
+              className="flex-1 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── User Overrides Panel ─────────────────────────────────────────────────────
+
+interface UserOverridesPanelProps {
+  users: UserInfo[];
+  allPermissions: Permission[];
+}
+
+function UserOverridesPanel({ users, allPermissions }: UserOverridesPanelProps) {
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [overrides, setOverrides] = useState<Override[]>([]);
+  const [effectivePerms, setEffectivePerms] = useState<string[]>([]);
+  const [userRole, setUserRole] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [addPerm, setAddPerm] = useState('');
+  const [addGranted, setAddGranted] = useState(true);
+  const [addReason, setAddReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filteredUsers = users.filter(
+    (u) =>
+      u.username.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const loadUserData = async (userId: number) => {
+    try {
+      setLoading(true);
+      setError('');
+      const res = await rbacAPI.getUserOverrides(String(userId)) as any;
+      const data = res?.data || res;
+      setOverrides(data?.overrides || []);
+      setEffectivePerms(data?.effective_permissions || []);
+      setUserRole(data?.role || '');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectUser = (userId: number) => {
+    setSelectedUserId(userId);
+    loadUserData(userId);
+  };
+
+  const handleAddOverride = async () => {
+    if (!selectedUserId || !addPerm) return;
+    try {
+      setSaving(true);
+      await rbacAPI.setUserOverride(String(selectedUserId), {
+        permission: addPerm,
+        granted: addGranted,
+        reason: addReason || undefined,
+      });
+      setAddPerm('');
+      setAddReason('');
+      await loadUserData(selectedUserId);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveOverride = async (permission: string) => {
+    if (!selectedUserId) return;
+    try {
+      await rbacAPI.removeUserOverride(String(selectedUserId), permission);
+      await loadUserData(selectedUserId);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const selectedUser = users.find((u) => u.id === selectedUserId);
+
+  return (
+    <div className="grid grid-cols-3 gap-4 h-full">
+      {/* User list */}
+      <div className="col-span-1 flex flex-col gap-2">
+        <input
+          type="text"
+          placeholder="Search users…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        <div className="flex-1 overflow-y-auto space-y-1 max-h-[60vh]">
+          {filteredUsers.map((user) => (
+            <button
+              key={user.id}
+              onClick={() => handleSelectUser(user.id)}
+              className={cn(
+                'w-full flex flex-col items-start px-3 py-2.5 rounded-lg text-left transition-colors text-sm',
+                selectedUserId === user.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-foreground/5 text-foreground'
+              )}
+            >
+              <span className="font-medium truncate w-full">{user.username}</span>
+              <span
+                className={cn(
+                  'text-xs truncate w-full',
+                  selectedUserId === user.id ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                )}
+              >
+                {user.role} · {user.email}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Override editor */}
+      <div className="col-span-2">
+        {!selectedUser ? (
+          <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+            <Users className="w-8 h-8 mb-2 opacity-40" />
+            <p className="text-sm">Select a user to view their overrides</p>
+          </div>
+        ) : loading ? (
+          <div className="flex items-center justify-center h-48 text-muted-foreground">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold text-sm">{selectedUser.username}</h3>
+              <p className="text-xs text-muted-foreground">
+                Role: <span className="font-mono">{userRole}</span> · {effectivePerms.length} effective permissions
+              </p>
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
+              </div>
+            )}
+
+            {/* Existing overrides */}
+            {overrides.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Active Overrides
+                </p>
+                <div className="space-y-1.5">
+                  {overrides.map((ov) => (
+                    <div
+                      key={ov.id}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-foreground/5 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px]',
+                            ov.granted ? 'bg-green-500' : 'bg-red-500'
+                          )}
+                        >
+                          {ov.granted ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                        </span>
+                        <div>
+                          <span className="font-mono text-xs">{ov.permission}</span>
+                          {ov.reason && (
+                            <p className="text-[10px] text-muted-foreground">{ov.reason}</p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveOverride(ov.permission)}
+                        className="text-muted-foreground hover:text-red-400 transition-colors p-1 rounded"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Add override form */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                Add Override
+              </p>
+              <div className="space-y-2">
+                <select
+                  value={addPerm}
+                  onChange={(e) => setAddPerm(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">Select permission…</option>
+                  {allPermissions.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {p.key} — {p.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <input
+                      type="radio"
+                      name="granted"
+                      checked={addGranted}
+                      onChange={() => setAddGranted(true)}
+                      className="accent-green-500"
+                    />
+                    <span className="text-green-400">Grant</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <input
+                      type="radio"
+                      name="granted"
+                      checked={!addGranted}
+                      onChange={() => setAddGranted(false)}
+                      className="accent-red-500"
+                    />
+                    <span className="text-red-400">Deny</span>
+                  </label>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Reason (optional)"
+                  value={addReason}
+                  onChange={(e) => setAddReason(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <button
+                  onClick={handleAddOverride}
+                  disabled={!addPerm || saving}
+                  className="w-full py-2 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  {saving ? 'Saving…' : 'Add override'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function RBACManager() {
-  const [roles, setRoles] = useState<RoleInfo[]>([]);
-  const [permissions, setPermissions] = useState<PermissionInfo[]>([]);
+  const [roles, setRoles] = useState<RoleData[]>([]);
+  const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [activeTab, setActiveTab] = useState<'matrix' | 'overrides'>('matrix');
-  const [selectedUserId, setSelectedUserId] = useState<string>('');
-  const [userOverrides, setUserOverrides] = useState<UserOverride[]>([]);
-  const [pendingChanges, setPendingChanges] = useState<Record<string, string[]>>({});
+  const [activeTab, setActiveTab] = useState<'roles' | 'overrides'>('roles');
+  // pendingPerms: role key → current permission list (local edits before save)
+  const [pendingPerms, setPendingPerms] = useState<Record<string, string[]>>({});
+  const [savedPerms, setSavedPerms] = useState<Record<string, string[]>>({});
+  const [saving, setSaving] = useState<string | null>(null); // role key being saved
 
   useEffect(() => {
     loadData();
@@ -58,8 +510,8 @@ export default function RBACManager() {
 
   useEffect(() => {
     if (success) {
-      const timer = setTimeout(() => setSuccess(''), 3000);
-      return () => clearTimeout(timer);
+      const t = setTimeout(() => setSuccess(''), 3000);
+      return () => clearTimeout(t);
     }
   }, [success]);
 
@@ -68,462 +520,162 @@ export default function RBACManager() {
       setLoading(true);
       setError('');
 
-      const [matrixRes, permsRes, usersRes] = await Promise.allSettled([
-        rbacAPI.getMatrix(),
+      const [rolesRes, permsRes, usersRes] = await Promise.allSettled([
+        rbacAPI.getRoles(),
         rbacAPI.getPermissions(),
-        usersAPI.getAllUsers(1, 100),
+        usersAPI.getAllUsers(1, 200),
       ]);
 
-      if (matrixRes.status === 'fulfilled') {
-        const data = (matrixRes.value as any)?.data || matrixRes.value;
-
-        // Backend returns { roles: [{key,name,description}], permissions: [...], matrix: { ROLE: { permissions: {perm: bool} } } }
-        const rawRoles = Array.isArray(data) ? data : data?.roles || [];
-        const matrixData = data?.matrix || {};
-
-        // Build RoleInfo[] from roles list + matrix permission data
-        const rolesData: RoleInfo[] = rawRoles.map((r: any) => {
-          const roleKey = r.key || r.role || r.name;
-          const roleMatrix = matrixData[roleKey];
-          const perms: string[] = [];
-          if (roleMatrix?.permissions) {
-            Object.entries(roleMatrix.permissions).forEach(([perm, granted]) => {
-              if (granted) perms.push(perm);
-            });
-          }
-          return { role: roleKey, permissions: perms };
+      if (rolesRes.status === 'fulfilled') {
+        const data = (rolesRes.value as any)?.data || rolesRes.value;
+        const rawRoles: RoleData[] = data?.roles || [];
+        setRoles(rawRoles);
+        const initial: Record<string, string[]> = {};
+        rawRoles.forEach((r) => {
+          initial[r.key] = [...(r.permissions || [])];
         });
-
-        setRoles(rolesData);
-        // Initialize pending changes from current state
-        const changes: Record<string, string[]> = {};
-        rolesData.forEach((r: RoleInfo) => {
-          changes[r.role] = [...(r.permissions || [])];
-        });
-        setPendingChanges(changes);
+        setPendingPerms(initial);
+        setSavedPerms(initial);
       }
 
       if (permsRes.status === 'fulfilled') {
         const data = (permsRes.value as any)?.data || permsRes.value;
-        const rawPerms = Array.isArray(data) ? data : data?.permissions || [];
-        // Normalize: backend may return {key, name, description, category} or {name, ...}
-        setPermissions(
-          rawPerms.map((p: any) => ({
-            name: p.key || p.name,
-            description: p.description,
-            category: p.category,
-          }))
-        );
+        const rawPerms: Permission[] = data?.permissions || [];
+        setAllPermissions(rawPerms);
       }
 
       if (usersRes.status === 'fulfilled') {
         const data = (usersRes.value as any)?.data || usersRes.value;
-        const userList = data?.items || (Array.isArray(data) ? data : []);
-        setUsers(userList);
+        setUsers(data?.items || (Array.isArray(data) ? data : []));
       }
-    } catch (err: unknown) {
+    } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const togglePermission = (role: string, permission: string) => {
-    setPendingChanges((prev) => {
+  const togglePermission = useCallback((role: string, perm: string) => {
+    setPendingPerms((prev) => {
       const current = prev[role] || [];
-      const updated = current.includes(permission)
-        ? current.filter((p) => p !== permission)
-        : [...current, permission];
+      const updated = current.includes(perm) ? current.filter((p) => p !== perm) : [...current, perm];
       return { ...prev, [role]: updated };
     });
-  };
+  }, []);
 
-  const hasPermission = (role: string, permission: string): boolean => {
-    return (pendingChanges[role] || []).includes(permission);
-  };
+  const resetRole = useCallback((role: string) => {
+    setPendingPerms((prev) => ({ ...prev, [role]: [...(savedPerms[role] || [])] }));
+  }, [savedPerms]);
 
-  const saveRolePermissions = async (role: string) => {
+  const saveRole = async (role: string) => {
     try {
-      setSaving(true);
+      setSaving(role);
       setError('');
-      await rbacAPI.updateRolePermissions(role, pendingChanges[role] || []);
-      setSuccess(`Permissions for ${role} saved successfully`);
-      await loadData();
-    } catch (err: unknown) {
+      await rbacAPI.updateRolePermissions(role, pendingPerms[role] || []);
+      setSavedPerms((prev) => ({ ...prev, [role]: [...(pendingPerms[role] || [])] }));
+      setSuccess(`${role} permissions saved`);
+    } catch (err) {
       setError(getErrorMessage(err));
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   };
 
-  const loadUserOverrides = async (userId: string) => {
-    if (!userId) {
-      setUserOverrides([]);
-      return;
-    }
-    try {
-      setError('');
-      const response = await rbacAPI.getUserOverrides(userId) as any;
-      const data = response?.data || response;
-      setUserOverrides(Array.isArray(data) ? data : data?.overrides || []);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err));
-    }
+  const isDirty = (role: string) => {
+    const pending = pendingPerms[role] || [];
+    const saved = savedPerms[role] || [];
+    if (pending.length !== saved.length) return true;
+    const savedSet = new Set(saved);
+    return pending.some((p) => !savedSet.has(p));
   };
-
-  const handleUserSelect = async (userId: string) => {
-    setSelectedUserId(userId);
-    await loadUserOverrides(userId);
-  };
-
-  const handleAddOverride = async (permission: string, granted: boolean) => {
-    if (!selectedUserId) return;
-    try {
-      setError('');
-      await rbacAPI.setUserOverride(selectedUserId, { permission, granted });
-      setSuccess('Permission override added');
-      await loadUserOverrides(selectedUserId);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err));
-    }
-  };
-
-  const handleRemoveOverride = async (permission: string) => {
-    if (!selectedUserId) return;
-    try {
-      setError('');
-      await rbacAPI.removeUserOverride(selectedUserId, permission);
-      setSuccess('Permission override removed');
-      await loadUserOverrides(selectedUserId);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err));
-    }
-  };
-
-  // Group permissions by category
-  const groupedPermissions = permissions.reduce<Record<string, PermissionInfo[]>>((acc, p) => {
-    const cat = p.category || 'General';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(p);
-    return acc;
-  }, {});
-
-  const roleNames = roles.map((r) => r.role);
-  const selectedUser = users.find((u) => u.id === selectedUserId);
-
-  const tabs = [
-    { key: 'matrix' as const, label: 'Permission Matrix', icon: Shield },
-    { key: 'overrides' as const, label: 'User Overrides', icon: Key },
-  ];
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-20">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading RBAC configuration...</p>
-        </div>
+      <div className="flex items-center justify-center h-64 text-muted-foreground">
+        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+        Loading access control…
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Lock className="w-8 h-8" />
-            RBAC Manager
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage role-based access control and user permissions
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Shield className="w-6 h-6 text-primary" />
+          <div>
+            <h1 className="text-xl font-bold">Access Control</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage role permissions · {allPermissions.length} permissions · {roles.length} roles
+            </p>
+          </div>
         </div>
         <button
           onClick={loadData}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-foreground/5 transition-colors text-muted-foreground"
         >
-          <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
-          Refresh
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Roles</p>
-          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Shield className="w-5 h-5 text-blue-600" />
-            {roles.length}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Permissions</p>
-          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Key className="w-5 h-5 text-purple-600" />
-            {permissions.length}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Users</p>
-          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Users className="w-5 h-5 text-green-600" />
-            {users.length}
-          </p>
-        </div>
-      </div>
-
-      {/* Alerts */}
+      {/* Status banners */}
       {error && (
-        <div className="mb-4 p-4 bg-red-500/10 text-red-700 rounded-md flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div>{error}</div>
+        <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 rounded-lg px-4 py-3 border border-red-500/20">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="mb-4 p-4 bg-green-500/10 text-green-700 rounded-md flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div>{success}</div>
+        <div className="flex items-center gap-2 text-sm text-green-400 bg-green-500/10 rounded-lg px-4 py-3 border border-green-500/20">
+          <CheckCircle2 className="w-4 h-4 shrink-0" /> {success}
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-border mb-6">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
-                activeTab === tab.key
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          );
-        })}
+      <div className="flex gap-1 bg-foreground/5 rounded-lg p-1 w-fit">
+        {(['roles', 'overrides'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              'px-4 py-1.5 rounded-md text-sm font-medium transition-colors capitalize',
+              activeTab === tab
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {tab === 'roles' ? (
+              <span className="flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" /> Role Permissions
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" /> User Overrides
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Permission Matrix Tab */}
-      {activeTab === 'matrix' && (
-        <>
-          <div className="bg-card border border-border rounded-lg overflow-hidden mb-4">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted border-b border-border">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-foreground min-w-[200px]">
-                      Permission
-                    </th>
-                    {roleNames.map((role) => (
-                      <th
-                        key={role}
-                        className="px-4 py-3 text-center text-sm font-semibold text-foreground min-w-[100px]"
-                      >
-                        <span className="px-2 py-1 rounded text-xs bg-blue-500/10 text-blue-600">
-                          {role}
-                        </span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(groupedPermissions).map(([category, perms]) => (
-                    <React.Fragment key={category}>
-                      <tr className="bg-muted/30">
-                        <td
-                          colSpan={roleNames.length + 1}
-                          className="px-4 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider"
-                        >
-                          {category}
-                        </td>
-                      </tr>
-                      {perms.map((perm) => (
-                        <tr key={perm.name} className="border-b border-border hover:bg-muted/50">
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-foreground text-sm">{perm.name}</p>
-                            {perm.description && (
-                              <p className="text-xs text-muted-foreground">{perm.description}</p>
-                            )}
-                          </td>
-                          {roleNames.map((role) => (
-                            <td key={`${role}-${perm.name}`} className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => togglePermission(role, perm.name)}
-                                className={cn(
-                                  'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                                  hasPermission(role, perm.name) ? 'bg-primary' : 'bg-gray-300'
-                                )}
-                              >
-                                <span
-                                  className={cn(
-                                    'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform',
-                                    hasPermission(role, perm.name) ? 'translate-x-4.5' : 'translate-x-0.5'
-                                  )}
-                                />
-                              </button>
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  ))}
-                  {permissions.length === 0 && (
-                    <tr>
-                      <td colSpan={roleNames.length + 1} className="px-4 py-8 text-center text-muted-foreground">
-                        No permissions defined
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Save Buttons */}
-          <div className="flex gap-2 justify-end">
-            {roleNames.map((role) => (
-              <button
-                key={role}
-                onClick={() => saveRolePermissions(role)}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm"
-              >
-                <Save className="w-4 h-4" />
-                Save {role}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* User Overrides Tab */}
-      {activeTab === 'overrides' && (
-        <div className="space-y-6">
-          {/* User Selector */}
-          <div className="bg-card border border-border rounded-lg p-4">
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Select User
-            </label>
-            <select
-              value={selectedUserId}
-              onChange={(e) => handleUserSelect(e.target.value)}
-              className="w-full px-4 py-2 bg-background border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Choose a user...</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.username} ({user.email}) - {user.role}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedUser && (
-            <>
-              {/* User Info */}
-              <div className="bg-card border border-border rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <Users className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <p className="font-medium text-foreground">{selectedUser.username}</p>
-                    <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
-                  </div>
-                  <span className="ml-auto px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600">
-                    {selectedUser.role}
-                  </span>
-                </div>
-              </div>
-
-              {/* Current Overrides */}
-              <div>
-                <h3 className="text-lg font-semibold text-foreground mb-3">Permission Overrides</h3>
-                {userOverrides.length === 0 ? (
-                  <div className="text-center py-8 border border-dashed border-border rounded-lg">
-                    <Key className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
-                    <p className="text-muted-foreground text-sm">No permission overrides for this user</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {userOverrides.map((override) => (
-                      <div
-                        key={override.permission}
-                        className="bg-card border border-border rounded-lg p-3 flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              'w-2 h-2 rounded-full',
-                              override.granted ? 'bg-green-500' : 'bg-red-500'
-                            )}
-                          />
-                          <span className="font-medium text-foreground text-sm">
-                            {override.permission}
-                          </span>
-                          <span
-                            className={cn(
-                              'px-2 py-0.5 rounded text-xs font-medium',
-                              override.granted
-                                ? 'bg-green-500/10 text-green-700'
-                                : 'bg-red-500/10 text-red-700'
-                            )}
-                          >
-                            {override.granted ? 'Granted' : 'Denied'}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveOverride(override.permission)}
-                          className="text-xs text-red-600 hover:text-red-700 hover:underline"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Add Override */}
-              <div className="bg-card border border-border rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Add Override</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {permissions
-                    .filter((p) => !userOverrides.some((o) => o.permission === p.name))
-                    .slice(0, 10)
-                    .map((perm) => (
-                      <div
-                        key={perm.name}
-                        className="flex items-center justify-between p-2 border border-border rounded-md text-sm"
-                      >
-                        <span className="text-foreground">{perm.name}</span>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleAddOverride(perm.name, true)}
-                            className="px-2 py-0.5 text-xs bg-green-500/10 text-green-700 rounded hover:bg-green-500/20"
-                          >
-                            Grant
-                          </button>
-                          <button
-                            onClick={() => handleAddOverride(perm.name, false)}
-                            className="px-2 py-0.5 text-xs bg-red-500/10 text-red-700 rounded hover:bg-red-500/20"
-                          >
-                            Deny
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </>
-          )}
+      {/* Tab content */}
+      {activeTab === 'roles' ? (
+        <div className="grid grid-cols-2 gap-4">
+          {roles.map((role) => (
+            <RoleCard
+              key={role.key}
+              role={role}
+              allPermissions={allPermissions}
+              pendingPerms={pendingPerms[role.key] || []}
+              onToggle={(perm) => togglePermission(role.key, perm)}
+              onSave={() => saveRole(role.key)}
+              onReset={() => resetRole(role.key)}
+              saving={saving === role.key}
+              isDirty={isDirty(role.key)}
+            />
+          ))}
         </div>
+      ) : (
+        <UserOverridesPanel users={users} allPermissions={allPermissions} />
       )}
     </div>
   );

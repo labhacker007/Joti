@@ -46,7 +46,7 @@ def list_audit_logs(
     user_id: Optional[int] = None,
     resource_type: Optional[str] = None,
     correlation_id: Optional[str] = None,
-    current_user: User = Depends(require_permission(Permission.VIEW_AUDIT_LOGS.value)),
+    current_user: User = Depends(require_permission(Permission.AUDIT_READ.value)),
     db: Session = Depends(get_db)
 ):
     """List audit logs with filters and pagination."""
@@ -109,7 +109,7 @@ def list_audit_logs(
 @router.get("/{log_id}", response_model=AuditLogResponse)
 def get_audit_log(
     log_id: int,
-    current_user: User = Depends(require_permission(Permission.VIEW_AUDIT_LOGS.value)),
+    current_user: User = Depends(require_permission(Permission.AUDIT_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get a specific audit log entry."""
@@ -149,7 +149,7 @@ def get_audit_log(
 @router.get("/correlation/{correlation_id}", response_model=List[AuditLogResponse])
 def get_logs_by_correlation(
     correlation_id: str,
-    current_user: User = Depends(require_permission(Permission.VIEW_AUDIT_LOGS.value)),
+    current_user: User = Depends(require_permission(Permission.AUDIT_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Get all audit logs for a specific correlation ID."""

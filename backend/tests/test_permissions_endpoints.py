@@ -15,35 +15,47 @@ def test_users_my_permissions_returns_expected_shape(client):
     assert r.status_code == 200
     data = r.json()
 
-    assert isinstance(data.get("accessible_pages"), list)
     assert isinstance(data.get("api_permissions"), list)
     assert isinstance(data.get("all_permissions"), list)
     assert data["api_permissions"] == data["all_permissions"]
     assert data.get("effective_role") == "ADMIN"
 
-    page_keys = {p.get("key") for p in data["accessible_pages"]}
-    assert "admin" in page_keys
-    assert "reports" in page_keys
 
-
-def test_admin_role_page_access_returns_page_permissions(client):
+def test_rbac_permissions_endpoint_returns_12_permissions(client):
     token = login_admin(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    r = client.get("/admin/rbac/pages/role/TI", headers=headers)
+    r = client.get("/admin/rbac/permissions", headers=headers)
     assert r.status_code == 200
     data = r.json()
 
-    assert data.get("role") == "TI"
-    assert isinstance(data.get("pages"), list)
-    assert isinstance(data.get("api_permissions"), list)
+    perms = data.get("permissions", [])
+    assert len(perms) == 12, f"Expected 12 permissions, got {len(perms)}"
 
-    # Page objects should include page-level permissions and granted subset
-    pages = {p["page_key"]: p for p in data["pages"]}
-    assert "reports" in pages
-    reports = pages["reports"]
-    assert isinstance(reports.get("all_permissions"), list)
-    assert isinstance(reports.get("granted_permissions"), list)
-    assert set(reports["granted_permissions"]).issubset(set(reports["all_permissions"]))
-    assert reports.get("has_access") is True
+    keys = {p["key"] for p in perms}
+    assert "articles:read" in keys
+    assert "admin:rbac" in keys
+    assert "admin:system" in keys
 
+
+def test_rbac_roles_endpoint_returns_all_roles(client):
+    token = login_admin(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = client.get("/admin/rbac/roles", headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+
+    roles = data.get("roles", [])
+    role_keys = {r["key"] for r in roles}
+
+    assert "ADMIN" in role_keys
+    assert "ANALYST" in role_keys
+    assert "ENGINEER" in role_keys
+    assert "MANAGER" in role_keys
+    assert "EXECUTIVE" in role_keys
+    assert "VIEWER" in role_keys
+
+    # ADMIN should have all 12 permissions
+    admin_role = next(r for r in roles if r["key"] == "ADMIN")
+    assert len(admin_role["permissions"]) == 12

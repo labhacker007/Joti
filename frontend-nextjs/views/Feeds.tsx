@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Bookmark,
@@ -20,6 +21,7 @@ import {
   Loader,
   Shield,
   Brain,
+  Crosshair,
 } from 'lucide-react';
 import { articlesAPI, userFeedsAPI } from '@/api/client';
 import { formatRelativeTime, cn } from '@/lib/utils';
@@ -108,6 +110,7 @@ function getSourceFavicon(sourceUrl?: string): string | null {
 }
 
 export default function Feeds() {
+  const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -115,7 +118,7 @@ export default function Feeds() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalArticles, setTotalArticles] = useState(0);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'watchlist' | 'bookmarked'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'watchlist' | 'bookmarked' | 'priority'>('all');
   const [timeRange, setTimeRange] = useState('24h');
   const [counts, setCounts] = useState<Counts>({ total: 0, unread: 0, watchlist_matches: 0 });
   const [viewMode, setViewMode] = useState<'list' | 'card'>('list');
@@ -133,13 +136,13 @@ export default function Feeds() {
   const [uploading, setUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
 
-  const pageSize = 15;
+  const pageSize = viewMode === 'card' ? 16 : 15;
 
   const randomQuote = useMemo(() => CYBER_QUOTES[Math.floor(Math.random() * CYBER_QUOTES.length)], []);
 
   useEffect(() => {
     fetchArticles();
-  }, [currentPage, searchQuery, activeFilter, timeRange]);
+  }, [currentPage, searchQuery, activeFilter, timeRange, viewMode]);
 
   useEffect(() => {
     fetchCounts();
@@ -169,6 +172,7 @@ export default function Feeds() {
       if (activeFilter === 'unread') filters.unread_only = true;
       if (activeFilter === 'watchlist') filters.watchlist_only = true;
       if (activeFilter === 'bookmarked') filters.bookmarked_only = true;
+      if (activeFilter === 'priority') filters.watchlist_only = true;
       if (timeRange !== 'all') filters.time_range = timeRange;
 
       const response = (await articlesAPI.getArticles(
@@ -291,7 +295,7 @@ export default function Feeds() {
     setCurrentPage(1);
   };
 
-  const setFilter = (filter: 'all' | 'unread' | 'watchlist' | 'bookmarked') => {
+  const setFilter = (filter: 'all' | 'unread' | 'watchlist' | 'bookmarked' | 'priority') => {
     setActiveFilter(filter);
     setCurrentPage(1);
   };
@@ -372,6 +376,16 @@ export default function Feeds() {
             Upload
           </button>
 
+          {/* Watchlist */}
+          <button
+            onClick={() => router.push('/watchlist')}
+            className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-xs font-medium hover:bg-accent flex items-center gap-1.5 border border-border"
+            title="Watchlist keywords"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+            Watchlist
+          </button>
+
           {/* View Toggle */}
           <div className="flex bg-muted rounded-lg p-0.5">
             <button
@@ -398,63 +412,66 @@ export default function Feeds() {
         </div>
       </div>
 
-      {/* Add Feed Inline Panel */}
+      {/* Add Feed Modal Overlay */}
       {showAddFeed && (
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-foreground">Add Custom Feed</h3>
-            <button onClick={() => setShowAddFeed(false)} className="p-1 hover:bg-muted rounded">
-              <X className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              {FEED_TYPES.map((ft) => (
-                <button
-                  key={ft.value}
-                  onClick={() => setNewFeedType(ft.value)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors text-center',
-                    newFeedType === ft.value
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted text-foreground border-border hover:border-primary/50'
-                  )}
-                >
-                  {ft.label}
-                </button>
-              ))}
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowAddFeed(false)} />
+          <div className="relative bg-card border border-border rounded-xl p-5 shadow-xl w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-foreground">Add Custom Feed</h3>
+              <button onClick={() => setShowAddFeed(false)} className="p-1 hover:bg-muted rounded">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
             </div>
-            <div className="flex gap-2">
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                {FEED_TYPES.map((ft) => (
+                  <button
+                    key={ft.value}
+                    onClick={() => setNewFeedType(ft.value)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors text-center',
+                      newFeedType === ft.value
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted text-foreground border-border hover:border-primary/50'
+                    )}
+                  >
+                    {ft.label}
+                  </button>
+                ))}
+              </div>
               <input
                 type="url"
                 value={newFeedUrl}
                 onChange={(e) => setNewFeedUrl(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleAddFeed(); }}
                 placeholder={newFeedType === 'website' ? 'https://example.com' : 'https://example.com/rss'}
-                className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
               <input
                 type="text"
                 value={newFeedName}
                 onChange={(e) => setNewFeedName(e.target.value)}
                 placeholder="Feed name (optional)"
-                className="w-48 px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
               <button
                 onClick={handleAddFeed}
                 disabled={addingFeed || !newFeedUrl.trim()}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+                className="w-full px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
               >
-                {addingFeed ? 'Adding...' : 'Add'}
+                {addingFeed ? 'Adding...' : 'Add Feed'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Upload Document Inline Panel */}
+      {/* Upload Document Modal Overlay */}
       {showUpload && (
-        <div className="bg-card border border-border rounded-lg p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { setShowUpload(false); setUploadResults([]); }} />
+          <div className="relative bg-card border border-border rounded-xl p-5 shadow-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-foreground">Upload Document</h3>
             <button onClick={() => { setShowUpload(false); setUploadResults([]); }} className="p-1 hover:bg-muted rounded">
@@ -522,6 +539,7 @@ export default function Feeds() {
               ))}
             </div>
           )}
+          </div>
         </div>
       )}
 
@@ -578,6 +596,18 @@ export default function Feeds() {
         >
           <Bookmark className="w-3 h-3" />
           Bookmarked
+        </button>
+        <button
+          onClick={() => setFilter('priority')}
+          className={cn(
+            'px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5',
+            activeFilter === 'priority'
+              ? 'bg-red-600 text-white'
+              : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-accent'
+          )}
+        >
+          <Shield className="w-3 h-3" />
+          Priority
         </button>
 
         {counts.unread > 0 && (
@@ -708,7 +738,7 @@ export default function Feeds() {
         </div>
       ) : (
         /* Card View — Feedly-style compact magazine grid */
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
           {articles.map((article) => {
             const favicon = getSourceFavicon(article.source_url);
             return (
@@ -722,7 +752,7 @@ export default function Feeds() {
               >
                 {/* Compact image or colored strip */}
                 {article.image_url ? (
-                  <div className="relative h-28 w-full overflow-hidden bg-muted">
+                  <div className="relative h-20 w-full overflow-hidden bg-muted">
                     <img
                       src={article.image_url}
                       alt=""
@@ -743,7 +773,7 @@ export default function Feeds() {
                 )}
 
                 {/* Card body — tight padding */}
-                <div className="p-2.5 flex-1 flex flex-col min-h-0">
+                <div className="p-2 flex-1 flex flex-col min-h-0">
                   {/* Source + time row */}
                   <div className="flex items-center gap-1.5 mb-1.5 text-[10px] text-muted-foreground">
                     {favicon ? (

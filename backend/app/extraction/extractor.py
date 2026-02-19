@@ -149,6 +149,91 @@ _TTP_KEYWORD_MAP: Dict[str, Dict] = {
 }
 
 
+# ── Threat Actor keyword map ─────────────────────────────────────────────────
+
+_THREAT_ACTOR_MAP: Dict[str, Dict] = {
+    # Nation-state APT groups (Russia)
+    "APT28": {"aliases": ["fancy bear", "sofacy", "pawn storm", "sednit", "apt 28"], "attribution": "Russia"},
+    "APT29": {"aliases": ["cozy bear", "the dukes", "nobelium", "apt 29"], "attribution": "Russia"},
+    "Sandworm": {"aliases": ["sandworm team", "voodoo bear", "telebots", "electrum"], "attribution": "Russia"},
+    "Turla": {"aliases": ["venomous bear", "waterbug", "snake", "uroburos", "epic turla"], "attribution": "Russia"},
+    # Nation-state APT groups (China)
+    "APT41": {"aliases": ["double dragon", "barium", "wicked panda", "winnti", "apt 41"], "attribution": "China"},
+    "APT40": {"aliases": ["leviathan", "temp.periscope", "kryptonite panda", "apt 40"], "attribution": "China"},
+    "APT10": {"aliases": ["stone panda", "menupass", "cloud hopper", "apt 10"], "attribution": "China"},
+    "Volt Typhoon": {"aliases": ["volt typhoon", "vanguard panda", "bronze silhouette"], "attribution": "China"},
+    "Salt Typhoon": {"aliases": ["salt typhoon", "ghost emperor", "famousSparrow"], "attribution": "China"},
+    # Nation-state APT groups (North Korea)
+    "Lazarus Group": {"aliases": ["lazarus", "hidden cobra", "zinc", "apt38", "apt 38"], "attribution": "North Korea"},
+    "Kimsuky": {"aliases": ["kimsuky", "thallium", "velvet chollima", "black banshee"], "attribution": "North Korea"},
+    "APT37": {"aliases": ["reaper", "ricochet chollima", "group123", "apt 37"], "attribution": "North Korea"},
+    # Nation-state APT groups (Iran)
+    "APT33": {"aliases": ["elfin", "refined kitten", "magnallium", "apt 33"], "attribution": "Iran"},
+    "APT34": {"aliases": ["oilrig", "helix kitten", "cobalt gypsy", "apt 34"], "attribution": "Iran"},
+    "APT35": {"aliases": ["charming kitten", "phosphorus", "newscaster", "apt 35"], "attribution": "Iran"},
+    # Financially motivated
+    "FIN7": {"aliases": ["fin7", "carbanak", "navigator group", "sangria tempest"], "attribution": "Criminal"},
+    "Scattered Spider": {"aliases": ["scattered spider", "oktapus", "unc3944", "starfraud"], "attribution": "Criminal"},
+    "REvil": {"aliases": ["revil", "sodinokibi", "gold southfield"], "attribution": "Criminal"},
+    "Conti": {"aliases": ["conti", "wizard spider", "gold ulrick"], "attribution": "Criminal"},
+    "BlackCat": {"aliases": ["blackcat", "alphv", "noberus"], "attribution": "Criminal"},
+    "LockBit": {"aliases": ["lockbit"], "attribution": "Criminal"},
+}
+
+# Build flat keyword → actor mapping for quick lookup
+_THREAT_ACTOR_KEYWORDS: Dict[str, str] = {}
+for actor_name, info in _THREAT_ACTOR_MAP.items():
+    # Map both the canonical name and all aliases
+    _THREAT_ACTOR_KEYWORDS[actor_name.lower()] = actor_name
+    for alias in info["aliases"]:
+        _THREAT_ACTOR_KEYWORDS[alias.lower()] = actor_name
+
+# Also match generic APT patterns
+_APT_PATTERN = re.compile(r"\b(APT[-\s]?\d+|TA[-\s]?\d+|FIN\d+|UNC\d+|DEV[-\s]?\d+|Group[-\s]?\d+)\b", re.IGNORECASE)
+
+
+def _extract_threat_actors(content: str) -> List[Dict]:
+    """Extract named threat actors from content."""
+    content_lower = content.lower()
+    actors: List[Dict] = []
+    seen: set = set()
+
+    # Check known actor keywords
+    for keyword, canonical_name in _THREAT_ACTOR_KEYWORDS.items():
+        if keyword in content_lower and canonical_name not in seen:
+            seen.add(canonical_name)
+            idx = content_lower.find(keyword)
+            start = max(0, idx - 30)
+            end = min(len(content), idx + len(keyword) + 30)
+            evidence = content[start:end].strip().replace("\n", " ")
+            info = _THREAT_ACTOR_MAP.get(canonical_name, {})
+            actors.append({
+                "value": canonical_name,
+                "attribution": info.get("attribution", "Unknown"),
+                "confidence": 80,
+                "evidence": evidence,
+            })
+
+    # Check APT pattern (e.g., APT123, TA456)
+    for match in _APT_PATTERN.finditer(content):
+        value = match.group(0).upper().replace(" ", "").replace("-", "")
+        # Normalize e.g. APT 28 → APT28
+        normalized = re.sub(r"(\D)(\d)", r"\1\2", value)
+        if normalized not in seen:
+            seen.add(normalized)
+            start = max(0, match.start() - 30)
+            end = min(len(content), match.end() + 30)
+            evidence = content[start:end].strip().replace("\n", " ")
+            actors.append({
+                "value": normalized,
+                "attribution": "Unknown",
+                "confidence": 70,
+                "evidence": evidence,
+            })
+
+    return actors
+
+
 # ── GenAI extraction prompt ──────────────────────────────────────────────────
 
 _EXTRACTION_SYSTEM_PROMPT = """You are an expert threat intelligence analyst. Your task is to extract ALL Indicators of Compromise (IOCs) and MITRE ATT&CK Techniques, Tactics, and Procedures (TTPs) from the given text.
@@ -331,16 +416,19 @@ class IntelligenceExtractor:
 
         iocs = _extract_iocs_regex(content)
         ttps = _extract_ttps_regex(content)
+        threat_actors = _extract_threat_actors(content)
 
         logger.info(
             "regex_extraction_complete",
             ioc_count=len(iocs),
             ttp_count=len(ttps),
+            threat_actor_count=len(threat_actors),
         )
 
         return {
             "iocs": iocs,
             "ttps": ttps,
+            "threat_actors": threat_actors,
             "entities": [],
             "summary": None,
         }
@@ -407,6 +495,7 @@ class IntelligenceExtractor:
         # Always enrich with regex results to catch anything GenAI missed
         regex_iocs = _extract_iocs_regex(content)
         regex_ttps = _extract_ttps_regex(content)
+        threat_actors = _extract_threat_actors(content)
 
         # Merge: GenAI results take priority, add unique regex finds
         merged_iocs = _merge_iocs(genai_iocs, regex_iocs)
@@ -420,11 +509,13 @@ class IntelligenceExtractor:
             genai_ttps=len(genai_ttps),
             regex_ttps=len(regex_ttps),
             merged_ttps=len(merged_ttps),
+            threat_actors=len(threat_actors),
         )
 
         return {
             "iocs": merged_iocs,
             "ttps": merged_ttps,
+            "threat_actors": threat_actors,
             "entities": [],
             "summary": None,
             "executive_summary": None,

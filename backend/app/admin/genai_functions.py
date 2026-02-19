@@ -158,7 +158,7 @@ def calculate_statistics(
 @router.get("/", response_model=List[FunctionConfigResponse])
 async def list_function_configs(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     List all GenAI function configurations.
@@ -215,7 +215,7 @@ async def list_function_configs(
 async def get_function_config(
     function_name: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Get specific function configuration by name.
@@ -272,7 +272,7 @@ async def get_function_config(
 async def create_function_config(
     payload: FunctionConfigCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Create new GenAI function configuration.
@@ -350,7 +350,7 @@ async def update_function_config(
     function_name: str,
     payload: FunctionConfigUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Update existing function configuration.
@@ -427,7 +427,7 @@ async def update_function_config(
 async def delete_function_config(
     function_name: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Delete function configuration.
@@ -459,7 +459,7 @@ async def get_function_stats(
     function_name: str,
     days: int = 30,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Get detailed usage statistics for a function.
@@ -528,7 +528,7 @@ async def get_function_stats(
 @router.get("/{function_name}/recommendations", response_model=List[ModelRecommendation])
 async def get_model_recommendations(
     function_name: str,
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_VIEW.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Get recommended models for a specific function.
@@ -631,7 +631,7 @@ async def get_model_recommendations(
 async def reset_function_stats(
     function_name: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI_EDIT.value))
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """
     Reset usage statistics for a function (does not delete logs).
