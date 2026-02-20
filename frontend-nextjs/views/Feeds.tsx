@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Bookmark,
@@ -97,9 +97,13 @@ function getSourceFavicon(sourceUrl?: string): string | null {
   }
 }
 
-export default function Feeds() {
+interface FeedsProps {
+  sourceId?: number;
+  userFeedId?: number;
+}
+
+export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -112,12 +116,10 @@ export default function Feeds() {
   const [counts, setCounts] = useState<Counts>({ total: 0, unread: 0, watchlist_matches: 0 });
   const [viewMode, setViewMode] = useState<'list' | 'card'>('list');
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
-  
-  // Get source/feed filter reactively from URL params
-  const sourceFilterParam = searchParams.get('source_id');
-  const userFeedFilterParam = searchParams.get('user_feed_id');
-  const sourceFilter = sourceFilterParam ? parseInt(sourceFilterParam) : null;
-  const userFeedFilter = userFeedFilterParam ? parseInt(userFeedFilterParam) : null;
+
+  // Source/feed filter from props (passed from page server component via searchParams)
+  const sourceFilter = sourceId ?? null;
+  const userFeedFilter = userFeedId ?? null;
   const [activeSourceName, setActiveSourceName] = useState<string | null>(null);
 
   // Add Feed state
