@@ -10,7 +10,7 @@ if BACKEND_DIR not in sys.path:
 # Test environment configuration must be set before importing app modules.
 import tempfile
 
-TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "parshu_test.db")
+TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "joti_test.db")
 if os.path.exists(TEST_DB_PATH):
     try:
         os.remove(TEST_DB_PATH)
@@ -22,7 +22,7 @@ os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{TEST_DB_PATH}")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-please-change-32-chars-minimum")
 os.environ.setdefault("ENABLE_AUTOMATION_SCHEDULER", "false")
-os.environ.setdefault("ADMIN_EMAIL", "admin@parshu.local")
+os.environ.setdefault("ADMIN_EMAIL", "admin@joti.local")
 os.environ.setdefault("ADMIN_PASSWORD", "Admin@123456789")
 os.environ.setdefault("REDIS_URL", "")  # tests should not require redis
 
