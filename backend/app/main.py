@@ -203,6 +203,9 @@ app.include_router(sources_router, prefix="/api")
 app.include_router(watchlist_router, prefix="/api")
 app.include_router(audit_router, prefix="/api")
 
+from app.threat_actors.routes import router as threat_actors_router
+app.include_router(threat_actors_router, prefix="/api")
+
 # Register specific /users/* sub-routers BEFORE the generic /users router
 # (otherwise /users/{user_id} catches /users/feeds, /users/watchlist, etc.)
 from app.users.feeds import router as user_feeds_router

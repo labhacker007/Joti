@@ -8,7 +8,7 @@ import {
   Trash2, Check, X, Database, Radar, Brain, BarChart3, Grid3X3,
   Info, ArrowRight, Zap, Settings, Activity, Clock, Bug, Server, Lock, Layers,
 } from 'lucide-react';
-import { articlesAPI, userFeedsAPI, sourcesAPI } from '@/api/client';
+import { articlesAPI, userFeedsAPI, sourcesAPI, threatActorsAPI } from '@/api/client';
 import FileUploadDropzone from '@/components/FileUploadDropzone';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import ArticleDetailDrawer from '@/components/ArticleDetailDrawer';
@@ -75,6 +75,34 @@ interface UploadResult {
   executiveSummary?: string;
   iocCount?: number;
   ttpCount?: number;
+}
+
+interface ThreatActorProfile {
+  id: number;
+  name: string;
+  description?: string;
+  origin_country?: string;
+  motivation?: string;
+  actor_type?: string;
+  first_seen?: string;
+  last_seen?: string;
+  is_active?: boolean;
+  target_sectors?: string[];
+  aliases?: string[];
+  ttps?: string[];
+  infrastructure?: string[];
+  tools?: string[];
+  campaigns?: string[];
+  ioc_count?: number;
+  article_count?: number;
+  ttp_count?: number;
+  last_enriched_at?: string;
+  enrichment_source?: string;
+  genai_confidence?: number;
+  is_verified?: boolean;
+  tags?: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 type PanelType = 'command_center' | 'ioc_explorer' | 'mitre_matrix' | 'threat_actors' | 'correlation' | 'ai_analysis' | 'intel_ingestion';
@@ -208,6 +236,17 @@ export default function ThreatIntelligence() {
   const [ingestFeedType, setIngestFeedType] = useState('rss');
   const [ingesting, setIngesting] = useState(false);
 
+  // Threat Actor Profile state
+  const [threatActors, setThreatActors] = useState<ThreatActorProfile[]>([]);
+  const [taTotalProfiles, setTaTotalProfiles] = useState(0);
+  const [taSyncing, setTaSyncing] = useState(false);
+  const [taEnriching, setTaEnriching] = useState<number | null>(null);
+  const [taPage, setTaPage] = useState(1);
+  const [taSearch, setTaSearch] = useState('');
+  const [taActorTypeFilter, setTaActorTypeFilter] = useState('');
+  const [taActiveFilter, setTaActiveFilter] = useState<boolean | null>(null);
+  const [taSelectedProfile, setTaSelectedProfile] = useState<ThreatActorProfile | null>(null);
+
   // Refs
   const mitreFramework = useRef<'attack' | 'atlas'>('attack');
 
@@ -287,29 +326,55 @@ export default function ThreatIntelligence() {
     }
   }, [timeRange]);
 
+  const fetchThreatActors = useCallback(async (page?: number) => {
+    try {
+      setLoadingKey('threatActors', true);
+      const p = page ?? taPage;
+      const res = await threatActorsAPI.list({
+        page: p,
+        page_size: 24,
+        search: taSearch || undefined,
+        actor_type: taActorTypeFilter || undefined,
+        is_active: taActiveFilter !== null ? taActiveFilter : undefined,
+      }) as any;
+      const data = res?.data || res;
+      setThreatActors(data?.items || []);
+      setTaTotalProfiles(data?.total || 0);
+    } catch { /* silent */ } finally {
+      setLoadingKey('threatActors', false);
+    }
+  }, [taPage, taSearch, taActorTypeFilter, taActiveFilter]);
+
   // ---- Effects ----
 
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
   useEffect(() => {
-    if (activePanel === 'ioc_explorer' || activePanel === 'threat_actors') {
+    if (activePanel === 'ioc_explorer') {
       setCurrentPage(1);
-      const type = activePanel === 'threat_actors' ? 'THREAT_ACTOR' : '';
-      setIntelTypeFilter(type);
+      setIntelTypeFilter('');
+    }
+    if (activePanel === 'threat_actors') {
+      setTaPage(1);
+      fetchThreatActors(1);
     }
   }, [activePanel]);
 
   useEffect(() => {
-    if (activePanel === 'ioc_explorer' || activePanel === 'threat_actors') {
-      fetchItems(1);
-    }
+    if (activePanel === 'ioc_explorer') fetchItems(1);
   }, [intelTypeFilter, iocTypeFilter, sourceCategory]);
 
   useEffect(() => {
-    if (activePanel === 'ioc_explorer' || activePanel === 'threat_actors') {
-      fetchItems();
-    }
+    if (activePanel === 'ioc_explorer') fetchItems();
   }, [currentPage]);
+
+  useEffect(() => {
+    if (activePanel === 'threat_actors') fetchThreatActors(1);
+  }, [taSearch, taActorTypeFilter, taActiveFilter]);
+
+  useEffect(() => {
+    if (activePanel === 'threat_actors') fetchThreatActors();
+  }, [taPage]);
 
   useEffect(() => {
     if (activePanel === 'mitre_matrix') fetchMitreMatrix();
@@ -947,79 +1012,300 @@ export default function ThreatIntelligence() {
       {/* ============================================================ */}
       {activePanel === 'threat_actors' && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 max-w-sm">
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
               <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
-              <input type="text" placeholder="Search threat actors..."
-                value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              <input type="text" placeholder="Search actors, aliases..."
+                value={taSearch} onChange={e => setTaSearch(e.target.value)}
                 className="w-full pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
-            <span className="text-xs text-muted-foreground ml-auto">{totalItems} references</span>
+
+            <select value={taActorTypeFilter} onChange={e => setTaActorTypeFilter(e.target.value)}
+              className="px-3 py-2 bg-card border border-border rounded-lg text-xs text-foreground focus:outline-none">
+              <option value="">All Types</option>
+              <option value="APT">APT</option>
+              <option value="ransomware">Ransomware</option>
+              <option value="cybercriminal">Cybercriminal</option>
+              <option value="hacktivist">Hacktivist</option>
+              <option value="nation-state">Nation-State</option>
+            </select>
+
+            <select value={taActiveFilter === null ? '' : String(taActiveFilter)}
+              onChange={e => setTaActiveFilter(e.target.value === '' ? null : e.target.value === 'true')}
+              className="px-3 py-2 bg-card border border-border rounded-lg text-xs text-foreground focus:outline-none">
+              <option value="">All Activity</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+
+            <span className="text-xs text-muted-foreground">{taTotalProfiles} profiles</span>
+
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  setTaSyncing(true);
+                  try {
+                    await threatActorsAPI.sync();
+                    fetchThreatActors(1);
+                    fetchSummary();
+                  } catch { /* silent */ } finally { setTaSyncing(false); }
+                }}
+                disabled={taSyncing}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-muted text-foreground rounded-lg hover:bg-accent disabled:opacity-50">
+                {taSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Sync from Intel
+              </button>
+            </div>
           </div>
 
-          {loading.items && items.length === 0 ? <Spinner /> : filteredItems.length === 0 ? (
-            <EmptyState message="No threat actors found" sub="Threat actors are extracted from article analysis" />
+          {/* Empty / No-profiles state */}
+          {loading.threatActors && threatActors.length === 0 ? <Spinner /> : threatActors.length === 0 ? (
+            <div className="text-center py-16 border border-dashed border-border rounded-xl space-y-4">
+              <Users className="w-14 h-14 text-muted-foreground/20 mx-auto" />
+              <div>
+                <p className="text-sm font-medium text-foreground">No threat actor profiles yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Click <strong>Sync from Intel</strong> to build profiles from extracted threat actor intelligence,
+                  or add feed sources with threat actor data in Intel Ingestion.
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  setTaSyncing(true);
+                  try { await threatActorsAPI.sync(); fetchThreatActors(1); } catch { /* silent */ } finally { setTaSyncing(false); }
+                }}
+                disabled={taSyncing}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 mx-auto">
+                {taSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Sync Profiles Now
+              </button>
+            </div>
           ) : (
             <>
-              {/* Group by actor name */}
-              {(() => {
-                const grouped = new Map<string, { items: IntelItem[]; totalConfidence: number }>();
-                filteredItems.forEach(item => {
-                  const key = item.value;
-                  const existing = grouped.get(key) || { items: [], totalConfidence: 0 };
-                  existing.items.push(item);
-                  existing.totalConfidence += item.confidence;
-                  grouped.set(key, existing);
-                });
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {threatActors.map(actor => {
+                  const isExpanded = taSelectedProfile?.id === actor.id;
+                  const actorTypeColors: Record<string, string> = {
+                    APT: 'bg-red-500/10 text-red-600', ransomware: 'bg-orange-500/10 text-orange-600',
+                    cybercriminal: 'bg-yellow-500/10 text-yellow-600', hacktivist: 'bg-blue-500/10 text-blue-600',
+                    'nation-state': 'bg-purple-500/10 text-purple-600', unknown: 'bg-gray-500/10 text-gray-500',
+                  };
+                  const motivationIcons: Record<string, string> = {
+                    financial: '💰', espionage: '🕵️', hacktivism: '✊', destructive: '💥', unknown: '❓',
+                  };
+                  const typeColor = actorTypeColors[actor.actor_type?.toLowerCase() || 'unknown'] || 'bg-gray-500/10 text-gray-500';
 
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {Array.from(grouped.entries())
-                      .sort((a, b) => b[1].items.length - a[1].items.length)
-                      .map(([actor, data]) => {
-                        const avgConf = Math.round(data.totalConfidence / data.items.length);
-                        const articles = new Set(data.items.map(i => i.article?.title).filter(Boolean));
-                        const attribution = data.items[0]?.meta?.attribution || data.items[0]?.evidence?.split('.')[0] || '';
+                  return (
+                    <div key={actor.id}
+                      className={cn('bg-card border rounded-xl transition-all cursor-pointer',
+                        isExpanded ? 'border-primary/50 shadow-md' : 'border-border hover:border-primary/30'
+                      )}
+                      onClick={() => setTaSelectedProfile(isExpanded ? null : actor)}>
 
-                        return (
-                          <div key={actor} className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-colors">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <Users className="w-5 h-5 text-yellow-500" />
-                                <h3 className="text-sm font-bold text-foreground">{actor}</h3>
-                              </div>
-                              <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium', getConfidenceColor(avgConf))}>
-                                {avgConf}%
-                              </span>
-                            </div>
-                            {attribution && <p className="text-[10px] text-muted-foreground mb-2 line-clamp-2">{attribution}</p>}
-                            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                              <span>{data.items.length} references</span>
-                              <span>{articles.size} articles</span>
-                            </div>
-                            {articles.size > 0 && (
-                              <div className="mt-2 pt-2 border-t border-border">
-                                {Array.from(articles).slice(0, 2).map((title, i) => (
-                                  <p key={i} className="text-[10px] text-muted-foreground truncate">{title}</p>
-                                ))}
-                                {articles.size > 2 && (
-                                  <p className="text-[10px] text-primary">+{articles.size - 2} more</p>
-                                )}
-                              </div>
+                      {/* Card Header */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Users className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                            <h3 className="text-sm font-bold text-foreground truncate">{actor.name}</h3>
+                            {actor.is_verified && (
+                              <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" title="Verified" />
                             )}
                           </div>
-                        );
-                      })}
-                  </div>
-                );
-              })()}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {actor.actor_type && (
+                              <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium', typeColor)}>
+                                {actor.actor_type}
+                              </span>
+                            )}
+                            {actor.is_active !== undefined && (
+                              <span className={cn('w-2 h-2 rounded-full flex-shrink-0',
+                                actor.is_active ? 'bg-green-500' : 'bg-gray-400'
+                              )} title={actor.is_active ? 'Active' : 'Inactive'} />
+                            )}
+                          </div>
+                        </div>
 
-              {totalItems > 50 && (
+                        {/* Origin + Motivation row */}
+                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-2">
+                          {actor.origin_country && (
+                            <span className="flex items-center gap-1">
+                              <Globe className="w-3 h-3" /> {actor.origin_country}
+                            </span>
+                          )}
+                          {actor.motivation && (
+                            <span>{motivationIcons[actor.motivation] || '❓'} {actor.motivation}</span>
+                          )}
+                          {actor.last_seen && (
+                            <span className="ml-auto flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> {formatRelativeTime(actor.last_seen)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Description */}
+                        {actor.description && (
+                          <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">{actor.description}</p>
+                        )}
+
+                        {/* Aliases */}
+                        {actor.aliases && actor.aliases.length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-[10px] text-muted-foreground font-medium mb-1">Also known as:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {actor.aliases.slice(0, isExpanded ? 20 : 4).map((alias, i) => (
+                                <span key={i} className="px-1.5 py-0.5 text-[10px] bg-yellow-500/10 text-yellow-700 rounded font-medium">
+                                  {alias}
+                                </span>
+                              ))}
+                              {!isExpanded && actor.aliases.length > 4 && (
+                                <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground rounded border border-dashed border-border">
+                                  +{actor.aliases.length - 4} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Stats row */}
+                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground border-t border-border pt-2 mt-2">
+                          <span className="flex items-center gap-1">
+                            <FileText className="w-3 h-3" /> {actor.article_count || 0} articles
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Crosshair className="w-3 h-3" /> {actor.ttp_count || 0} TTPs
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Shield className="w-3 h-3" /> {actor.ioc_count || 0} IOCs
+                          </span>
+                          <span className="ml-auto">
+                            {isExpanded ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-primary" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expanded Details */}
+                      {isExpanded && (
+                        <div className="border-t border-border p-4 space-y-3 bg-muted/20" onClick={e => e.stopPropagation()}>
+                          {/* Target Sectors */}
+                          {actor.target_sectors && actor.target_sectors.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold text-foreground mb-1.5 flex items-center gap-1">
+                                <Target className="w-3 h-3 text-red-500" /> Target Sectors
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {actor.target_sectors.map((s, i) => (
+                                  <span key={i} className="px-1.5 py-0.5 text-[10px] bg-red-500/10 text-red-600 rounded">{s}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* TTPs */}
+                          {actor.ttps && actor.ttps.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold text-foreground mb-1.5 flex items-center gap-1">
+                                <Crosshair className="w-3 h-3 text-orange-500" /> MITRE ATT&CK TTPs
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {actor.ttps.slice(0, 12).map((ttp, i) => (
+                                  <span key={i} className="px-1.5 py-0.5 text-[10px] font-mono bg-orange-500/10 text-orange-700 rounded">{ttp}</span>
+                                ))}
+                                {actor.ttps.length > 12 && (
+                                  <span className="text-[10px] text-muted-foreground">+{actor.ttps.length - 12} more</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tools / Malware */}
+                          {actor.tools && actor.tools.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold text-foreground mb-1.5 flex items-center gap-1">
+                                <Zap className="w-3 h-3 text-yellow-500" /> Known Tools & Malware
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {actor.tools.map((tool, i) => (
+                                  <span key={i} className="px-1.5 py-0.5 text-[10px] bg-yellow-500/10 text-yellow-700 rounded">{tool}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Infrastructure */}
+                          {actor.infrastructure && actor.infrastructure.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold text-foreground mb-1.5 flex items-center gap-1">
+                                <Server className="w-3 h-3 text-blue-500" /> Infrastructure
+                              </p>
+                              <div className="space-y-0.5">
+                                {actor.infrastructure.slice(0, 5).map((infra, i) => (
+                                  <p key={i} className="font-mono text-[10px] text-muted-foreground">{infra}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* GenAI enrichment info */}
+                          {actor.last_enriched_at && (
+                            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-purple-400" />
+                              Enriched {formatRelativeTime(actor.last_enriched_at)} via {actor.enrichment_source || 'GenAI'}
+                              {actor.genai_confidence ? ` · ${actor.genai_confidence}% confidence` : ''}
+                            </p>
+                          )}
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              onClick={async () => {
+                                setTaEnriching(actor.id);
+                                try {
+                                  const res = await threatActorsAPI.enrich(actor.id) as any;
+                                  const updated = res?.data?.profile || res?.profile;
+                                  if (updated) {
+                                    setThreatActors(prev => prev.map(a => a.id === actor.id ? updated : a));
+                                    setTaSelectedProfile(updated);
+                                  }
+                                } catch { /* silent */ } finally { setTaEnriching(null); }
+                              }}
+                              disabled={taEnriching === actor.id}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium bg-purple-500/10 text-purple-600 rounded-lg hover:bg-purple-500/20 disabled:opacity-50">
+                              {taEnriching === actor.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                              Enrich with GenAI
+                            </button>
+                            <button
+                              onClick={async () => {
+                                const res = await threatActorsAPI.getIntelligence(actor.id) as any;
+                                const data = res?.data || res;
+                                if (data?.items?.length) {
+                                  const text = data.items.map((i: any) => `${i.value} | ${i.confidence}% | ${i.article_title || ''}`).join('\n');
+                                  copyToClipboard(text);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium bg-muted text-foreground rounded-lg hover:bg-accent">
+                              <Copy className="w-3 h-3" /> Copy Intel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination */}
+              {taTotalProfiles > 24 && (
                 <div className="flex items-center justify-center gap-2 pt-4">
-                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                  <button onClick={() => setTaPage(p => Math.max(1, p - 1))} disabled={taPage === 1}
                     className="px-3 py-1.5 text-xs bg-muted text-foreground rounded hover:bg-accent disabled:opacity-50">Previous</button>
-                  <span className="text-xs text-muted-foreground">Page {currentPage} of {Math.ceil(totalItems / 50)}</span>
-                  <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage * 50 >= totalItems}
+                  <span className="text-xs text-muted-foreground">Page {taPage} of {Math.ceil(taTotalProfiles / 24)}</span>
+                  <button onClick={() => setTaPage(p => p + 1)} disabled={taPage * 24 >= taTotalProfiles}
                     className="px-3 py-1.5 text-xs bg-muted text-foreground rounded hover:bg-accent disabled:opacity-50">Next</button>
                 </div>
               )}

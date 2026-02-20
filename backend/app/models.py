@@ -1404,3 +1404,62 @@ class PromptExecutionLog(Base):
         Index("idx_execution_log_timestamp", "timestamp"),
         Index("idx_execution_log_user", "user_id"),
     )
+
+
+# =====================================
+# THREAT ACTOR PROFILES
+# =====================================
+
+class ThreatActorProfile(Base):
+    """Enriched threat actor profile with alias resolution and attribution."""
+    __tablename__ = "threat_actor_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Primary identity
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    description = Column(Text, nullable=True)
+
+    # Attribution / origin
+    origin_country = Column(String(100), nullable=True)
+    motivation = Column(String(255), nullable=True)   # financial, espionage, hacktivism, destructive
+    actor_type = Column(String(100), nullable=True)   # APT, ransomware, cybercriminal, hacktivist
+
+    # Activity window
+    first_seen = Column(DateTime, nullable=True)
+    last_seen = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True)
+
+    # Intelligence
+    target_sectors = Column(JSON, default=list)        # ["government", "finance", "healthcare"]
+    aliases = Column(JSON, default=list)               # ["UNC3944", "Roasted 0ktapus", "Muddled Libra"]
+    ttps = Column(JSON, default=list)                  # MITRE ATT&CK IDs: ["T1566.001", "T1078"]
+    infrastructure = Column(JSON, default=list)        # C2 IPs/domains
+    tools = Column(JSON, default=list)                 # Known malware/tools used
+    campaigns = Column(JSON, default=list)             # Named campaigns
+
+    # Stats (denormalized for performance)
+    ioc_count = Column(Integer, default=0)
+    article_count = Column(Integer, default=0)
+    ttp_count = Column(Integer, default=0)
+
+    # GenAI enrichment tracking
+    last_enriched_at = Column(DateTime, nullable=True)
+    enrichment_source = Column(String(255), nullable=True)  # "genai", "manual", "import"
+    genai_confidence = Column(Integer, default=0)           # 0-100 confidence in GenAI enrichment
+
+    # Metadata
+    is_verified = Column(Boolean, default=False)   # Analyst-verified profile
+    tags = Column(JSON, default=list)
+    external_refs = Column(JSON, default=list)    # Links to MITRE Groups, Wikipedia, etc.
+    meta = Column("metadata", JSON, default=dict)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_ta_profile_name", "name"),
+        Index("idx_ta_profile_active", "is_active"),
+        Index("idx_ta_profile_type", "actor_type"),
+    )

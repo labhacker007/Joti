@@ -1180,3 +1180,25 @@ export const miscAPI = {
     return get('/version');
   },
 };
+
+// ============================================
+// THREAT ACTORS API
+// ============================================
+
+export const threatActorsAPI = {
+  list: async (params?: { page?: number; page_size?: number; search?: string; actor_type?: string; is_active?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.page_size) q.set('page_size', String(params.page_size));
+    if (params?.search) q.set('search', params.search);
+    if (params?.actor_type) q.set('actor_type', params.actor_type);
+    if (params?.is_active !== undefined) q.set('is_active', String(params.is_active));
+    return get(`/threat-actors/?${q}`);
+  },
+  get: async (id: number) => get(`/threat-actors/${id}`),
+  update: async (id: number, data: any) => patch(`/threat-actors/${id}`, data),
+  delete: async (id: number) => del(`/threat-actors/${id}`),
+  sync: async () => post('/threat-actors/sync', {}),
+  enrich: async (id: number) => post(`/threat-actors/enrich/${id}`, {}),
+  getIntelligence: async (id: number) => get(`/threat-actors/${id}/intelligence`),
+};
