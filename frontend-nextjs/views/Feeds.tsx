@@ -800,10 +800,21 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         const parent = target.parentElement!;
-                        // Replace broken image with favicon fallback
+                        // Replace broken image with favicon fallback — use DOM methods to avoid innerHTML XSS
                         parent.classList.remove('h-40');
                         parent.classList.add('h-24');
-                        parent.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-muted/50"><img src="${favicon || ''}" alt="" class="w-10 h-10 rounded opacity-40" onerror="this.style.display='none'" /></div>`;
+                        while (parent.firstChild) parent.removeChild(parent.firstChild);
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'w-full h-full flex items-center justify-center bg-muted/50';
+                        if (favicon) {
+                          const img = document.createElement('img');
+                          img.src = favicon;
+                          img.alt = '';
+                          img.className = 'w-10 h-10 rounded opacity-40';
+                          img.onerror = () => { img.style.display = 'none'; };
+                          wrapper.appendChild(img);
+                        }
+                        parent.appendChild(wrapper);
                       }}
                     />
                     {article.is_high_priority && (

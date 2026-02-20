@@ -1533,6 +1533,7 @@ export default function ThreatIntelligence() {
                   <div className="text-xs text-muted-foreground leading-relaxed prose prose-sm max-w-none"
                     dangerouslySetInnerHTML={{
                       __html: campaignBrief
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                         .replace(/^## (.+)$/gm, '<h3 class="font-semibold text-foreground mt-4 mb-1.5 text-sm">$1</h3>')
                         .replace(/^### (.+)$/gm, '<h4 class="font-semibold text-foreground mt-3 mb-1">$1</h4>')
                         .replace(/\*\*(.+?)\*\*/g, '<strong class="text-foreground">$1</strong>')
@@ -1692,6 +1693,7 @@ export default function ThreatIntelligence() {
               <div className="prose prose-sm max-w-none text-sm text-foreground leading-relaxed"
                 dangerouslySetInnerHTML={{
                   __html: landscapeSummary
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                     .replace(/^### (.+)$/gm, '<h4 class="font-semibold text-foreground mt-4 mb-1">$1</h4>')
                     .replace(/^## (.+)$/gm, '<h3 class="font-bold text-foreground mt-5 mb-2">$1</h3>')
                     .replace(/^# (.+)$/gm, '<h2 class="font-bold text-foreground text-lg mt-5 mb-2">$1</h2>')
