@@ -160,7 +160,7 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
       <li key={item.path}>
         <Link
           href={item.path}
-          className={`flex items-center gap-3 px-3 py-2 rounded-md transition text-sm ${
+          className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm ${
             isActive
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -177,18 +177,18 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
   return (
     <aside
       className={`fixed left-0 top-0 h-full bg-card border-r border-border transition-all duration-300 z-50 ${
-        collapsed ? 'w-16' : 'w-48'
+        collapsed ? 'w-14' : 'w-44'
       }`}
     >
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="p-3 border-b border-border flex items-center justify-between">
+        <div className="px-2 py-2 border-b border-border flex items-center justify-between">
           {!collapsed && (
-            <h1 className="text-lg font-bold text-foreground">J.O.T.I</h1>
+            <h1 className="text-base font-bold text-foreground">J.O.T.I</h1>
           )}
           <button
             onClick={onToggle}
-            className="p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground"
+            className="p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? (
@@ -228,11 +228,11 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
         )}
 
         {/* Main Navigation */}
-        <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-1.5 py-2 space-y-0.5">
           {/* All Feeds link */}
           <Link
             href="/feeds"
-            className={`flex items-center gap-3 px-3 py-2 rounded-md transition text-sm ${
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm ${
               pathname === '/feeds'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -246,7 +246,7 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
           {/* Watchlist link */}
           <Link
             href="/watchlist"
-            className={`flex items-center gap-3 px-3 py-2 rounded-md transition text-sm ${
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm ${
               pathname === '/watchlist'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -260,7 +260,7 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
           {/* Threat Intelligence link */}
           <Link
             href="/intelligence"
-            className={`flex items-center gap-3 px-3 py-2 rounded-md transition text-sm ${
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm ${
               pathname === '/intelligence'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -271,14 +271,17 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
             {!collapsed && <span>Intelligence</span>}
           </Link>
 
-          {/* Org Feeds — scrollable section */}
+          {/* Org Feeds — collapsible + scrollable */}
           {!collapsed && orgFeeds.length > 0 && (
-            <div className="mt-3">
+            <div className="mt-2">
               <button
                 onClick={() => setOrgFeedsOpen(!orgFeedsOpen)}
-                className="flex items-center justify-between w-full px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground"
+                className="flex items-center justify-between w-full px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground"
               >
-                <span>Org Feeds</span>
+                <span className="flex items-center gap-1.5">
+                  Org Feeds
+                  <span className="text-[9px] font-normal bg-muted-foreground/20 px-1 py-0.5 rounded">{orgFeeds.length}</span>
+                </span>
                 {orgFeedsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
               {orgFeedsOpen && (
@@ -288,8 +291,8 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
                     return (
                       <li key={feed.id}>
                         <Link
-                          href={`/feeds?source=${encodeURIComponent(feed.name)}`}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition truncate"
+                          href={`/feeds?source_id=${feed.id}`}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition"
                           title={feed.name}
                         >
                           {favicon ? (
@@ -312,14 +315,17 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
             </div>
           )}
 
-          {/* Custom Feeds — scrollable section */}
+          {/* My Feeds — collapsible */}
           {!collapsed && customFeeds.length > 0 && (
-            <div className="mt-2">
+            <div className="mt-1.5">
               <button
                 onClick={() => setCustomFeedsOpen(!customFeedsOpen)}
-                className="flex items-center justify-between w-full px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground"
+                className="flex items-center justify-between w-full px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground"
               >
-                <span>Custom</span>
+                <span className="flex items-center gap-1.5">
+                  My Feeds
+                  <span className="text-[9px] font-normal bg-muted-foreground/20 px-1 py-0.5 rounded">{customFeeds.length}</span>
+                </span>
                 {customFeedsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
               {customFeedsOpen && (
@@ -329,8 +335,8 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
                     return (
                       <li key={feed.id}>
                         <Link
-                          href={`/my-feeds`}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition truncate"
+                          href={`/feeds?user_feed_id=${feed.id}`}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition"
                           title={feed.name}
                         >
                           {favicon ? (
@@ -353,21 +359,13 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
             </div>
           )}
 
-          {/* Collapsed: show feed icons */}
-          {collapsed && orgFeeds.length > 0 && (
-            <div className="mt-2 space-y-0.5">
-              <div className="flex justify-center py-1">
-                <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-              </div>
-            </div>
-          )}
 
           {/* Admin Section — toggled from button, not always shown */}
           {isAdmin && showAdmin && (
             <div id="sidebar-admin-section">
               <div className="my-2 border-t border-border" />
               {!collapsed && (
-                <p className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                   Admin
                 </p>
               )}
@@ -379,10 +377,10 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
         </nav>
 
         {/* Bottom Panel */}
-        <div className="border-t border-border p-2 space-y-1">
+        <div className="border-t border-border px-1.5 py-2 space-y-0.5">
           {/* Theme Switcher */}
           <div
-            className={`flex items-center ${collapsed ? 'justify-center' : 'px-3 py-1'}`}
+            className={`flex items-center ${collapsed ? 'justify-center' : 'px-2 py-0.5'}`}
           >
             <ThemeSwitcher
               selectedTheme={theme as any}
@@ -419,7 +417,7 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
                   setCustomFeedsOpen(true);
                 }
               }}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md transition w-full text-sm ${
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition w-full text-sm ${
                 showAdmin
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -434,7 +432,7 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
           {/* Profile Link */}
           <Link
             href="/profile"
-            className={`flex items-center gap-3 px-3 py-2 rounded-md transition text-sm ${
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition text-sm ${
               pathname === '/profile'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -452,7 +450,7 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
           {/* Logout */}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 rounded-md transition w-full text-sm text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md transition w-full text-sm text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
             title={collapsed ? 'Logout' : undefined}
           >
             <LogOut className="w-4 h-4 flex-shrink-0" />

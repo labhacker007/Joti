@@ -22,8 +22,6 @@ import {
   Brain,
   Crosshair,
   RefreshCw,
-  ChevronDown,
-  ChevronRight,
 } from 'lucide-react';
 import { articlesAPI, userFeedsAPI, sourcesAPI, genaiAPI } from '@/api/client';
 import { formatRelativeTime, cn } from '@/lib/utils';
@@ -148,10 +146,6 @@ export default function Feeds() {
   // Dynamic quote/joke
   const [dynamicQuote, setDynamicQuote] = useState<{ text: string; author: string } | null>(null);
 
-  // Org feeds (user-added feeds) — collapsible section
-  const [orgFeeds, setOrgFeeds] = useState<any[]>([]);
-  const [orgFeedsOpen, setOrgFeedsOpen] = useState(true);
-
   // Infinite scroll state for card view
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -176,20 +170,6 @@ export default function Feeds() {
       }
     };
     fetchQuote();
-  }, []);
-
-  // Fetch user's org feeds
-  useEffect(() => {
-    const fetchOrgFeeds = async () => {
-      try {
-        const res = (await userFeedsAPI.getMyFeeds()) as any;
-        const data = res.data || res;
-        setOrgFeeds(Array.isArray(data) ? data : data?.feeds || []);
-      } catch {
-        // Non-critical
-      }
-    };
-    fetchOrgFeeds();
   }, []);
 
   // Read URL params for source/feed filtering
@@ -699,54 +679,6 @@ export default function Feeds() {
             </div>
           )}
           </div>
-        </div>
-      )}
-
-      {/* Org Feeds — Collapsible, Scrollable */}
-      {orgFeeds.length > 0 && (
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <button
-            onClick={() => setOrgFeedsOpen(!orgFeedsOpen)}
-            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              {orgFeedsOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-              <Rss className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium text-foreground">Your Feeds</span>
-              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{orgFeeds.length}</span>
-            </div>
-          </button>
-          {orgFeedsOpen && (
-            <div className="border-t border-border max-h-48 overflow-y-auto px-2 py-2 space-y-1">
-              {orgFeeds.map((feed: any) => (
-                <button
-                  key={feed.id}
-                  onClick={() => {
-                    if (userFeedFilter === feed.id) {
-                      setUserFeedFilter(null);
-                    } else {
-                      setUserFeedFilter(feed.id);
-                      setSourceFilter(null);
-                    }
-                    setCurrentPage(1);
-                  }}
-                  className={cn(
-                    'w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-left transition-colors text-sm',
-                    userFeedFilter === feed.id
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-foreground hover:bg-muted'
-                  )}
-                >
-                  <Globe className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
-                  <span className="truncate flex-1">{feed.name || feed.url}</span>
-                  <span className={cn(
-                    'w-2 h-2 rounded-full flex-shrink-0',
-                    feed.is_active ? 'bg-green-500' : 'bg-gray-400'
-                  )} />
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       )}
 

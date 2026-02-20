@@ -995,7 +995,7 @@ export const genaiAPI = {
   },
   // Ollama
   getOllamaStatus: async () => {
-    return get('/admin/ollama/status');
+    return get('/admin/genai/ollama/status');
   },
   getOllamaLibrary: async () => {
     return get('/admin/genai/ollama/library');

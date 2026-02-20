@@ -90,8 +90,29 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("auto_seed_failed", error=str(e))
 
+    # Start background feed ingestion scheduler
+    try:
+        from app.automation.scheduler import setup_scheduler
+        from app.core.config import settings as app_settings
+        interval = int(getattr(app_settings, 'FEED_REFRESH_INTERVAL_MINUTES', 60))
+        scheduler = setup_scheduler(interval_minutes=interval)
+        if getattr(app_settings, 'ENABLE_AUTOMATION_SCHEDULER', True):
+            scheduler.start()
+            logger.info("feed_scheduler_started", interval_minutes=interval)
+        else:
+            logger.info("feed_scheduler_disabled")
+    except Exception as e:
+        logger.error("feed_scheduler_start_failed", error=str(e))
+
     yield
-    
+
+    # Stop scheduler on shutdown
+    try:
+        from app.automation.scheduler import hunt_scheduler
+        hunt_scheduler.shutdown()
+    except Exception:
+        pass
+
     logger.info("app_shutdown")
 
 

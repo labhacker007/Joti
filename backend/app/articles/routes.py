@@ -1599,6 +1599,10 @@ def get_all_intelligence(
             "mitre_name": meta.get("mitre_name") or meta.get("name"),
             "mitre_url": f"https://attack.mitre.org/techniques/{intel.mitre_id}/" if intel.mitre_id and intel.mitre_id.startswith("T") else (f"https://atlas.mitre.org/techniques/{intel.mitre_id}" if intel.mitre_id else None),
             "mitre_framework": mitre_fw,
+            "meta": meta,
+            "is_reviewed": intel.is_reviewed if hasattr(intel, 'is_reviewed') else False,
+            "is_false_positive": intel.is_false_positive if hasattr(intel, 'is_false_positive') else False,
+            "notes": intel.notes if hasattr(intel, 'notes') else None,
             "created_at": intel.created_at.isoformat() if intel.created_at else None,
             "article": {
                 "id": article.id,

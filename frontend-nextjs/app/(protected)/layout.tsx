@@ -30,7 +30,7 @@ export default function ProtectedLayout({
   return (
     <ProtectedRoute>
       <div className="flex min-h-screen">
-        <Suspense fallback={<div className="w-48" />}>
+        <Suspense fallback={<div className="w-44" />}>
           <Sidebar
             userRole={user?.role}
             collapsed={collapsed}
@@ -40,8 +40,8 @@ export default function ProtectedLayout({
         <main
           className={`flex-1 min-w-0 transition-all duration-300 bg-background ${
             mounted
-              ? collapsed ? 'ml-16' : 'ml-48'
-              : 'ml-48'
+              ? collapsed ? 'ml-14' : 'ml-44'
+              : 'ml-44'
           }`}
         >
           <div className="p-6 max-w-screen-2xl mx-auto w-full">

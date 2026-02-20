@@ -2775,6 +2775,205 @@ These guardrails are automatically included in every GenAI prompt to ensure:
 
 
 # =============================================================================
+# GenAI Function-to-Model Mapping Endpoints
+# =============================================================================
+
+class FunctionConfigCreate(BaseModel):
+    function_name: str
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    primary_model_id: Optional[str] = None
+    secondary_model_id: Optional[str] = None
+
+
+class FunctionConfigUpdate(BaseModel):
+    primary_model_id: Optional[str] = None
+    secondary_model_id: Optional[str] = None
+
+
+@router.get("/genai/functions/", summary="Get all GenAI function-to-model mappings")
+async def get_genai_functions(
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Get all function-to-model mappings stored in system configuration."""
+    configs = db.query(SystemConfiguration).filter(
+        SystemConfiguration.category == "genai_functions"
+    ).all()
+
+    functions = []
+    for config in configs:
+        try:
+            data = json.loads(config.value) if config.value else {}
+            functions.append({
+                "id": config.id,
+                "function_name": config.key,
+                "display_name": data.get("display_name", config.key),
+                "description": data.get("description", ""),
+                "primary_model_id": data.get("primary_model_id"),
+                "secondary_model_id": data.get("secondary_model_id"),
+                "updated_at": config.updated_at.isoformat() if config.updated_at else None,
+            })
+        except Exception:
+            pass
+
+    return functions
+
+
+@router.post("/genai/functions/", summary="Create a GenAI function-to-model mapping")
+async def create_genai_function(
+    request: FunctionConfigCreate,
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Create or upsert a function-to-model mapping."""
+    existing = db.query(SystemConfiguration).filter(
+        SystemConfiguration.category == "genai_functions",
+        SystemConfiguration.key == request.function_name
+    ).first()
+
+    value = json.dumps({
+        "display_name": request.display_name or request.function_name,
+        "description": request.description or "",
+        "primary_model_id": request.primary_model_id,
+        "secondary_model_id": request.secondary_model_id,
+    })
+
+    if existing:
+        existing.value = value
+        existing.updated_by = current_user.id
+    else:
+        db.add(SystemConfiguration(
+            category="genai_functions",
+            key=request.function_name,
+            value=value,
+            value_type="json",
+            description=f"Function mapping for {request.function_name}",
+            updated_by=current_user.id
+        ))
+
+    db.commit()
+    return {"message": "Function config saved", "function_name": request.function_name}
+
+
+@router.patch("/genai/functions/{function_name}", summary="Update a GenAI function-to-model mapping")
+async def update_genai_function(
+    function_name: str,
+    request: FunctionConfigUpdate,
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Update the model mapping for a specific GenAI function."""
+    existing = db.query(SystemConfiguration).filter(
+        SystemConfiguration.category == "genai_functions",
+        SystemConfiguration.key == function_name
+    ).first()
+
+    if not existing:
+        raise HTTPException(status_code=404, detail=f"Function '{function_name}' not found")
+
+    try:
+        data = json.loads(existing.value) if existing.value else {}
+    except Exception:
+        data = {}
+
+    if request.primary_model_id is not None:
+        data["primary_model_id"] = request.primary_model_id or None
+    if request.secondary_model_id is not None:
+        data["secondary_model_id"] = request.secondary_model_id or None
+
+    existing.value = json.dumps(data)
+    existing.updated_by = current_user.id
+    db.commit()
+    return {"message": "Function updated", "function_name": function_name}
+
+
+@router.get("/genai/functions/logs/all", summary="Get all GenAI execution logs")
+async def get_all_genai_logs(
+    function_name: Optional[str] = None,
+    guardrails_failed: Optional[bool] = None,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Get GenAI execution logs from the request log table."""
+    from app.genai.models import GenAIRequestLog
+    query = db.query(GenAIRequestLog)
+
+    if function_name:
+        query = query.filter(GenAIRequestLog.function_name == function_name)
+    if guardrails_failed is True:
+        query = query.filter(GenAIRequestLog.guardrails_passed == False)
+
+    total = query.count()
+    logs = query.order_by(GenAIRequestLog.created_at.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "logs": [
+            {
+                "id": log.id,
+                "function_name": log.function_name,
+                "model_used": log.model_used,
+                "provider": log.provider,
+                "tokens_used": log.tokens_used,
+                "response_time_ms": log.response_time_ms,
+                "guardrails_passed": log.guardrails_passed,
+                "guardrail_violations": log.guardrail_violations,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+                "user_id": log.user_id,
+                "success": log.success,
+                "error": log.error_message if hasattr(log, 'error_message') else None,
+            }
+            for log in logs
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/genai/functions/{function_name}/logs", summary="Get logs for a specific GenAI function")
+async def get_function_logs(
+    function_name: str,
+    guardrails_failed: Optional[bool] = None,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Get execution logs for a specific GenAI function."""
+    from app.genai.models import GenAIRequestLog
+    query = db.query(GenAIRequestLog).filter(GenAIRequestLog.function_name == function_name)
+
+    if guardrails_failed is True:
+        query = query.filter(GenAIRequestLog.guardrails_passed == False)
+
+    total = query.count()
+    logs = query.order_by(GenAIRequestLog.created_at.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "logs": [
+            {
+                "id": log.id,
+                "function_name": log.function_name,
+                "model_used": log.model_used,
+                "provider": log.provider,
+                "tokens_used": log.tokens_used,
+                "response_time_ms": log.response_time_ms,
+                "guardrails_passed": log.guardrails_passed,
+                "guardrail_violations": log.guardrail_violations,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+                "user_id": log.user_id,
+                "success": log.success,
+            }
+            for log in logs
+        ],
+        "total": total,
+    }
+
+
+# =============================================================================
 # RBAC Management Endpoints
 # =============================================================================
 
