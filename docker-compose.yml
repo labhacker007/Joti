@@ -34,10 +34,6 @@ services:
       DEBUG: ${DEBUG:-false}
       ENV: ${ENV:-prod}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      GENAI_PROVIDER: ${GENAI_PROVIDER:-ollama}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3:latest}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ENABLE_AUTOMATION_SCHEDULER: ${ENABLE_AUTOMATION_SCHEDULER:-true}
     ports:
       - "${BACKEND_PORT:-8000}:8000"

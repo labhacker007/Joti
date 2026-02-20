@@ -112,20 +112,11 @@ docker-compose exec backend python manage.py activateuser --email user@example.c
 
 ## GenAI Setup (Optional)
 
-By default the app uses **Ollama** (local, free). To switch providers, edit `.env`:
+Configure AI providers (Ollama, OpenAI, Claude, Gemini) through the web UI after logging in:
 
-```env
-# OpenAI
-GENAI_PROVIDER=openai
-OPENAI_API_KEY=sk-...
+**Admin → AI Engine → Models**
 
-# Ollama (local)
-GENAI_PROVIDER=ollama
-OLLAMA_BASE_URL=http://host.docker.internal:11434
-OLLAMA_MODEL=llama3:latest
-```
-
-Configure models and function mappings in the Admin → GenAI panel after logging in.
+No environment variables are needed for GenAI — all API keys, model selections, and function mappings are managed in the admin panel.
 
 ## Ports
 
