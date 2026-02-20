@@ -1130,7 +1130,7 @@ export default function ThreatIntelligence() {
                             <Users className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                             <h3 className="text-sm font-bold text-foreground truncate">{actor.name}</h3>
                             {actor.is_verified && (
-                              <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" title="Verified" />
+                              <span title="Verified"><CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" /></span>
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
