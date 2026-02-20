@@ -77,6 +77,8 @@ interface ProviderConfig {
   provider: string;
   label: string;
   keyField: string;
+  modelField?: string;
+  knownModels?: string[];
   urlField?: string;
   description: string;
   isLocal?: boolean;
@@ -139,24 +141,43 @@ const PROVIDER_DEFS: ProviderConfig[] = [
     provider: 'openai',
     label: 'OpenAI',
     keyField: 'OPENAI_API_KEY',
+    modelField: 'OPENAI_MODEL',
+    knownModels: [
+      'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo',
+      'o1-preview', 'o1-mini', 'o3-mini',
+    ],
     description: 'GPT-4o, GPT-4o-mini, GPT-4 Turbo',
   },
   {
     provider: 'anthropic',
     label: 'Anthropic',
     keyField: 'ANTHROPIC_API_KEY',
+    modelField: 'ANTHROPIC_MODEL',
+    knownModels: [
+      'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
+      'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229',
+    ],
     description: 'Claude 3.5 Sonnet, Claude 3 Opus',
   },
   {
     provider: 'gemini',
     label: 'Google Gemini',
     keyField: 'GEMINI_API_KEY',
-    description: 'Gemini 1.5 Pro, Gemini 1.5 Flash',
+    modelField: 'GEMINI_MODEL',
+    knownModels: [
+      'gemini-2.0-flash', 'gemini-2.0-flash-thinking-exp',
+      'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro',
+    ],
+    description: 'Gemini 2.0 Flash, Gemini 1.5 Pro',
   },
   {
     provider: 'kimi',
     label: 'Kimi (Moonshot AI)',
     keyField: 'KIMI_API_KEY',
+    modelField: 'KIMI_MODEL',
+    knownModels: [
+      'kimi-k2-0711-preview', 'moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k',
+    ],
     description: 'Kimi K2 / 2.5 — kimi-k2-0711-preview, moonshot-v1-128k',
   },
   {
@@ -218,6 +239,12 @@ export default function GenAIManagement() {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [savingProvider, setSavingProvider] = useState<string | null>(null);
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
+
+  // Model selection per provider
+  const [selectedModels, setSelectedModels] = useState<Record<string, string>>({});
+  const [customModelInputs, setCustomModelInputs] = useState<Record<string, string>>({});
+  const [savingModel, setSavingModel] = useState<string | null>(null);
+  const [modelErrors, setModelErrors] = useState<Record<string, string>>({});
 
   // Function mapping states
   const [editingFunction, setEditingFunction] = useState<string | null>(null);
@@ -354,6 +381,22 @@ export default function GenAIManagement() {
         if (keys['ollama_model'] && keys['ollama_model'] !== '********') {
           setOllamaModel(keys['ollama_model']);
         }
+        // Pre-populate model selections for API providers
+        const initModels: Record<string, string> = {};
+        PROVIDER_DEFS.forEach((p) => {
+          if (p.modelField) {
+            const saved = keys[p.modelField];
+            if (saved && saved !== '********') {
+              // If saved model is not in knownModels list, treat as custom
+              const known = p.knownModels ?? [];
+              initModels[p.provider] = known.includes(saved) ? saved : '__custom__';
+              if (!known.includes(saved)) {
+                setCustomModelInputs((prev) => ({ ...prev, [p.provider]: saved }));
+              }
+            }
+          }
+        });
+        setSelectedModels((prev) => ({ ...prev, ...initModels }));
       }
 
       if (ollamaRes.status === 'fulfilled') {
@@ -535,6 +578,44 @@ export default function GenAIManagement() {
       setError(getErrorMessage(err));
     } finally {
       setSavingProvider(null);
+    }
+  };
+
+  const handleSaveModel = async (provider: ProviderConfig) => {
+    if (!provider.modelField) return;
+    const raw = selectedModels[provider.provider];
+    const model = raw === '__custom__'
+      ? customModelInputs[provider.provider]?.trim()
+      : raw;
+
+    if (!model) {
+      setModelErrors((prev) => ({ ...prev, [provider.provider]: 'Please select or enter a model name.' }));
+      return;
+    }
+
+    try {
+      setSavingModel(provider.provider);
+      setModelErrors((prev) => ({ ...prev, [provider.provider]: '' }));
+
+      await connectorsAPI.saveConfiguration({
+        category: 'genai',
+        key: provider.modelField,
+        value: model,
+        is_secret: false,
+      });
+
+      // If it was a custom entry, collapse it to the saved value in state
+      if (raw === '__custom__') {
+        setSelectedModels((prev) => ({ ...prev, [provider.provider]: model }));
+        setCustomModelInputs((prev) => ({ ...prev, [provider.provider]: '' }));
+        // Add to knownModels list isn't possible (const), so leave as-is
+      }
+
+      setSuccess(`${provider.label} model set to "${model}". Run Test to verify it exists.`);
+    } catch (err: unknown) {
+      setModelErrors((prev) => ({ ...prev, [provider.provider]: getErrorMessage(err) }));
+    } finally {
+      setSavingModel(null);
     }
   };
 
@@ -831,7 +912,7 @@ export default function GenAIManagement() {
                 </div>
 
                 {/* Provider Config */}
-                <div className="border-t border-border p-4 bg-muted/30">
+                <div className="border-t border-border p-4 bg-muted/30 space-y-3">
                   {provider.isLocal ? (
                     <div className="space-y-2">
                       <div className="flex gap-2">
@@ -863,52 +944,136 @@ export default function GenAIManagement() {
                       </p>
                     </div>
                   ) : (
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type={showKeys[provider.provider] ? 'text' : 'password'}
-                          value={apiKeys[provider.provider] || ''}
-                          onChange={(e) =>
-                            setApiKeys((prev) => ({
-                              ...prev,
-                              [provider.provider]: e.target.value,
-                            }))
-                          }
-                          placeholder={hasKey ? 'Key saved (enter new to replace)' : `Enter ${provider.label} API key`}
-                          className="w-full px-3 py-2 pr-10 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        />
+                    <>
+                      {/* API Key row */}
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type={showKeys[provider.provider] ? 'text' : 'password'}
+                            value={apiKeys[provider.provider] || ''}
+                            onChange={(e) =>
+                              setApiKeys((prev) => ({
+                                ...prev,
+                                [provider.provider]: e.target.value,
+                              }))
+                            }
+                            placeholder={hasKey ? 'Key saved (enter new to replace)' : `Enter ${provider.label} API key`}
+                            className="w-full px-3 py-2 pr-10 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowKeys((prev) => ({
+                                ...prev,
+                                [provider.provider]: !prev[provider.provider],
+                              }))
+                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showKeys[provider.provider] ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                         <button
-                          type="button"
-                          onClick={() =>
-                            setShowKeys((prev) => ({
-                              ...prev,
-                              [provider.provider]: !prev[provider.provider],
-                            }))
-                          }
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          onClick={() => handleSaveProviderKey(provider)}
+                          disabled={isSaving || !apiKeys[provider.provider]?.trim()}
+                          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm flex items-center gap-2"
                         >
-                          {showKeys[provider.provider] ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
+                          <Key className="w-4 h-4" />
+                          {isSaving ? 'Saving...' : 'Save Key'}
                         </button>
                       </div>
-                      <button
-                        onClick={() => handleSaveProviderKey(provider)}
-                        disabled={isSaving || !apiKeys[provider.provider]?.trim()}
-                        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm flex items-center gap-2"
-                      >
-                        <Key className="w-4 h-4" />
-                        {isSaving ? 'Saving...' : 'Save Key'}
-                      </button>
-                    </div>
+
+                      {/* Model selector row */}
+                      {provider.modelField && (
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-medium text-muted-foreground">
+                            Model
+                          </label>
+                          <div className="flex gap-2">
+                            <select
+                              value={selectedModels[provider.provider] || ''}
+                              onChange={(e) => {
+                                setSelectedModels((prev) => ({ ...prev, [provider.provider]: e.target.value }));
+                                setModelErrors((prev) => ({ ...prev, [provider.provider]: '' }));
+                                if (e.target.value !== '__custom__') {
+                                  setCustomModelInputs((prev) => ({ ...prev, [provider.provider]: '' }));
+                                }
+                              }}
+                              className="flex-1 px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                            >
+                              <option value="">— use default —</option>
+                              {provider.knownModels?.map((m) => (
+                                <option key={m} value={m}>{m}</option>
+                              ))}
+                              <option value="__custom__">Other / Custom model ID...</option>
+                            </select>
+                            {selectedModels[provider.provider] && selectedModels[provider.provider] !== '__custom__' && (
+                              <button
+                                onClick={() => handleSaveModel(provider)}
+                                disabled={savingModel === provider.provider}
+                                className="px-3 py-2 bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50 text-sm flex items-center gap-1.5 whitespace-nowrap"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                                {savingModel === provider.provider ? 'Saving...' : 'Save'}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Custom model input */}
+                          {selectedModels[provider.provider] === '__custom__' && (
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={customModelInputs[provider.provider] || ''}
+                                onChange={(e) => {
+                                  setCustomModelInputs((prev) => ({ ...prev, [provider.provider]: e.target.value }));
+                                  setModelErrors((prev) => ({ ...prev, [provider.provider]: '' }));
+                                }}
+                                placeholder={`e.g. ${provider.knownModels?.[0] ?? 'model-id'}`}
+                                className="flex-1 px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                              />
+                              <button
+                                onClick={() => handleSaveModel(provider)}
+                                disabled={savingModel === provider.provider || !customModelInputs[provider.provider]?.trim()}
+                                className="px-3 py-2 bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50 text-sm flex items-center gap-1.5 whitespace-nowrap"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                                {savingModel === provider.provider ? 'Saving...' : 'Save'}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Model error */}
+                          {modelErrors[provider.provider] && (
+                            <p className="text-xs text-red-600 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                              {modelErrors[provider.provider]}
+                            </p>
+                          )}
+
+                          {/* Active model hint */}
+                          <p className="text-xs text-muted-foreground">
+                            Active:{' '}
+                            <span className="font-medium text-foreground">
+                              {savedKeys[provider.modelField] && savedKeys[provider.modelField] !== '********'
+                                ? savedKeys[provider.modelField]
+                                : (status as any)?.model || 'provider default'}
+                            </span>
+                            {' '}— use <strong>Test</strong> above to verify the model exists.
+                          </p>
+                        </div>
+                      )}
+                    </>
                   )}
 
-                  {/* Provider model count */}
-                  {status?.models && status.models.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {status.models.length} models discovered
+                  {/* Provider model count (Ollama) */}
+                  {status?.models && status.models.length > 0 && provider.isLocal && (
+                    <p className="text-xs text-muted-foreground">
+                      {status.models.length} models installed
                     </p>
                   )}
                 </div>
