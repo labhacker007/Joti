@@ -503,9 +503,15 @@ def ingest_feed_sync(db: Session, source: FeedSource) -> IngestionResult:
         
     except Exception as e:
         logger.error("feed_ingestion_failed", source_id=source.id, error=str(e))
-        source.fetch_error = str(e)
-        db.commit()
-        
+        # Always rollback before any further DB operations — the session may be in
+        # a PendingRollback state if a flush/commit inside the try block failed.
+        db.rollback()
+        try:
+            source.fetch_error = str(e)[:500]
+            db.commit()
+        except Exception:
+            db.rollback()
+
         return IngestionResult(
             source_id=source.id,
             source_name=source.name,
@@ -670,7 +676,20 @@ def trigger_all_ingestion(
     total_high_priority = 0
     
     for source in sources:
-        result = ingest_feed_sync(db, source)
+        try:
+            result = ingest_feed_sync(db, source)
+        except Exception as exc:
+            db.rollback()
+            logger.error("trigger_ingestion_source_failed", source_id=source.id, error=str(exc))
+            result = IngestionResult(
+                source_id=source.id,
+                source_name=source.name,
+                new_articles=0,
+                duplicates=0,
+                high_priority=0,
+                status="error",
+                error=str(exc)[:200],
+            )
         results.append(result)
         total_articles += result.new_articles
         total_high_priority += result.high_priority
