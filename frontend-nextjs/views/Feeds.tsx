@@ -452,7 +452,7 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
         {/* Left: Action buttons */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setShowAddFeed(true); setShowUpload(false); }}
+            onClick={() => setShowAddFeed(true)}
             className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 flex items-center gap-1.5"
             title="Add custom feed"
           >
