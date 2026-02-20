@@ -73,7 +73,10 @@ export default function UserManagement() {
         pageSize
       ) as any;
 
-      let users = response.data?.items || [];
+      // Backend returns a flat array (not paginated), handle both formats
+      let users: User[] = Array.isArray(response)
+        ? response
+        : (response.data?.items || response.items || response.data || response || []);
 
       // Client-side filtering by search query if needed
       if (searchQuery) {
@@ -85,7 +88,8 @@ export default function UserManagement() {
       }
 
       setUsers(users);
-      setTotalPages(Math.ceil((response.data?.total || 0) / pageSize));
+      const total = Array.isArray(response) ? response.length : (response.data?.total || response.total || users.length);
+      setTotalPages(Math.ceil(total / pageSize));
     } catch (err: any) {
       setError(err.message || 'Failed to load users');
       console.error('Users error:', err);

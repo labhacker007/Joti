@@ -477,7 +477,7 @@ export default function SourcesManagement() {
                   >
                     <span
                       className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                        source.is_active ? 'translate-x-4.5' : 'translate-x-0.5'
+                        source.is_active ? 'translate-x-[18px]' : 'translate-x-0.5'
                       }`}
                     />
                   </button>

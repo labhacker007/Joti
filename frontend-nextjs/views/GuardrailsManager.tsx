@@ -518,6 +518,14 @@ export default function GuardrailsManager() {
       {/* ========== GUARDRAILS TAB ========== */}
       {activeTab === 'guardrails' && (
         <div className="space-y-4">
+          {/* Info: how guardrails work */}
+          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex gap-2 text-sm">
+            <Shield className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="text-blue-700">
+              <span className="font-medium">How guardrails work:</span> All <strong>active</strong> guardrails run on every GenAI call globally (for all functions). Toggle the status switch to enable or disable each guardrail.
+              Use <em>Seed Catalog</em> to populate 50+ pre-built security protections.
+            </div>
+          </div>
           {guardrailsLoading ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -526,7 +534,15 @@ export default function GuardrailsManager() {
             <div className="text-center py-12 text-muted-foreground">
               <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="text-lg font-medium">No guardrails configured</p>
-              <p className="text-sm mt-1">Add your first guardrail to protect GenAI operations</p>
+              <p className="text-sm mt-1 mb-4">Add guardrails to protect all GenAI operations</p>
+              <button
+                onClick={handleSeedCatalog}
+                disabled={seeding}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm disabled:opacity-50"
+              >
+                <Database className="w-4 h-4" />
+                {seeding ? 'Seeding...' : 'Seed 50+ Security Guardrails from Catalog'}
+              </button>
             </div>
           ) : (
             <div className="bg-card border border-border rounded-lg overflow-hidden">

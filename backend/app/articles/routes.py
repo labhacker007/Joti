@@ -1,5 +1,6 @@
 """Article management API routes."""
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload, contains_eager
 from sqlalchemy import desc
 from app.core.database import get_db
@@ -2462,26 +2463,171 @@ class SummarizationRequest(BaseModel):
 @router.post("/{article_id}/summarize", summary="Generate AI summary for article")
 async def summarize_article(
     article_id: int,
+    background_tasks: BackgroundTasks,
+    request: SummarizationRequest = SummarizationRequest(),
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
+    db: Session = Depends(get_db),
+):
+    """Generate executive and technical summaries for an article using GenAI.
+
+    Returns 202 Accepted immediately and runs generation in the background.
+    Poll GET /articles/{id} until executive_summary is populated.
+    """
+    import asyncio
+    from app.genai.provider import get_model_manager
+
+    article = db.query(Article).options(
+        joinedload(Article.feed_source)
+    ).filter(Article.id == article_id).first()
+
+    if not article:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    # Check if GenAI is configured before starting background task
+    try:
+        model_manager = get_model_manager()
+        primary_model = model_manager.get_primary_model()
+    except Exception as model_err:
+        logger.error("genai_not_configured", error=str(model_err))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="GenAI provider is not configured. Please configure a GenAI provider (Ollama, OpenAI, Claude, or Gemini) in Admin > Configuration > GenAI."
+        )
+
+    model_id = request.model_id or primary_model
+    content = f"Title: {article.title}\n\n{article.normalized_content or article.raw_content or article.summary or ''}"
+
+    # Mark as processing so the frontend knows to poll
+    article.genai_analysis_remarks = "processing"
+    db.commit()
+
+    async def _do_summarize(art_id: int, content_str: str, mod_id: str, user_id: int):
+        """Background task: generate both summaries concurrently then save."""
+        from app.core.database import SessionLocal
+        bg_db = SessionLocal()
+        try:
+            bg_article = bg_db.query(Article).filter(Article.id == art_id).first()
+            if not bg_article:
+                return
+
+            mm = get_model_manager()
+
+            exec_prompt_sys = """You are a threat intelligence analyst writing for executives.
+Write a 2-3 paragraph executive summary covering:
+1. What the threat is and its business impact
+2. Key indicators and attack techniques
+3. High-level recommendations
+Use clear, non-technical language suitable for C-level executives."""
+
+            tech_prompt_sys = """You are a senior SOC analyst writing a technical summary.
+Include:
+1. Attack chain analysis with MITRE ATT&CK mapping
+2. Detailed IOC breakdown by type
+3. Detection opportunities and hunt queries
+4. Remediation steps
+Be thorough and technical, suitable for SOC analysts and threat hunters."""
+
+            # Run both summaries concurrently to cut generation time in half
+            exec_coro = mm.generate_with_fallback(
+                system_prompt=exec_prompt_sys,
+                user_prompt=f"Summarize this threat intelligence article:\n\n{content_str[:3000]}",
+                preferred_model=mod_id
+            )
+            tech_coro = mm.generate_with_fallback(
+                system_prompt=tech_prompt_sys,
+                user_prompt=f"Write a technical summary for SOC analysts:\n\n{content_str[:4000]}",
+                preferred_model=mod_id
+            )
+
+            results = await asyncio.gather(exec_coro, tech_coro, return_exceptions=True)
+
+            exec_result = results[0]
+            tech_result = results[1]
+
+            model_used = mod_id
+            exec_summary = None
+            tech_summary = None
+
+            if isinstance(exec_result, Exception):
+                logger.warning("executive_summary_generation_failed", article_id=art_id, error=str(exec_result))
+            else:
+                exec_summary = exec_result.get("response", "")
+                model_used = exec_result.get("model_used", mod_id)
+
+            if isinstance(tech_result, Exception):
+                logger.warning("technical_summary_generation_failed", article_id=art_id, error=str(tech_result))
+            else:
+                tech_summary = tech_result.get("response", "")
+                if not model_used:
+                    model_used = tech_result.get("model_used", mod_id)
+
+            if exec_summary:
+                bg_article.executive_summary = exec_summary
+            if tech_summary:
+                bg_article.technical_summary = tech_summary
+
+            bg_article.genai_analysis_remarks = f"Summarized using {model_used}"
+            bg_db.commit()
+
+            AuditManager.log_event(
+                db=bg_db,
+                user_id=user_id,
+                event_type=AuditEventType.GENAI_SUMMARIZATION,
+                action=f"Generated AI summary for article {art_id} using {model_used}",
+                resource_type="article",
+                resource_id=art_id,
+                details={"model": model_used, "has_executive": bool(exec_summary), "has_technical": bool(tech_summary)}
+            )
+
+            logger.info("article_summarized", article_id=art_id, model=model_used)
+        except Exception as e:
+            logger.error("background_summarize_failed", article_id=art_id, error=str(e))
+            try:
+                bg_article = bg_db.query(Article).filter(Article.id == art_id).first()
+                if bg_article:
+                    bg_article.genai_analysis_remarks = f"Summarization failed: {str(e)[:200]}"
+                    bg_db.commit()
+            except Exception:
+                pass
+        finally:
+            bg_db.close()
+
+    background_tasks.add_task(_do_summarize, article_id, content, model_id, current_user.id)
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "article_id": article_id,
+            "article_title": article.title,
+            "status": "processing",
+            "message": "Summary generation started. Poll GET /articles/{id} until executive_summary is populated."
+        }
+    )
+
+
+@router.post("/{article_id}/summarize-sync", summary="Generate AI summary synchronously (legacy)")
+async def summarize_article_sync(
+    article_id: int,
     request: SummarizationRequest = SummarizationRequest(),
     current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
     db: Session = Depends(get_db)
 ):
-    """Generate executive and technical summaries for an article using GenAI."""
+    """Synchronous summarization fallback (may timeout for slow models)."""
+    import asyncio
     from app.genai.provider import get_model_manager
-    
+
     article = db.query(Article).options(
         joinedload(Article.feed_source)
     ).filter(Article.id == article_id).first()
-    
+
     if not article:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
-    
+
     content = f"Title: {article.title}\n\n{article.normalized_content or article.raw_content or article.summary or ''}"
-    
+
     try:
         model_manager = get_model_manager()
-        
-        # Check if GenAI is configured
+
         try:
             primary_model = model_manager.get_primary_model()
         except Exception as model_err:
@@ -2490,52 +2636,44 @@ async def summarize_article(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="GenAI provider is not configured. Please configure a GenAI provider (Ollama, OpenAI, Claude, or Gemini) in Admin > Configuration > GenAI."
             )
-        
-        # Use specified model or default
+
         model_id = request.model_id or primary_model
-        
-        # Executive summary prompt - generate even if technical fails
-        exec_summary = article.executive_summary  # Keep existing if generation fails
-        try:
-            exec_result = await model_manager.generate_with_fallback(
-                system_prompt="""You are a threat intelligence analyst writing for executives. 
+
+        exec_summary = article.executive_summary
+        tech_summary = article.technical_summary
+        model_used = model_id
+
+        exec_coro = model_manager.generate_with_fallback(
+            system_prompt="""You are a threat intelligence analyst writing for executives.
 Write a 2-3 paragraph executive summary covering:
 1. What the threat is and its business impact
-2. Key indicators and attack techniques  
+2. Key indicators and attack techniques
 3. High-level recommendations
 Use clear, non-technical language suitable for C-level executives.""",
-                user_prompt=f"Summarize this threat intelligence article:\n\n{content[:3000]}",
-                preferred_model=model_id
-            )
-            exec_summary = exec_result.get("response", "")
-            model_used = exec_result.get("model_used", model_id)
-        except Exception as exec_err:
-            logger.warning("executive_summary_generation_failed", article_id=article_id, error=str(exec_err))
-            model_used = model_id
-        
-        # Technical summary prompt - generate even if executive failed
-        tech_summary = article.technical_summary  # Keep existing if generation fails
-        try:
-            tech_result = await model_manager.generate_with_fallback(
-                system_prompt="""You are a senior SOC analyst writing a technical summary.
+            user_prompt=f"Summarize this threat intelligence article:\n\n{content[:3000]}",
+            preferred_model=model_id
+        )
+        tech_coro = model_manager.generate_with_fallback(
+            system_prompt="""You are a senior SOC analyst writing a technical summary.
 Include:
 1. Attack chain analysis with MITRE ATT&CK mapping
 2. Detailed IOC breakdown by type
 3. Detection opportunities and hunt queries
 4. Remediation steps
 Be thorough and technical, suitable for SOC analysts and threat hunters.""",
-                user_prompt=f"Write a technical summary for SOC analysts:\n\n{content[:4000]}",
-                preferred_model=model_id
-            )
-            tech_summary = tech_result.get("response", "")
-            if not model_used:
-                model_used = tech_result.get("model_used", model_id)
-        except Exception as tech_err:
-            logger.warning("technical_summary_generation_failed", article_id=article_id, error=str(tech_err))
-            if not model_used:
-                model_used = model_id
-        
-        # Update article - update both summaries independently
+            user_prompt=f"Write a technical summary for SOC analysts:\n\n{content[:4000]}",
+            preferred_model=model_id
+        )
+
+        results = await asyncio.gather(exec_coro, tech_coro, return_exceptions=True)
+
+        if not isinstance(results[0], Exception):
+            exec_summary = results[0].get("response", "")
+            model_used = results[0].get("model_used", model_id)
+
+        if not isinstance(results[1], Exception):
+            tech_summary = results[1].get("response", "")
+
         if exec_summary:
             article.executive_summary = exec_summary
         if tech_summary:

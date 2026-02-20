@@ -2931,37 +2931,58 @@ class FunctionConfigUpdate(BaseModel):
     secondary_model_id: Optional[str] = None
 
 
+@router.post("/genai/functions/seed-defaults", summary="Seed default GenAI function configs")
+async def seed_default_functions_admin(
+    current_user: User = Depends(require_permission(MANAGE_USERS)),
+    db: Session = Depends(get_db)
+):
+    """Create/update all default GenAI function configs (idempotent)."""
+    from app.admin.genai_functions import DEFAULT_FUNCTION_SEEDS
+    from app.models import GenAIFunctionConfig
+    created, updated = [], []
+    for fn in DEFAULT_FUNCTION_SEEDS:
+        existing = db.query(GenAIFunctionConfig).filter(
+            GenAIFunctionConfig.function_name == fn["function_name"]
+        ).first()
+        if existing:
+            existing.display_name = fn["display_name"]
+            existing.description = fn["description"]
+            updated.append(fn["function_name"])
+        else:
+            db.add(GenAIFunctionConfig(
+                function_name=fn["function_name"],
+                display_name=fn["display_name"],
+                description=fn["description"],
+            ))
+            created.append(fn["function_name"])
+    db.commit()
+    return {"created": created, "updated": updated, "total": len(DEFAULT_FUNCTION_SEEDS)}
+
+
 @router.get("/genai/functions/", summary="Get all GenAI function-to-model mappings")
 async def get_genai_functions(
     current_user: User = Depends(require_permission(MANAGE_USERS)),
     db: Session = Depends(get_db)
 ):
-    """Get all function-to-model mappings stored in system configuration."""
-    configs = db.query(SystemConfiguration).filter(
-        SystemConfiguration.category == "genai_functions"
-    ).all()
-
-    functions = []
-    for config in configs:
-        try:
-            data = json.loads(config.value) if config.value else {}
-            functions.append({
-                "id": config.id,
-                "function_name": config.key,
-                "display_name": data.get("display_name", config.key),
-                "description": data.get("description", ""),
-                "primary_model_id": data.get("primary_model_id"),
-                "secondary_model_id": data.get("secondary_model_id"),
-                "total_requests": data.get("total_requests", 0),
-                "total_tokens": data.get("total_tokens", 0),
-                "total_cost": data.get("total_cost", 0.0),
-                "active_prompt_name": data.get("active_prompt_name"),
-                "updated_at": config.updated_at.isoformat() if config.updated_at else None,
-            })
-        except Exception:
-            pass
-
-    return functions
+    """Get all GenAI function configs from GenAIFunctionConfig table."""
+    from app.models import GenAIFunctionConfig
+    configs = db.query(GenAIFunctionConfig).order_by(GenAIFunctionConfig.function_name).all()
+    return [
+        {
+            "id": c.id,
+            "function_name": c.function_name,
+            "display_name": c.display_name or c.function_name,
+            "description": c.description or "",
+            "primary_model_id": c.primary_model_id,
+            "secondary_model_id": c.secondary_model_id,
+            "total_requests": c.total_requests,
+            "total_tokens": c.total_tokens,
+            "total_cost": c.total_cost,
+            "active_prompt_id": c.active_prompt_id,
+            "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+        }
+        for c in configs
+    ]
 
 
 @router.post("/genai/functions/", summary="Create a GenAI function-to-model mapping")
@@ -2970,30 +2991,28 @@ async def create_genai_function(
     current_user: User = Depends(require_permission(MANAGE_USERS)),
     db: Session = Depends(get_db)
 ):
-    """Create or upsert a function-to-model mapping."""
-    existing = db.query(SystemConfiguration).filter(
-        SystemConfiguration.category == "genai_functions",
-        SystemConfiguration.key == request.function_name
+    """Create or upsert a function config in GenAIFunctionConfig table."""
+    from app.models import GenAIFunctionConfig
+    existing = db.query(GenAIFunctionConfig).filter(
+        GenAIFunctionConfig.function_name == request.function_name
     ).first()
 
-    value = json.dumps({
-        "display_name": request.display_name or request.function_name,
-        "description": request.description or "",
-        "primary_model_id": request.primary_model_id,
-        "secondary_model_id": request.secondary_model_id,
-    })
-
     if existing:
-        existing.value = value
-        existing.updated_by = current_user.id
+        existing.display_name = request.display_name or existing.display_name
+        existing.description = request.description or existing.description
+        if request.primary_model_id is not None:
+            existing.primary_model_id = request.primary_model_id or None
+        if request.secondary_model_id is not None:
+            existing.secondary_model_id = request.secondary_model_id or None
+        existing.updated_by_id = current_user.id
     else:
-        db.add(SystemConfiguration(
-            category="genai_functions",
-            key=request.function_name,
-            value=value,
-            value_type="json",
-            description=f"Function mapping for {request.function_name}",
-            updated_by=current_user.id
+        db.add(GenAIFunctionConfig(
+            function_name=request.function_name,
+            display_name=request.display_name or request.function_name,
+            description=request.description or "",
+            primary_model_id=request.primary_model_id,
+            secondary_model_id=request.secondary_model_id,
+            updated_by_id=current_user.id,
         ))
 
     db.commit()
@@ -3007,27 +3026,20 @@ async def update_genai_function(
     current_user: User = Depends(require_permission(MANAGE_USERS)),
     db: Session = Depends(get_db)
 ):
-    """Update the model mapping for a specific GenAI function."""
-    existing = db.query(SystemConfiguration).filter(
-        SystemConfiguration.category == "genai_functions",
-        SystemConfiguration.key == function_name
+    """Update the model mapping for a specific GenAI function in GenAIFunctionConfig."""
+    from app.models import GenAIFunctionConfig
+    existing = db.query(GenAIFunctionConfig).filter(
+        GenAIFunctionConfig.function_name == function_name
     ).first()
 
     if not existing:
         raise HTTPException(status_code=404, detail=f"Function '{function_name}' not found")
 
-    try:
-        data = json.loads(existing.value) if existing.value else {}
-    except Exception:
-        data = {}
-
     if request.primary_model_id is not None:
-        data["primary_model_id"] = request.primary_model_id or None
+        existing.primary_model_id = request.primary_model_id or None
     if request.secondary_model_id is not None:
-        data["secondary_model_id"] = request.secondary_model_id or None
-
-    existing.value = json.dumps(data)
-    existing.updated_by = current_user.id
+        existing.secondary_model_id = request.secondary_model_id or None
+    existing.updated_by_id = current_user.id
     db.commit()
     return {"message": "Function updated", "function_name": function_name}
 

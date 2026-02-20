@@ -1014,6 +1014,9 @@ export const genaiAPI = {
   createFunctionConfig: async (data: any) => {
     return post('/admin/genai/functions/', data);
   },
+  seedDefaultFunctions: async () => {
+    return post('/admin/genai/functions/seed-defaults', {});
+  },
   // Ollama
   getOllamaStatus: async () => {
     return get('/admin/genai/ollama/status');

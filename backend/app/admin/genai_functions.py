@@ -206,9 +206,50 @@ async def get_all_execution_logs(
     }
 
 
+DEFAULT_FUNCTION_SEEDS = [
+    {"function_name": "article_summarization", "display_name": "Article Summarization", "description": "Generates executive and technical summaries for threat intelligence articles."},
+    {"function_name": "intel_extraction", "display_name": "Intel Extraction", "description": "Extracts IOCs, MITRE ATT&CK TTPs, threat actor names, and malware families from article content."},
+    {"function_name": "hunt_query_generation", "display_name": "Hunt Query Generation", "description": "Generates platform-specific threat hunting queries (XSIAM XQL, Defender KQL, Splunk SPL, Wiz GraphQL)."},
+    {"function_name": "hunt_title", "display_name": "Hunt Title Generation", "description": "Auto-generates concise, descriptive titles for hunt queries based on threat context."},
+    {"function_name": "threat_landscape", "display_name": "Threat Landscape Analysis", "description": "Generates AI threat landscape briefs covering current threat posture, active TTPs, top threat actors, and SOC recommendations."},
+    {"function_name": "campaign_brief", "display_name": "Campaign Brief", "description": "Analyzes correlated articles and shared IOCs to generate a threat campaign brief."},
+    {"function_name": "correlation_analysis", "display_name": "Correlation Analysis", "description": "Finds correlations across threat intelligence: shared IOCs, clusters of related indicators, cross-article TTP patterns."},
+    {"function_name": "threat_actor_enrichment", "display_name": "Threat Actor Enrichment", "description": "Enriches threat actor profiles with GenAI-generated intelligence."},
+    {"function_name": "ioc_context", "display_name": "IOC Context & Explanation", "description": "Provides contextual explanation for individual IOCs, associated threat actors, and suggested defensive actions."},
+    {"function_name": "intel_ingestion", "display_name": "Intel Ingestion Analysis", "description": "Analyses manually uploaded documents and URLs, extracts IOCs, maps TTPs, and populates the intelligence database."},
+]
+
+
 # ============================================================================
 # API Routes - CRUD Operations
 # ============================================================================
+
+@router.post("/seed-defaults", summary="Create all default GenAI function configs")
+async def seed_default_functions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
+):
+    """Create default GenAI function configurations (idempotent — skips existing)."""
+    created = []
+    skipped = []
+    for fn in DEFAULT_FUNCTION_SEEDS:
+        existing = db.query(GenAIFunctionConfig).filter(
+            GenAIFunctionConfig.function_name == fn["function_name"]
+        ).first()
+        if existing:
+            existing.display_name = fn["display_name"]
+            existing.description = fn["description"]
+            skipped.append(fn["function_name"])
+        else:
+            db.add(GenAIFunctionConfig(
+                function_name=fn["function_name"],
+                display_name=fn["display_name"],
+                description=fn["description"],
+            ))
+            created.append(fn["function_name"])
+    db.commit()
+    return {"created": created, "updated": skipped, "total": len(DEFAULT_FUNCTION_SEEDS)}
+
 
 @router.get("/", response_model=List[FunctionConfigResponse])
 async def list_function_configs(

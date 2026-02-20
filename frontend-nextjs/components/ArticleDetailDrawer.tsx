@@ -280,21 +280,52 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
     }
   };
 
+  const pollForSummary = async (articleId: string | number, maxWaitMs = 300000) => {
+    const pollInterval = 4000; // 4 seconds
+    const start = Date.now();
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      try {
+        const res = (await articlesAPI.getArticle(String(articleId))) as any;
+        const data = res?.data || res;
+        if (data?.executive_summary || data?.technical_summary) {
+          return data;
+        }
+        // Detect failure via remarks
+        const remarks: string = data?.genai_analysis_remarks || '';
+        if (remarks.startsWith('Summarization failed:')) {
+          throw new Error(remarks);
+        }
+      } catch (pollErr: any) {
+        if (pollErr?.message?.startsWith('Summarization failed:')) throw pollErr;
+        // network hiccup — keep trying
+      }
+    }
+    throw new Error('Summary generation timed out. The AI model may be busy — try again later.');
+  };
+
   const triggerAutoSummarize = async (data: ArticleDetail) => {
     setSummarizing(true);
     try {
       const response = (await articlesAPI.summarizeArticle(data.id)) as any;
       const result = response.data || response;
-      setArticle((prev) =>
-        prev
-          ? {
-              ...prev,
-              executive_summary: result.executive_summary,
-              technical_summary: result.technical_summary,
-              genai_analysis_remarks: `Summarized using ${result.model_used}`,
-            }
-          : null
-      );
+
+      // If backend returned 202 (background task), poll for result
+      if (result.status === 'processing') {
+        const updated = await pollForSummary(data.id);
+        setArticle((prev) => prev ? { ...prev, ...updated } : null);
+      } else {
+        setArticle((prev) =>
+          prev
+            ? {
+                ...prev,
+                executive_summary: result.executive_summary,
+                technical_summary: result.technical_summary,
+                genai_analysis_remarks: `Summarized using ${result.model_used}`,
+              }
+            : null
+        );
+      }
     } catch (err: any) {
       const detail = err?.response?.data?.detail || err?.message || 'Summary generation failed — ensure a GenAI provider is configured in Admin → AI Engine';
       setError(detail);
@@ -306,21 +337,28 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
   const handleSummarize = async () => {
     if (!article) return;
     setSummarizing(true);
+    setError('');
     try {
       const response = (await articlesAPI.summarizeArticle(article.id)) as any;
       const data = response.data || response;
-      setArticle((prev) =>
-        prev
-          ? {
-              ...prev,
-              executive_summary: data.executive_summary,
-              technical_summary: data.technical_summary,
-              genai_analysis_remarks: `Summarized using ${data.model_used}`,
-            }
-          : null
-      );
+
+      if (data.status === 'processing') {
+        const updated = await pollForSummary(article.id);
+        setArticle((prev) => prev ? { ...prev, ...updated } : null);
+      } else {
+        setArticle((prev) =>
+          prev
+            ? {
+                ...prev,
+                executive_summary: data.executive_summary,
+                technical_summary: data.technical_summary,
+                genai_analysis_remarks: `Summarized using ${data.model_used}`,
+              }
+            : null
+        );
+      }
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || 'Failed to generate summary. Is a GenAI provider configured?';
+      const detail = err?.response?.data?.detail || err?.message || 'Failed to generate summary. Is a GenAI provider configured?';
       setError(detail);
     } finally {
       setSummarizing(false);

@@ -165,10 +165,16 @@ const PROVIDER_DEFS: ProviderConfig[] = [
 
 // Default GenAI functions
 const DEFAULT_FUNCTIONS = [
-  { function_name: 'summarization', display_name: 'Summarization', description: 'Generate executive and technical summaries of articles' },
-  { function_name: 'ioc_extraction', display_name: 'IOC Extraction', description: 'Extract indicators of compromise from content' },
-  { function_name: 'ttp_mapping', display_name: 'TTP Mapping', description: 'Map extracted intelligence to MITRE ATT&CK TTPs' },
-  { function_name: 'hunt_query', display_name: 'Hunt Query Generation', description: 'Generate hunt queries for XQL, KQL, SPL platforms' },
+  { function_name: 'article_summarization', display_name: 'Article Summarization', description: 'Generate executive and technical summaries of threat intelligence articles' },
+  { function_name: 'intel_extraction', display_name: 'Intel Extraction', description: 'Extract IOCs, MITRE ATT&CK TTPs, threat actor names, and malware families from article content' },
+  { function_name: 'hunt_query_generation', display_name: 'Hunt Query Generation', description: 'Generate platform-specific hunt queries (XQL, KQL, SPL, GraphQL)' },
+  { function_name: 'hunt_title', display_name: 'Hunt Title Generation', description: 'Auto-generate concise, descriptive titles for hunt queries' },
+  { function_name: 'threat_landscape', display_name: 'Threat Landscape Analysis', description: 'Generate AI threat landscape briefs covering current threat posture and top TTPs' },
+  { function_name: 'campaign_brief', display_name: 'Campaign Brief', description: 'Generate threat campaign briefs from correlated articles and shared IOCs' },
+  { function_name: 'correlation_analysis', display_name: 'Correlation Analysis', description: 'Find correlations across threat intelligence: shared IOCs, related indicators, cross-article TTPs' },
+  { function_name: 'threat_actor_enrichment', display_name: 'Threat Actor Enrichment', description: 'Enrich threat actor profiles with GenAI-generated intelligence' },
+  { function_name: 'ioc_context', display_name: 'IOC Context & Explanation', description: 'Provide contextual explanation for IOCs and suggested defensive actions' },
+  { function_name: 'intel_ingestion', display_name: 'Intel Ingestion Analysis', description: 'Analyse uploaded documents and URLs, extract IOCs, map TTPs' },
 ];
 
 export default function GenAIManagement() {
@@ -289,7 +295,14 @@ export default function GenAIManagement() {
 
       if (modelRes.status === 'fulfilled') {
         const data = (modelRes.value as any)?.data || modelRes.value;
-        setModels(Array.isArray(data) ? data : data?.models || []);
+        const rawModels: any[] = Array.isArray(data) ? data : (data?.models || []);
+        // Normalize: backend returns is_enabled, frontend interface uses enabled
+        setModels(rawModels.map((m: any) => ({
+          ...m,
+          id: String(m.id),
+          name: m.name || m.display_name || m.model_name || m.model_identifier || 'Unknown',
+          enabled: m.enabled !== undefined ? m.enabled : (m.is_enabled ?? false),
+        })));
       }
 
       if (funcRes.status === 'fulfilled') {
@@ -438,10 +451,14 @@ export default function GenAIManagement() {
   const handleToggleModel = async (modelId: string) => {
     try {
       setError('');
-      await genaiAPI.toggleModel(modelId);
+      const res = (await genaiAPI.toggleModel(modelId)) as any;
+      const payload = res?.data || res;
+      const newEnabled = payload?.is_enabled;
       setModels((prev) =>
         prev.map((m) =>
-          m.id === modelId ? { ...m, enabled: !m.enabled } : m
+          m.id === modelId
+            ? { ...m, enabled: newEnabled !== undefined ? newEnabled : !m.enabled }
+            : m
         )
       );
       setSuccess('Model toggled');
@@ -533,16 +550,27 @@ export default function GenAIManagement() {
   const handleCreateDefaultFunctions = async () => {
     try {
       setError('');
-      for (const fn of DEFAULT_FUNCTIONS) {
-        const exists = functions.find((f) => f.function_name === fn.function_name);
-        if (!exists) {
-          await genaiAPI.createFunctionConfig(fn);
-        }
-      }
-      setSuccess('Default functions created');
+      // Use the backend seed-defaults endpoint for a single idempotent call
+      const res = (await genaiAPI.seedDefaultFunctions()) as any;
+      const data = res?.data || res;
+      const created = data?.created?.length ?? 0;
+      const updated = data?.updated?.length ?? 0;
+      setSuccess(`Default functions seeded: ${created} created, ${updated} updated`);
       await loadData();
     } catch (err: unknown) {
-      setError(getErrorMessage(err));
+      // Fallback: create individually if seed endpoint doesn't exist
+      try {
+        for (const fn of DEFAULT_FUNCTIONS) {
+          const exists = functions.find((f) => f.function_name === fn.function_name);
+          if (!exists) {
+            await genaiAPI.createFunctionConfig(fn);
+          }
+        }
+        setSuccess('Default functions created');
+        await loadData();
+      } catch (innerErr: unknown) {
+        setError(getErrorMessage(innerErr));
+      }
     }
   };
 

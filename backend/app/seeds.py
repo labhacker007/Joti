@@ -561,7 +561,8 @@ def _seed_guardrails(db):
 
 
 def _seed_genai_functions(db):
-    """Seed GenAI function configurations so Admin → AI Engine → Functions tab is pre-populated."""
+    """Seed GenAI function configurations into GenAIFunctionConfig table."""
+    from app.models import GenAIFunctionConfig
     functions = [
         {
             "function_name": "article_summarization",
@@ -589,9 +590,14 @@ def _seed_genai_functions(db):
             "description": "Generates comprehensive AI threat landscape briefs covering current threat posture, active TTPs, top threat actors, and SOC recommendations based on aggregated intelligence.",
         },
         {
-            "function_name": "campaign_attribution",
-            "display_name": "Campaign Attribution",
-            "description": "Analyzes correlated article clusters and shared IOCs to attribute threat campaigns to known actors, assess campaign scope, and recommend hunting priorities.",
+            "function_name": "campaign_brief",
+            "display_name": "Campaign Brief",
+            "description": "Analyzes correlated articles and shared IOCs to generate a threat campaign brief attributing activity to known actors with hunting priorities.",
+        },
+        {
+            "function_name": "correlation_analysis",
+            "display_name": "Correlation Analysis",
+            "description": "Finds correlations across threat intelligence: shared IOCs between articles, clusters of related indicators, and cross-article TTP patterns.",
         },
         {
             "function_name": "threat_actor_enrichment",
@@ -603,37 +609,28 @@ def _seed_genai_functions(db):
             "display_name": "IOC Context & Explanation",
             "description": "Provides contextual explanation for individual IOCs — what they are, why they're significant, associated threat actors, and suggested defensive actions.",
         },
+        {
+            "function_name": "intel_ingestion",
+            "display_name": "Intel Ingestion Analysis",
+            "description": "Analyses manually uploaded documents and URLs, extracts IOCs, maps TTPs, and populates the intelligence database.",
+        },
     ]
 
     for fn in functions:
-        existing = db.query(SystemConfiguration).filter(
-            SystemConfiguration.category == "genai_functions",
-            SystemConfiguration.key == fn["function_name"]
+        existing = db.query(GenAIFunctionConfig).filter(
+            GenAIFunctionConfig.function_name == fn["function_name"]
         ).first()
-        value = json.dumps({
-            "display_name": fn["display_name"],
-            "description": fn["description"],
-            "primary_model_id": None,
-            "secondary_model_id": None,
-        })
         if not existing:
-            db.add(SystemConfiguration(
-                category="genai_functions",
-                key=fn["function_name"],
-                value=value,
-                value_type="json",
-                description=f"Function mapping for {fn['function_name']}",
+            db.add(GenAIFunctionConfig(
+                function_name=fn["function_name"],
+                display_name=fn["display_name"],
+                description=fn["description"],
             ))
             print(f"✓ Added GenAI function: {fn['display_name']}")
         else:
             # Update description/display_name but don't overwrite model assignments
-            try:
-                current = json.loads(existing.value) if existing.value else {}
-                current["display_name"] = fn["display_name"]
-                current["description"] = fn["description"]
-                existing.value = json.dumps(current)
-            except Exception:
-                pass
+            existing.display_name = fn["display_name"]
+            existing.description = fn["description"]
 
 
 if __name__ == "__main__":
