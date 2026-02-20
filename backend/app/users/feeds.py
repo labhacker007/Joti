@@ -736,3 +736,105 @@ async def get_feed_articles(
         "page": page,
         "limit": limit
     }
+
+
+# ─────────────────────────────────────────────────────
+# Scheduler-callable sync helper (no auth / no request context)
+# ─────────────────────────────────────────────────────
+
+def _ingest_user_feed_sync(db: Session, feed: UserFeed) -> int:
+    """
+    Synchronously ingest a single user feed.
+    Called by the background scheduler — does NOT require a request context.
+    Returns number of new articles created.
+    """
+    import hashlib
+    import feedparser
+    from app.models import Article
+    from app.core.fetch import safe_fetch_text_sync, FetchError as CoreFetchError
+    from app.core.ssrf import ssrf_policy_from_settings
+    from app.integrations.sources import _auto_analyze_article
+
+    logger.info("scheduler_user_feed_ingest_start", feed_id=feed.id, url=feed.url)
+    articles_created = 0
+
+    try:
+        policy = ssrf_policy_from_settings(enforce_allowlist=None)
+
+        if feed.feed_type == "html":
+            from app.ingestion.html_scraper import HTMLPageScraper
+            result = safe_fetch_text_sync(
+                feed.url, policy=policy,
+                headers={"User-Agent": "Jyoti Feed Reader/1.0"},
+                timeout_seconds=15.0, max_bytes=2_000_000,
+            )
+            scraper = HTMLPageScraper()
+            entries = scraper.extract_articles(result.text, feed.url)
+        else:
+            result = safe_fetch_text_sync(
+                feed.url, policy=policy,
+                headers={"User-Agent": "Jyoti Feed Reader/1.0"},
+                timeout_seconds=15.0, max_bytes=2_000_000,
+            )
+            parsed = feedparser.parse(result.text)
+            entries = []
+            for e in parsed.entries[:50]:
+                entries.append({
+                    "title": e.get("title", "Untitled"),
+                    "url": e.get("link", ""),
+                    "summary": e.get("summary", ""),
+                    "raw_content": e.get("content", [{}])[0].get("value", "") if e.get("content") else e.get("summary", ""),
+                    "published_at": None,
+                })
+
+        # Find or create a virtual FeedSource stub for this user feed
+        feed_source_stub = db.query(__import__('app.models', fromlist=['FeedSource']).FeedSource).filter_by(
+            url=feed.url
+        ).first()
+
+        for entry in entries:
+            content_hash = hashlib.sha256(
+                (entry.get("url", "") + entry.get("title", "")).encode()
+            ).hexdigest()
+            if db.query(Article).filter_by(content_hash=content_hash).first():
+                continue
+
+            from app.models import FeedSource
+            source = db.query(FeedSource).filter_by(url=feed.url).first()
+            if not source:
+                continue
+
+            article = Article(
+                source_id=source.id if source else None,
+                title=entry.get("title", "Untitled"),
+                url=entry.get("url", ""),
+                raw_content=entry.get("raw_content") or entry.get("summary", ""),
+                summary=str(entry.get("summary", ""))[:500] if entry.get("summary") else None,
+                content_hash=content_hash,
+                status="NEW",
+                published_at=entry.get("published_at"),
+                external_id=entry.get("url") or content_hash,
+            )
+            db.add(article)
+            db.flush()
+            try:
+                _auto_analyze_article(db=db, article=article, content=article.raw_content or "", source_url=feed.url)
+            except Exception:
+                pass
+            articles_created += 1
+
+        feed.last_fetched = datetime.utcnow()
+        feed.fetch_error = None
+        feed.article_count = (feed.article_count or 0) + articles_created
+        db.commit()
+        logger.info("scheduler_user_feed_ingest_done", feed_id=feed.id, new=articles_created)
+    except Exception as e:
+        feed.fetch_error = str(e)[:500]
+        feed.last_fetched = datetime.utcnow()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+        logger.warning("scheduler_user_feed_ingest_failed", feed_id=feed.id, error=str(e))
+
+    return articles_created

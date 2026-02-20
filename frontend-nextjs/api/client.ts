@@ -762,10 +762,14 @@ export const userFeedsAPI = {
   },
 
   /**
-   * Create new custom feed for current user
+   * Create new custom feed for current user.
+   * Skips synchronous URL validation (validate=false) to avoid blocking the
+   * request while the backend fetches the external feed URL — that fetch can
+   * take 15-30 s and causes a Network Error on the client. Feed validity is
+   * confirmed during the first background ingestion run instead.
    */
   createFeed: async (data: any) => {
-    return post('/users/feeds', data);
+    return post('/users/feeds', data, { params: { validate: false } });
   },
 
   /**
@@ -835,6 +839,12 @@ export const adminAPI = {
   },
   runSchedulerJob: async (jobId: string) => {
     return post(`/admin/scheduler/jobs/${jobId}/run`, {});
+  },
+  getSchedulerSettings: async () => {
+    return get('/admin/scheduler/settings');
+  },
+  updateSchedulerSettings: async (data: Record<string, any>) => {
+    return put('/admin/scheduler/settings', data);
   },
   getGuardrails: async () => {
     return get('/admin/genai-guardrails/guardrails/global');

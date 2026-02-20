@@ -28,8 +28,11 @@ import {
   Clock,
   XCircle,
   CheckCircle2,
+  Rss,
+  Sparkles,
+  Save,
 } from 'lucide-react';
-import { genaiAPI, connectorsAPI } from '@/api/client';
+import { genaiAPI, connectorsAPI, adminAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
 import { cn } from '@/lib/utils';
 
@@ -106,6 +109,27 @@ interface ExecutionLog {
   user_id?: number;
 }
 
+interface SchedulerSettings {
+  org_feed_poll_interval_minutes: number;
+  custom_feed_poll_interval_minutes: number;
+  custom_feed_enabled: boolean;
+  genai_summarize_enabled: boolean;
+  genai_summarize_interval_minutes: number;
+  genai_extract_enabled: boolean;
+  genai_extract_interval_minutes: number;
+}
+
+interface JobInfo {
+  enabled: boolean;
+  last_run: string | null;
+  next_run: string | null;
+  last_status: string;
+  last_message: string;
+  run_count: number;
+  interval_seconds: number;
+  description: string;
+}
+
 // Provider definitions
 const PROVIDER_DEFS: ProviderConfig[] = [
   {
@@ -163,7 +187,7 @@ export default function GenAIManagement() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'providers' | 'models' | 'functions' | 'ollama' | 'logs'>('providers');
+  const [activeTab, setActiveTab] = useState<'providers' | 'models' | 'functions' | 'ollama' | 'logs' | 'automation'>('providers');
 
   // Execution logs state
   const [executionLogs, setExecutionLogs] = useState<ExecutionLog[]>([]);
@@ -184,6 +208,20 @@ export default function GenAIManagement() {
   const [editingFunction, setEditingFunction] = useState<string | null>(null);
   const [functionEdits, setFunctionEdits] = useState<Record<string, { primary: string; secondary: string }>>({});
 
+  // Automation / scheduler states
+  const [schedulerSettings, setSchedulerSettings] = useState<SchedulerSettings>({
+    org_feed_poll_interval_minutes: 60,
+    custom_feed_poll_interval_minutes: 30,
+    custom_feed_enabled: true,
+    genai_summarize_enabled: false,
+    genai_summarize_interval_minutes: 60,
+    genai_extract_enabled: false,
+    genai_extract_interval_minutes: 120,
+  });
+  const [schedulerJobs, setSchedulerJobs] = useState<Record<string, JobInfo>>({});
+  const [savingAutomation, setSavingAutomation] = useState(false);
+  const [runningJob, setRunningJob] = useState<string | null>(null);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -192,6 +230,9 @@ export default function GenAIManagement() {
   useEffect(() => {
     if (activeTab === 'logs' && executionLogs.length === 0) {
       loadExecutionLogs();
+    }
+    if (activeTab === 'automation') {
+      loadAutomationSettings();
     }
   }, [activeTab]);
 
@@ -292,6 +333,48 @@ export default function GenAIManagement() {
       setError(getErrorMessage(err));
     } finally {
       setLogsLoading(false);
+    }
+  };
+
+  const loadAutomationSettings = async () => {
+    try {
+      const res = (await adminAPI.getSchedulerSettings()) as any;
+      const data = res?.data || res;
+      if (data?.settings) {
+        setSchedulerSettings((prev) => ({ ...prev, ...data.settings }));
+      }
+      if (data?.jobs) {
+        setSchedulerJobs(data.jobs);
+      }
+    } catch {
+      // Non-critical — keep defaults
+    }
+  };
+
+  const handleSaveAutomation = async () => {
+    try {
+      setSavingAutomation(true);
+      setError('');
+      await adminAPI.updateSchedulerSettings(schedulerSettings);
+      setSuccess('Automation settings saved and applied');
+      await loadAutomationSettings();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSavingAutomation(false);
+    }
+  };
+
+  const handleRunJob = async (jobId: string) => {
+    try {
+      setRunningJob(jobId);
+      await adminAPI.runSchedulerJob(jobId);
+      setSuccess(`Job "${jobId}" triggered`);
+      setTimeout(loadAutomationSettings, 2000);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setRunningJob(null);
     }
   };
 
@@ -488,6 +571,7 @@ export default function GenAIManagement() {
     { key: 'providers' as const, label: 'Providers', icon: Key },
     { key: 'models' as const, label: 'Models', icon: Brain },
     { key: 'functions' as const, label: 'Function Mapping', icon: ArrowRightLeft },
+    { key: 'automation' as const, label: 'Automation', icon: Settings },
     { key: 'ollama' as const, label: 'Ollama Library', icon: HardDrive },
     { key: 'logs' as const, label: 'Execution Logs', icon: ScrollText },
   ];
@@ -1264,6 +1348,229 @@ export default function GenAIManagement() {
               );
             })
           )}
+        </div>
+      )}
+
+      {/* ====== AUTOMATION TAB ====== */}
+      {activeTab === 'automation' && (
+        <div className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Configure how frequently feeds are polled and enable automated GenAI processing.
+            Changes are applied immediately to running jobs.
+          </p>
+
+          {/* ── Feed Polling ── */}
+          <div className="bg-card border border-border rounded-lg p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Rss className="w-5 h-5 text-primary" />
+              <h3 className="font-semibold text-foreground">Feed Polling Intervals</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              {/* Org Feeds */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Org Feeds — Poll Every
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={5}
+                    max={1440}
+                    value={schedulerSettings.org_feed_poll_interval_minutes}
+                    onChange={(e) => setSchedulerSettings((p) => ({ ...p, org_feed_poll_interval_minutes: parseInt(e.target.value) || 60 }))}
+                    className="w-24 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  <span className="text-sm text-muted-foreground">minutes</span>
+                </div>
+                {schedulerJobs['feed_ingestion'] && (
+                  <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+                    <div>Last run: {schedulerJobs['feed_ingestion'].last_run ? new Date(schedulerJobs['feed_ingestion'].last_run).toLocaleString() : '—'}</div>
+                    <div>Status: <span className={schedulerJobs['feed_ingestion'].last_status === 'success' ? 'text-green-500' : 'text-red-500'}>{schedulerJobs['feed_ingestion'].last_status || '—'}</span></div>
+                    <div>Runs: {schedulerJobs['feed_ingestion'].run_count}</div>
+                  </div>
+                )}
+                <button
+                  onClick={() => handleRunJob('feed_ingestion')}
+                  disabled={runningJob === 'feed_ingestion'}
+                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+                >
+                  {runningJob === 'feed_ingestion' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  Run Now
+                </button>
+              </div>
+
+              {/* Custom/Personal Feeds */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-foreground">
+                    Personal Feeds — Poll Every
+                  </label>
+                  <button
+                    onClick={() => setSchedulerSettings((p) => ({ ...p, custom_feed_enabled: !p.custom_feed_enabled }))}
+                    className={cn('relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none', schedulerSettings.custom_feed_enabled ? 'bg-green-500' : 'bg-muted')}
+                    title={schedulerSettings.custom_feed_enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                  >
+                    <span className={cn('inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform', schedulerSettings.custom_feed_enabled ? 'translate-x-5' : 'translate-x-0.5')} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={5}
+                    max={1440}
+                    value={schedulerSettings.custom_feed_poll_interval_minutes}
+                    onChange={(e) => setSchedulerSettings((p) => ({ ...p, custom_feed_poll_interval_minutes: parseInt(e.target.value) || 30 }))}
+                    disabled={!schedulerSettings.custom_feed_enabled}
+                    className="w-24 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+                  />
+                  <span className="text-sm text-muted-foreground">minutes</span>
+                </div>
+                {schedulerJobs['user_feed_ingestion'] && (
+                  <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+                    <div>Last run: {schedulerJobs['user_feed_ingestion'].last_run ? new Date(schedulerJobs['user_feed_ingestion'].last_run).toLocaleString() : '—'}</div>
+                    <div>Status: <span className={schedulerJobs['user_feed_ingestion'].last_status === 'success' ? 'text-green-500' : 'text-red-500'}>{schedulerJobs['user_feed_ingestion'].last_status || '—'}</span></div>
+                    <div>Runs: {schedulerJobs['user_feed_ingestion'].run_count}</div>
+                  </div>
+                )}
+                <button
+                  onClick={() => handleRunJob('user_feed_ingestion')}
+                  disabled={runningJob === 'user_feed_ingestion' || !schedulerSettings.custom_feed_enabled}
+                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+                >
+                  {runningJob === 'user_feed_ingestion' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  Run Now
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── GenAI Automation ── */}
+          <div className="bg-card border border-border rounded-lg p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <h3 className="font-semibold text-foreground">GenAI Automation</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Schedule automatic AI processing for articles that haven&apos;t been analyzed yet.
+              Processes in small batches to avoid overloading.
+            </p>
+
+            <div className="space-y-4">
+              {/* Auto Summarize */}
+              <div className="flex items-start justify-between p-4 bg-muted/30 rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Brain className="w-4 h-4 text-blue-500" />
+                    <span className="font-medium text-sm">Auto-Summarize New Articles</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Generates executive &amp; technical summaries for articles ingested without one.
+                    Processes up to 20 articles per run.
+                  </p>
+                  {schedulerJobs['genai_batch_summarize'] && (
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <div>Last run: {schedulerJobs['genai_batch_summarize'].last_run ? new Date(schedulerJobs['genai_batch_summarize'].last_run).toLocaleString() : '—'}</div>
+                      <div>Status: <span className={schedulerJobs['genai_batch_summarize'].last_status === 'success' ? 'text-green-500' : 'text-red-500'}>{schedulerJobs['genai_batch_summarize'].last_status || '—'}</span></div>
+                      <div>Last result: {schedulerJobs['genai_batch_summarize'].last_message || '—'}</div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-2 ml-4">
+                  <button
+                    onClick={() => setSchedulerSettings((p) => ({ ...p, genai_summarize_enabled: !p.genai_summarize_enabled }))}
+                    className={cn('relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none', schedulerSettings.genai_summarize_enabled ? 'bg-green-500' : 'bg-muted')}
+                    title={schedulerSettings.genai_summarize_enabled ? 'Enabled' : 'Disabled'}
+                  >
+                    <span className={cn('inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform', schedulerSettings.genai_summarize_enabled ? 'translate-x-5' : 'translate-x-0.5')} />
+                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                    <input
+                      type="number"
+                      min={15}
+                      max={1440}
+                      value={schedulerSettings.genai_summarize_interval_minutes}
+                      onChange={(e) => setSchedulerSettings((p) => ({ ...p, genai_summarize_interval_minutes: parseInt(e.target.value) || 60 }))}
+                      disabled={!schedulerSettings.genai_summarize_enabled}
+                      className="w-20 px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none disabled:opacity-50"
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                  </div>
+                  <button
+                    onClick={() => handleRunJob('genai_batch_summarize')}
+                    disabled={runningJob === 'genai_batch_summarize'}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs bg-secondary text-foreground rounded hover:bg-secondary/80 disabled:opacity-50"
+                  >
+                    {runningJob === 'genai_batch_summarize' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                    Run Now
+                  </button>
+                </div>
+              </div>
+
+              {/* Auto Extract */}
+              <div className="flex items-start justify-between p-4 bg-muted/30 rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap className="w-4 h-4 text-yellow-500" />
+                    <span className="font-medium text-sm">Auto-Extract IOCs &amp; TTPs</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Extracts IOCs and MITRE ATT&amp;CK TTPs from articles not yet analyzed.
+                    Processes up to 10 articles per run.
+                  </p>
+                  {schedulerJobs['genai_batch_extract'] && (
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <div>Last run: {schedulerJobs['genai_batch_extract'].last_run ? new Date(schedulerJobs['genai_batch_extract'].last_run).toLocaleString() : '—'}</div>
+                      <div>Status: <span className={schedulerJobs['genai_batch_extract'].last_status === 'success' ? 'text-green-500' : 'text-red-500'}>{schedulerJobs['genai_batch_extract'].last_status || '—'}</span></div>
+                      <div>Last result: {schedulerJobs['genai_batch_extract'].last_message || '—'}</div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-2 ml-4">
+                  <button
+                    onClick={() => setSchedulerSettings((p) => ({ ...p, genai_extract_enabled: !p.genai_extract_enabled }))}
+                    className={cn('relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none', schedulerSettings.genai_extract_enabled ? 'bg-green-500' : 'bg-muted')}
+                    title={schedulerSettings.genai_extract_enabled ? 'Enabled' : 'Disabled'}
+                  >
+                    <span className={cn('inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform', schedulerSettings.genai_extract_enabled ? 'translate-x-5' : 'translate-x-0.5')} />
+                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                    <input
+                      type="number"
+                      min={15}
+                      max={1440}
+                      value={schedulerSettings.genai_extract_interval_minutes}
+                      onChange={(e) => setSchedulerSettings((p) => ({ ...p, genai_extract_interval_minutes: parseInt(e.target.value) || 120 }))}
+                      disabled={!schedulerSettings.genai_extract_enabled}
+                      className="w-20 px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none disabled:opacity-50"
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                  </div>
+                  <button
+                    onClick={() => handleRunJob('genai_batch_extract')}
+                    disabled={runningJob === 'genai_batch_extract'}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs bg-secondary text-foreground rounded hover:bg-secondary/80 disabled:opacity-50"
+                  >
+                    {runningJob === 'genai_batch_extract' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                    Run Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handleSaveAutomation}
+              disabled={savingAutomation}
+              className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+            >
+              {savingAutomation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save & Apply
+            </button>
+          </div>
         </div>
       )}
     </div>

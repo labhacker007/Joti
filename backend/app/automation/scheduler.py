@@ -113,6 +113,28 @@ class FeedScheduler:
         self._jobs[job_id] = job
         logger.info(f"Scheduled job registered: {job_id} every {interval_seconds}s")
 
+    def update_interval(self, job_id: str, new_interval_seconds: int) -> bool:
+        """Update the interval of an existing job. Takes effect on next scheduled run."""
+        job = self._jobs.get(job_id)
+        if not job:
+            return False
+        job.interval_seconds = new_interval_seconds
+        # Reschedule next run from now
+        job.next_run = datetime.utcnow() + timedelta(seconds=new_interval_seconds)
+        logger.info(f"Job interval updated: {job_id} → {new_interval_seconds}s")
+        return True
+
+    def set_enabled(self, job_id: str, enabled: bool) -> bool:
+        """Enable or disable a job."""
+        job = self._jobs.get(job_id)
+        if not job:
+            return False
+        job.enabled = enabled
+        if enabled and job.next_run is None:
+            job.next_run = datetime.utcnow() + timedelta(seconds=job.interval_seconds)
+        logger.info(f"Job {'enabled' if enabled else 'disabled'}: {job_id}")
+        return True
+
     def remove_job(self, job_id: str):
         """Remove a job from the scheduler."""
         self._jobs.pop(job_id, None)
@@ -220,6 +242,99 @@ def run_feed_ingestion() -> str:
         db.close()
 
 
+def run_user_feed_ingestion() -> str:
+    """Ingest all active personal/custom user feeds."""
+    from app.core.database import SessionLocal
+    from app.models import UserFeed
+
+    db = SessionLocal()
+    try:
+        feeds = db.query(UserFeed).filter(
+            UserFeed.is_active == True,
+            UserFeed.auto_ingest == True,
+        ).all()
+
+        total_new = 0
+        errors = 0
+        for feed in feeds:
+            try:
+                from app.users.feeds import _ingest_user_feed_sync
+                new_count = _ingest_user_feed_sync(db, feed)
+                total_new += new_count or 0
+            except Exception as e:
+                errors += 1
+                logger.warning(f"User feed ingestion failed for feed {feed.id}: {e}")
+
+        return f"Ingested {len(feeds)} user feeds: {total_new} new articles, {errors} errors"
+    finally:
+        db.close()
+
+
+def run_genai_batch_summarize() -> str:
+    """Auto-summarize articles that were ingested without a summary."""
+    from app.core.database import SessionLocal
+    from app.models import Article
+
+    db = SessionLocal()
+    try:
+        from app.integrations.sources import _generate_article_summaries
+
+        articles = db.query(Article).filter(
+            Article.executive_summary == None,
+            Article.raw_content != None,
+        ).order_by(Article.created_at.desc()).limit(20).all()
+
+        processed = 0
+        errors = 0
+        for article in articles:
+            try:
+                content = article.normalized_content or article.raw_content or ""
+                if len(content) > 50:
+                    _generate_article_summaries(article, content, {})
+                    db.commit()
+                    processed += 1
+            except Exception as e:
+                errors += 1
+                db.rollback()
+                logger.warning(f"Batch summarize failed for article {article.id}: {e}")
+
+        return f"Summarized {processed} articles, {errors} errors"
+    finally:
+        db.close()
+
+
+def run_genai_batch_extract() -> str:
+    """Auto-extract IOCs/TTPs from articles that lack intelligence data."""
+    from app.core.database import SessionLocal
+    from app.models import Article, ArticleIntelligence
+
+    db = SessionLocal()
+    try:
+        from app.integrations.sources import _auto_analyze_article
+
+        analyzed_ids = db.query(ArticleIntelligence.article_id).distinct().subquery()
+        articles = db.query(Article).filter(
+            Article.id.notin_(analyzed_ids),
+            Article.raw_content != None,
+        ).order_by(Article.created_at.desc()).limit(10).all()
+
+        processed = 0
+        errors = 0
+        for article in articles:
+            try:
+                content = article.normalized_content or article.raw_content or ""
+                if len(content) > 100:
+                    _auto_analyze_article(db=db, article=article, content=content, source_url=article.url or "")
+                    processed += 1
+            except Exception as e:
+                errors += 1
+                logger.warning(f"Batch extraction failed for article {article.id}: {e}")
+
+        return f"Extracted intel from {processed} articles, {errors} errors"
+    finally:
+        db.close()
+
+
 def cleanup_old_logs() -> str:
     """Remove GenAI request logs older than 30 days."""
     from app.core.database import SessionLocal
@@ -246,20 +361,83 @@ def cleanup_old_logs() -> str:
 hunt_scheduler = FeedScheduler()
 
 
+def _load_scheduler_settings() -> Dict[str, Any]:
+    """Load scheduler intervals from SystemConfiguration DB at runtime."""
+    try:
+        from app.core.database import SessionLocal
+        from app.models import SystemConfiguration
+        db = SessionLocal()
+        try:
+            rows = db.query(SystemConfiguration).filter(
+                SystemConfiguration.category == "scheduler"
+            ).all()
+            settings_map: Dict[str, Any] = {}
+            for row in rows:
+                val = row.value
+                if row.value_type == "int":
+                    try:
+                        val = int(val)
+                    except (TypeError, ValueError):
+                        pass
+                elif row.value_type == "bool":
+                    val = str(val).lower() in ("true", "1", "yes")
+                settings_map[row.key] = val
+            return settings_map
+        finally:
+            db.close()
+    except Exception:
+        return {}
+
+
 def setup_scheduler(interval_minutes: int = 60) -> FeedScheduler:
     """
     Register all recurring jobs and return the scheduler (not yet started).
     Call scheduler.start() from the app lifespan to begin execution.
+    Reads per-job intervals from SystemConfiguration (category='scheduler').
     """
-    interval_seconds = interval_minutes * 60
+    s = _load_scheduler_settings()
+
+    org_interval = int(s.get("org_feed_poll_interval_minutes", interval_minutes)) * 60
+    custom_interval = int(s.get("custom_feed_poll_interval_minutes", 30)) * 60
 
     hunt_scheduler.add_job(
         job_id="feed_ingestion",
         func=run_feed_ingestion,
-        interval_seconds=interval_seconds,
-        description=f"Ingest all active feeds every {interval_minutes} min + auto-extract intelligence",
+        interval_seconds=org_interval,
+        description=f"Ingest all active org feeds (every {org_interval // 60} min) + auto-extract intelligence",
         run_on_start=True,
     )
+
+    hunt_scheduler.add_job(
+        job_id="user_feed_ingestion",
+        func=run_user_feed_ingestion,
+        interval_seconds=custom_interval,
+        description=f"Ingest all active personal/custom feeds (every {custom_interval // 60} min)",
+        run_on_start=True,
+    )
+    hunt_scheduler.get_job("user_feed_ingestion").enabled = s.get("custom_feed_enabled", True)
+
+    # GenAI automation jobs (disabled by default, admin can enable from UI)
+    genai_summarize_interval = int(s.get("genai_summarize_interval_minutes", 60)) * 60
+    genai_extract_interval = int(s.get("genai_extract_interval_minutes", 120)) * 60
+
+    hunt_scheduler.add_job(
+        job_id="genai_batch_summarize",
+        func=run_genai_batch_summarize,
+        interval_seconds=genai_summarize_interval,
+        description=f"Auto-summarize new articles without summaries (every {genai_summarize_interval // 60} min)",
+        run_on_start=False,
+    )
+    hunt_scheduler.get_job("genai_batch_summarize").enabled = bool(s.get("genai_summarize_enabled", False))
+
+    hunt_scheduler.add_job(
+        job_id="genai_batch_extract",
+        func=run_genai_batch_extract,
+        interval_seconds=genai_extract_interval,
+        description=f"Auto-extract IOCs/TTPs from new articles (every {genai_extract_interval // 60} min)",
+        run_on_start=False,
+    )
+    hunt_scheduler.get_job("genai_batch_extract").enabled = bool(s.get("genai_extract_enabled", False))
 
     hunt_scheduler.add_job(
         job_id="log_cleanup",

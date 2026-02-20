@@ -309,6 +309,137 @@ async def run_scheduler_job_now(
         raise HTTPException(status_code=500, detail=f"Failed to trigger job '{job_id}'")
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Scheduler Settings — interval configuration for all scheduled jobs
+# ─────────────────────────────────────────────────────────────────────────
+
+_SCHEDULER_SETTING_KEYS = {
+    "org_feed_poll_interval_minutes": {"default": 60, "label": "Org Feeds Poll Interval (min)", "type": "int"},
+    "custom_feed_poll_interval_minutes": {"default": 30, "label": "Custom Feeds Poll Interval (min)", "type": "int"},
+    "custom_feed_enabled": {"default": True, "label": "Custom Feed Auto-Ingest Enabled", "type": "bool"},
+    "genai_summarize_enabled": {"default": False, "label": "GenAI Auto-Summarize Enabled", "type": "bool"},
+    "genai_summarize_interval_minutes": {"default": 60, "label": "GenAI Auto-Summarize Interval (min)", "type": "int"},
+    "genai_extract_enabled": {"default": False, "label": "GenAI Auto-Extract Enabled", "type": "bool"},
+    "genai_extract_interval_minutes": {"default": 120, "label": "GenAI Auto-Extract Interval (min)", "type": "int"},
+}
+
+
+@router.get("/scheduler/settings")
+async def get_scheduler_settings(
+    current_user: User = Depends(require_permission(MANAGE_CONNECTORS)),
+    db: Session = Depends(get_db),
+):
+    """Return current automation scheduler settings including poll intervals and GenAI automation flags."""
+    settings_map: dict = {}
+    rows = db.query(SystemConfiguration).filter(
+        SystemConfiguration.category == "scheduler"
+    ).all()
+    db_values = {r.key: r.value for r in rows}
+
+    for key, meta in _SCHEDULER_SETTING_KEYS.items():
+        raw = db_values.get(key)
+        if raw is None:
+            settings_map[key] = meta["default"]
+        elif meta["type"] == "int":
+            try:
+                settings_map[key] = int(raw)
+            except (ValueError, TypeError):
+                settings_map[key] = meta["default"]
+        elif meta["type"] == "bool":
+            settings_map[key] = str(raw).lower() in ("true", "1", "yes")
+        else:
+            settings_map[key] = raw
+
+    # Attach live job info from scheduler
+    jobs_info = {}
+    for job in hunt_scheduler.get_jobs():
+        jobs_info[job["job_id"]] = {
+            "enabled": job.get("enabled", True),
+            "last_run": job.get("last_run"),
+            "next_run": job.get("next_run"),
+            "last_status": job.get("last_status"),
+            "last_message": job.get("last_message"),
+            "run_count": job.get("run_count", 0),
+            "interval_seconds": job.get("interval_seconds"),
+            "description": job.get("description"),
+        }
+
+    return {"settings": settings_map, "jobs": jobs_info}
+
+
+@router.put("/scheduler/settings")
+async def update_scheduler_settings(
+    data: dict,
+    current_user: User = Depends(require_permission(MANAGE_CONNECTORS)),
+    db: Session = Depends(get_db),
+):
+    """Update automation scheduler settings. Immediately applies interval changes to running jobs."""
+    from app.models import AuditEventType
+    from app.audit.manager import AuditManager
+
+    updated = {}
+    for key, meta in _SCHEDULER_SETTING_KEYS.items():
+        if key not in data:
+            continue
+        raw_value = data[key]
+        if meta["type"] == "int":
+            try:
+                raw_value = int(raw_value)
+            except (ValueError, TypeError):
+                continue
+        elif meta["type"] == "bool":
+            raw_value = bool(raw_value)
+
+        row = db.query(SystemConfiguration).filter(
+            SystemConfiguration.category == "scheduler",
+            SystemConfiguration.key == key,
+        ).first()
+        if row:
+            row.value = str(raw_value).lower() if isinstance(raw_value, bool) else str(raw_value)
+            row.updated_by = current_user.id
+        else:
+            row = SystemConfiguration(
+                category="scheduler",
+                key=key,
+                value=str(raw_value).lower() if isinstance(raw_value, bool) else str(raw_value),
+                value_type=meta["type"],
+                description=meta["label"],
+                updated_by=current_user.id,
+            )
+            db.add(row)
+        updated[key] = raw_value
+
+    db.commit()
+
+    # Apply interval changes to live scheduler immediately
+    if "org_feed_poll_interval_minutes" in updated:
+        hunt_scheduler.update_interval("feed_ingestion", int(updated["org_feed_poll_interval_minutes"]) * 60)
+    if "custom_feed_poll_interval_minutes" in updated:
+        hunt_scheduler.update_interval("user_feed_ingestion", int(updated["custom_feed_poll_interval_minutes"]) * 60)
+    if "custom_feed_enabled" in updated:
+        hunt_scheduler.set_enabled("user_feed_ingestion", bool(updated["custom_feed_enabled"]))
+    if "genai_summarize_enabled" in updated:
+        hunt_scheduler.set_enabled("genai_batch_summarize", bool(updated["genai_summarize_enabled"]))
+    if "genai_summarize_interval_minutes" in updated:
+        hunt_scheduler.update_interval("genai_batch_summarize", int(updated["genai_summarize_interval_minutes"]) * 60)
+    if "genai_extract_enabled" in updated:
+        hunt_scheduler.set_enabled("genai_batch_extract", bool(updated["genai_extract_enabled"]))
+    if "genai_extract_interval_minutes" in updated:
+        hunt_scheduler.update_interval("genai_batch_extract", int(updated["genai_extract_interval_minutes"]) * 60)
+
+    AuditManager.log_event(
+        db=db,
+        event_type=AuditEventType.ADMIN_ACTION,
+        action="scheduler_settings_updated",
+        user_id=current_user.id,
+        resource_type="scheduler",
+        resource_id=None,
+        details={"updated_keys": list(updated.keys())},
+    )
+
+    return {"success": True, "updated": updated}
+
+
 @router.get("/health")
 async def admin_health_check(
     db: Session = Depends(get_db),
