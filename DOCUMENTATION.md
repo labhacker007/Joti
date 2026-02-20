@@ -35,11 +35,14 @@
 
 J.O.T.I is an enterprise-grade **Threat Intelligence Platform (TIP)** designed for SOC teams, threat analysts, and incident responders. It combines:
 
-- **Feed Aggregation** — RSS/Atom ingestion from 20+ curated threat intelligence sources
-- **Automated IOC Extraction** — regex + GenAI-powered extraction of 8+ indicator types
-- **MITRE ATT&CK Mapping** — automatic technique and tactic identification
+- **Feed Aggregation** — RSS/Atom ingestion from 230+ curated threat intelligence sources across 15+ categories
+- **Automated IOC Extraction** — regex + GenAI-powered extraction of 12+ indicator types with source domain filtering
+- **MITRE ATT&CK / ATLAS Mapping** — accurate lookup-based tactic/technique identification (695+ ATT&CK, 42 ATLAS)
+- **Threat Actor Profiles** — alias resolution (Scattered Spider = UNC3944 = Roasted 0ktapus), GenAI enrichment, TTPs/tools/sectors per actor
 - **Hunt Query Generation** — AI-generated queries for XSIAM, Defender, Splunk, Wiz
+- **Intel Ingestion** — document upload (PDF/Word/CSV) + feed URL ingestion with GenAI extraction
 - **Multi-Model GenAI** — OpenAI, Claude, Gemini, Ollama for analysis and summarization
+- **GenAI Security** — 51 attack protections across 11 categories (prompt injection, jailbreaking, token smuggling, etc.)
 - **Connector Framework** — extensible integration layer for SIEMs, EDRs, and enrichment platforms
 - **Enterprise Auth** — JWT, OAuth 2.0, SAML/SSO, TOTP/MFA
 - **Full RBAC** — 6 roles, 12 canonical permissions, per-user overrides
@@ -104,7 +107,7 @@ J.O.T.I is an enterprise-grade **Threat Intelligence Platform (TIP)** designed f
 ┌─────────────────────┐         ┌────────────────────┐
 │   PostgreSQL 15     │         │      Redis 7        │
 │                     │         │                     │
-│  44+ ORM Models     │         │  Session Cache      │
+│  45+ ORM Models     │         │  Session Cache      │
 │  Articles           │         │  Rate Limit State   │
 │  IOCs               │         │  Token Blacklist    │
 │  Hunt Queries       │         │  Feed Dedup Cache   │
@@ -121,17 +124,19 @@ J.O.T.I is an enterprise-grade **Threat Intelligence Platform (TIP)** designed f
 main.py
   ├── auth/           JWT · OAuth · SAML · TOTP · RBAC
   ├── articles/       CRUD · Bookmarks · Reports · Summarization · Analytics
-  ├── extraction/     IOC/IOA/TTP Extraction (regex + GenAI)
-  ├── ingestion/      RSS/Atom Parser · Background Scheduler
+  ├── extraction/     IOC/IOA/TTP/ATLAS Extraction (regex + GenAI) · mitre_data.py
+  ├── ingestion/      RSS/Atom Parser · Document Ingestor · Background Scheduler
   ├── genai/          Multi-provider Service · Testing · Quotas · Models
+  ├── guardrails/     51-attack GenAI Security Catalog · Validation Engine
+  ├── threat_actors/  Profile CRUD · Alias Resolution · GenAI Enrichment
   ├── integrations/   Feed Sources · Refresh Settings · Connectors
   ├── watchlist/      Global + Personal Keywords · Article Matching
   ├── users/          User CRUD · Preferences · Custom Feeds · Permissions
   ├── audit/          Event Logger · Middleware · Log Viewer
-  ├── admin/          Settings · RBAC · Prompts · Guardrails · Ollama
+  ├── admin/          Settings · RBAC · Prompts · Guardrails · Ollama · Skills
   ├── knowledge/      Document CRUD · Semantic Search Chunks
   ├── notifications/  Email · Slack · ServiceNow
-  ├── automation/     APScheduler · Feed Ingestion Jobs
+  ├── automation/     Thread-based FeedScheduler · Feed Ingestion · Log Cleanup
   └── core/           Config · DB · Logging · Rate Limiting · SSRF · Crypto
 ```
 
@@ -213,6 +218,9 @@ User ─────────────────────────
   ▼                                                     │
 FeedSource ──────▶ Article ──────▶ ExtractedIntelligence│
                       │                  (IOC/TTP/TA)   │
+                      │                  (sync) ▼        │
+                      │          ThreatActorProfile      │
+                      │          (aliases, TTPs, tools)  │
                       │                                  │
                       ├──▶ ArticleIOC ◀────── IOC        │
                       │                                  │
@@ -294,7 +302,7 @@ is_builtin, is_active, is_beta
 
 ## 5. API Reference
 
-### Summary Table (180+ endpoints across 20 routers)
+### Summary Table (190+ endpoints across 22 routers)
 
 | Router | Prefix | Endpoints | Permission Required |
 |---|---|---|---|
@@ -307,6 +315,7 @@ is_builtin, is_active, is_beta
 | Sources | `/sources` | 10 | `sources:read` / `sources:manage` |
 | Refresh Settings | `/refresh-settings` | 14 | `sources:read` |
 | Watchlist | `/watchlist` | 10 | `watchlist:read` / `watchlist:manage` |
+| **Threat Actors** | `/threat-actors` | **7** | `articles:read` / `articles:analyze` |
 | Users | `/users` | 11 | `users:manage` |
 | Audit | `/audit` | 3 | `audit:read` |
 | Admin Core | `/admin` | 40+ | `users:manage` / `admin:*` |
@@ -376,10 +385,11 @@ For each active FeedSource where next_fetch <= now:
 - Per-source refresh intervals (5 min to 24 hours)
 - High-fidelity flag triggers automatic deep analysis
 - User-level source preferences (override refresh interval)
-- 20+ default curated TI feeds (CISA, BleepingComputer, SANS ISC, Dark Reading, SecurityWeek, etc.)
+- **230 default curated TI feeds** across 15+ categories (government CERTs, vendor TI, ISACs, vulnerability research, media, podcasts)
 - Manual "ingest now" trigger via API
-- Custom document upload (PDF, HTML, text)
-- External URL fetch on demand
+- **Intel Ingestion Panel**: document upload (PDF, Word, Excel, CSV, HTML, TXT — 50 MB max) with GenAI extraction
+- Feed/URL ingestion from the Intel Ingestion panel — adds source and triggers continuous ingestion
+- Thread-based `FeedScheduler` daemon: starts on launch, configurable via `FEED_REFRESH_INTERVAL_MINUTES`
 
 ---
 
@@ -504,14 +514,30 @@ GenAI Unified Service
 - Guardrails: post-generation validation rules
 - Execution logs: every call tracked with tokens, latency, status
 
-**Guardrail Types:**
+**Guardrail Types (7 checks, 51 attack patterns):**
 ```
-regex_blocklist  → Block responses matching patterns
-keyword_blocklist → Block specific words/phrases
-length_check     → Min/max response length
-json_format      → Enforce JSON output structure
-toxicity_check   → Block harmful content
+regex_blocklist      → Block responses matching patterns
+keyword_blocklist    → Block specific words/phrases
+length_check         → Min/max response length
+json_format          → Enforce JSON output structure
+toxicity_check       → Block harmful content
+prompt_injection     → Detect 6 injection attack patterns (catalog-backed)
+token_smuggling      → Unicode homoglyphs, zero-width chars
+encoding_attacks     → Base64, ROT13, URL encoding, punycode
+ioc_grounding        → Validate IOCs are grounded in source text (output-side)
+mitre_id_validity    → Verify MITRE IDs exist in lookup table (output-side)
 ```
+
+**Security Catalog (genai_attack_catalog.py):**
+- 51 attacks across 11 categories pre-catalogued
+- Each attack: id, name, description, severity, detection regex patterns
+- `seed-catalog` admin endpoint pre-populates guardrails DB from catalog
+- Bulk export/import: download all guardrails as JSON, re-import on new instances
+
+**Ollama Docker Config:**
+- Defaults to `http://host.docker.internal:11434` — connects to Ollama running on the Docker host
+- Avoids `localhost:11434` container loopback issue
+- In-app Ollama wizard: model library browser, pull-by-name, connection test
 
 **Usage Quotas:**
 - Per-user daily/monthly token limits
@@ -531,7 +557,71 @@ toxicity_check   → Block harmful content
 
 ---
 
-### 6.5 RBAC & Authentication
+### 6.5 Threat Actor Profiles
+
+**Sync flow:**
+```
+POST /api/threat-actors/sync
+    │
+    ▼
+Query all ExtractedIntelligence WHERE type = THREAT_ACTOR
+    │
+    ▼
+For each intel item:
+    primary_name = get_primary_name(item.value)
+        uses KNOWN_ALIASES dict (20+ actor groups hardcoded)
+        e.g. "Roasted 0ktapus" → "Scattered Spider"
+             "Forest Blizzard" → "APT28"
+    │
+    ▼
+Group by primary_name → aggregate article_ids, aliases, dates
+    │
+    ▼
+For each group:
+    if ThreatActorProfile exists:
+        update article_count, last_seen, merge aliases
+    else:
+        create new ThreatActorProfile
+    │
+    ▼
+db.commit() → return synced count
+```
+
+**GenAI enrichment flow:**
+```
+POST /api/threat-actors/enrich/{id}
+    │
+    ▼
+Build prompt: "You are a TI analyst. Provide structured intelligence
+               about the threat actor: '{actor.name}'. Return JSON with:
+               aliases, description, origin_country, motivation,
+               actor_type, target_sectors, ttps, tools, confidence"
+    │
+    ▼
+GenAI call via unified service (uses configured extraction model)
+    │
+    ▼
+Parse JSON response → apply to profile (non-destructive: only fill empty fields)
+    │
+    ▼
+Update: last_enriched_at, enrichment_source="genai", genai_confidence
+db.commit()
+```
+
+**Key endpoints:**
+```
+GET    /api/threat-actors/          → list (search, actor_type, is_active filters)
+GET    /api/threat-actors/{id}      → single profile
+PATCH  /api/threat-actors/{id}      → update profile fields
+DELETE /api/threat-actors/{id}      → delete profile
+POST   /api/threat-actors/sync      → sync from ExtractedIntelligence
+POST   /api/threat-actors/enrich/{id} → GenAI enrichment
+GET    /api/threat-actors/{id}/intelligence → all intel items by name + aliases
+```
+
+---
+
+### 6.6 RBAC & Authentication
 
 **Permission Model:**
 
@@ -833,10 +923,11 @@ FEED_MANAGEMENT, SEARCH
 
 ### `/admin/guardrails` — Guardrail Rules
 - Guardrail list by function
-- Rule types: regex_blocklist, keyword_blocklist, length_check, json_format, toxicity_check
+- Rule types: regex_blocklist, keyword_blocklist, length_check, json_format, toxicity_check, prompt_injection, token_smuggling, encoding_attacks
 - Toggle per guardrail, edit rule expression
 - Test guardrail against sample text
-- Global guardrails (apply to all functions)
+- **Export all** → download JSON | **Import** → upload JSON file (skip/overwrite by name)
+- **Seed Catalog** → one-click populate from 51-attack security catalog
 
 ### `/admin/connectors` — Connector Registry
 - Platform list with category icons
@@ -974,7 +1065,49 @@ Sets preferred model for this function
 Applies guardrail: "block_non_json_output"
 ```
 
-### Workflow 4: New User Onboarding
+### Workflow 4: Threat Actor Profiling
+
+```
+Articles ingested over time
+    │
+    ▼
+ExtractedIntelligence records created with type=THREAT_ACTOR
+    e.g. "Scattered Spider" appears in 12 articles
+         "UNC3944" appears in 3 articles (same group)
+    │
+    ▼
+Analyst clicks "Sync from Intel" in Threat Intelligence Center → Threat Actors
+    │
+    ▼
+/api/threat-actors/sync
+    resolves "UNC3944" → "Scattered Spider" (canonical name)
+    creates ThreatActorProfile: name="Scattered Spider", aliases=["UNC3944","Roasted 0ktapus",...]
+    article_count=15, first_seen=..., last_seen=...
+    │
+    ▼
+Analyst clicks "Enrich with GenAI" on Scattered Spider card
+    │
+    ▼
+GenAI returns: origin=US, motivation=financial, actor_type=cybercriminal,
+               target_sectors=[finance, telecom, retail]
+               ttps=[T1078, T1621, T1110.003, T1566.001]
+               tools=[VIDAR, DARKGATE, AITM phishing kit]
+    │
+    ▼
+Profile updated: description, sectors, TTPs, tools, genai_confidence=87
+    │
+    ▼
+Analyst expands profile card → sees all aliases, TTPs (orange tags),
+tools (yellow tags), target sectors (red tags)
+    │
+    ▼
+Click "Copy Intel" → clipboard gets all associated IOCs with confidence scores
+    │
+    ▼
+Analyst pastes into hunt or report
+```
+
+### Workflow 5: New User Onboarding
 
 ```
 Admin creates user → POST /users {email, role: ANALYST}
@@ -1160,17 +1293,11 @@ docker compose up -d backend
 - Store enrichment results in IOC.metadata JSON field
 - Display in drawer: "IP: 1.2.3.4 — VirusTotal: 45/72 detections, GreyNoise: Malicious"
 
-#### 1.3 Threat Actor Profiles
-**Gap**: Threat actors are extracted as text strings but no structured profiles exist.
+#### 1.3 Threat Actor Profiles ✅ DONE
 
-**What best platforms do**: Mandiant Advantage has structured actor profiles with TTPs, targets, tools, history, attribution confidence.
+**Built**: Full `ThreatActorProfile` model with alias resolution (20+ actor groups), GenAI enrichment, and rich 7-panel UI card view. See [Section 6.5](#65-threat-actor-profiles).
 
-**Implementation**:
-- Knowledge base documents of type `ACTOR` (model already exists)
-- Auto-link extracted `THREAT_ACTOR` intelligence to actor profiles
-- Actor profile page: aliases, associated TTPs, targeted sectors, active timeframe, tools used
-- "Articles mentioning this actor" backlink
-- MISP galaxy integration for actor data import
+**Next enhancement**: MISP galaxy integration for actor data import, IOC enrichment pipeline to populate actor infrastructure automatically.
 
 #### 1.4 Trend Analysis & Threat Landscape Dashboard
 **Gap**: No time-series analysis. No way to see "CVE mentions spiking this week."

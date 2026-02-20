@@ -1,331 +1,301 @@
-# Threat Intelligence Platform
+# J.O.T.I — Threat Intelligence Platform
 
-A modular, enterprise-grade threat intelligence ingestion, analysis, and hunting platform built with FastAPI, React, and PostgreSQL.
+> **J.O.T.I** (Jyoti Open Threat Intelligence) is an enterprise-grade Threat Intelligence Platform (TIP) for SOC teams, threat analysts, and incident responders. It aggregates 230+ curated threat intelligence feeds, extracts IOCs/TTPs/threat actors with GenAI, maps to MITRE ATT&CK and ATLAS, and generates hunt queries across XSIAM, Defender, Splunk, and Wiz — all in one unified workspace.
 
-## Overview
+**License**: PolyForm Noncommercial 1.0.0 (community/non-commercial use only)
 
-This platform enables security teams to:
-- 📰 **Ingest** threat intelligence from RSS/Atom feeds and normalize content
-- 🔍 **Analyze** articles with state-machine triage workflow
-- 🧠 **Extract** IOCs, IOAs, MITRE ATT&CK TTPs using GenAI
-- 🎯 **Hunt** threats across XSIAM, Microsoft Defender, and Wiz platforms
-- 📊 **Report** and share findings with stakeholders
-- 🔐 **Audit** all activities with role-based access control (RBAC)
+---
+
+## What It Does
+
+| Capability | Description |
+|------------|-------------|
+| **Feed Aggregation** | 230+ curated RSS/Atom feeds across 15+ categories — government advisories, vendor TI, ISAC feeds, dark web trackers, and more |
+| **Intel Extraction** | Dual pipeline (regex + GenAI): extracts IOCs (12 types), MITRE ATT&CK TTPs, MITRE ATLAS techniques, threat actors, and CVEs from every article |
+| **Threat Actor Profiles** | Rich actor profiles with alias resolution (Scattered Spider = UNC3944 = Roasted 0ktapus), TTPs, tools, target sectors, origin country — built from extracted intel and enriched by GenAI |
+| **MITRE Heatmaps** | Full ATT&CK Enterprise heatmap (695+ techniques) and MITRE ATLAS heatmap (42 AI-specific techniques) — accurate lookup-based tactic mapping |
+| **Hunt Query Generation** | AI-generated queries for Palo Alto XSIAM (XQL), Microsoft Defender (KQL), Splunk (SPL), and Wiz (GraphQL) |
+| **Cross-Source Correlation** | Finds IOCs appearing in multiple articles, clusters related articles by shared indicators to surface coordinated campaigns |
+| **AI Threat Landscape** | On-demand AI briefs across 8 focus areas: Ransomware, APT, Vulnerabilities, Phishing, Supply Chain, Cloud, Malware, Full Landscape |
+| **Intel Ingestion** | Upload PDFs, Word docs, CSVs, HTML files for GenAI-powered extraction; add feed URLs for continuous ingestion |
+| **GenAI Security** | 51 attack protections across 11 categories — prompt injection, jailbreaking, token smuggling, encoding attacks, hallucination detection, payload embedding |
+| **Enterprise Auth** | JWT + OAuth 2.0 (Google/Microsoft) + SAML 2.0 (Okta/Azure AD/ADFS) + TOTP/MFA |
+| **RBAC** | 12 canonical permissions, 6 roles (Admin, Analyst, Engineer, Manager, Executive, Viewer), per-user overrides |
+| **Audit Logging** | 20+ event types, immutable append-only log, full correlation IDs |
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Docker + Docker Compose
+- 4 GB RAM minimum
+
+### Start the Platform
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/your-org/joti.git
+cd joti
+
+# 2. Set admin credentials (required)
+export ADMIN_EMAIL="admin@yourcompany.com"
+export ADMIN_PASSWORD="YourSecurePassword123!"
+
+# 3. Start all services
+docker-compose up -d
+
+# 4. Access the platform
+# Frontend:  http://localhost:3000
+# API Docs:  http://localhost:8000/docs
+# Health:    http://localhost:8000/health
+```
+
+The database is **auto-seeded** on first launch — admin user and 230+ feed sources are created automatically. The background scheduler starts ingesting articles immediately.
+
+### Environment Variables
+
+Copy and edit the environment file:
+
+```bash
+cp .env.docker .env
+```
+
+Key variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ADMIN_EMAIL` | ✅ | Initial admin account email |
+| `ADMIN_PASSWORD` | ✅ | Initial admin password (min 12 chars) |
+| `SECRET_KEY` | ✅ | JWT signing key — change before production |
+| `DATABASE_URL` | auto | PostgreSQL connection string |
+| `REDIS_URL` | auto | Redis connection string |
+| `OPENAI_API_KEY` | optional | OpenAI API key for GPT-4 |
+| `ANTHROPIC_API_KEY` | optional | Claude API key |
+| `GEMINI_API_KEY` | optional | Google Gemini API key |
+| `OLLAMA_BASE_URL` | optional | Ollama endpoint (default: `http://host.docker.internal:11434`) |
+| `CORS_ORIGINS` | auto | Allowed frontend origins |
+
+### Add a GenAI Provider
+
+Navigate to **Admin → AI Engine → Provider Setup** and configure one of:
+- **OpenAI**: Paste your `OPENAI_API_KEY`
+- **Claude**: Paste your `ANTHROPIC_API_KEY`
+- **Gemini**: Paste your `GEMINI_API_KEY`
+- **Ollama** (free, local): Uses the Ollama setup wizard — click "Test Connection", browse model library, pull a model
+
+---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    React Frontend (3000)                 │
-├─────────────────────────────────────────────────────────┤
-│         FastAPI Backend (8000) - Core Services           │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  Auth/RBAC │ Audit │ Articles │ Hunts │ Reports  │   │
-│  └──────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────┤
-│  PostgreSQL (5432) │ Redis (6379) │ GenAI Provider      │
-└─────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                  Next.js 15 Frontend  :3000                    │
+│  Feeds · Threat Intel Center · Admin · Reports · Knowledge Base│
+└────────────────────────────┬───────────────────────────────────┘
+                             │ REST API
+┌────────────────────────────▼───────────────────────────────────┐
+│                FastAPI Backend  :8000                          │
+│                                                                │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐  │
+│  │ Articles │ │ Ingestion│ │Extraction│ │  Threat Actors   │  │
+│  │  + Hunts │ │ Scheduler│ │IOC/TTP/TA│ │  + Alias Resolve │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘  │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐  │
+│  │  GenAI   │ │Guardrails│ │   RBAC   │ │  Audit + Reports │  │
+│  │ Multi-LLM│ │ 51 checks│ │ 12 perms │ │  Admin Analytics │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘  │
+└──────────┬──────────────────────────┬──────────────────────────┘
+           │                          │
+┌──────────▼──────────┐  ┌───────────▼───────────┐
+│  PostgreSQL  :5432  │  │   Redis  :6379         │
+│  45+ ORM models     │  │  Sessions, Rate Limits │
+│  Alembic migrations │  │  Dedup cache           │
+└─────────────────────┘  └───────────────────────┘
 ```
 
-## Quick Start
+---
 
-### Local Development with Docker
+## Key Workflows
+
+### 1. Article Triage
+```
+Feed Scheduler (hourly)
+  → Fetch RSS/Atom from 230+ sources
+  → Parse & deduplicate (SHA-256)
+  → Match against watchlist keywords
+  → Auto-flag high-priority matches
+  → Auto-extract IOCs/TTPs for high-fidelity sources
+```
+
+### 2. Intelligence Extraction
+```
+Article selected for analysis
+  → Regex pipeline (fast, reliable)
+  → GenAI pipeline (context-aware, deep)
+      • Source domain filtering (never extract publisher domain as IOC)
+      • Anti-hallucination: only extract explicitly mentioned indicators
+  → Store in ExtractedIntelligence with confidence + evidence
+  → Map TTPs → MITRE ATT&CK or ATLAS tactic/technique
+```
+
+### 3. Threat Actor Profiling
+```
+Threat actors extracted from articles
+  → Sync: group by canonical name (alias resolution)
+      e.g. "Scattered Spider" = "UNC3944" = "Roasted 0ktapus" = "Muddled Libra"
+  → Create/update ThreatActorProfile with article count
+  → Enrich with GenAI: aliases, origin, motivation, TTPs, tools, target sectors
+```
+
+### 4. Hunt Query Generation
+```
+Article contains extracted IOCs + TTPs
+  → AI generates platform-specific queries
+  → XSIAM (XQL) · Defender (KQL) · Splunk (SPL) · Wiz (GraphQL)
+  → Analyst reviews, edits, executes
+  → Results tracked with finding notes
+```
+
+---
+
+## Platform Structure
+
+```
+/
+├── backend/                     # FastAPI (Python 3.11)
+│   ├── app/
+│   │   ├── main.py              # App entry, middleware, router registration
+│   │   ├── models.py            # 45+ SQLAlchemy ORM models
+│   │   ├── seeds.py             # DB seeder (admin + 230 feed sources)
+│   │   ├── articles/            # Article CRUD, bookmarks, reports, summarization
+│   │   ├── admin/               # Admin panel: sources, guardrails, prompts, skills
+│   │   ├── audit/               # Audit logging (20+ event types)
+│   │   ├── auth/                # JWT, OAuth, SAML, RBAC (12 permissions)
+│   │   ├── automation/          # Feed scheduler (thread-based daemon)
+│   │   ├── extraction/          # IOC/TTP/ATLAS extraction + mitre_data.py
+│   │   ├── genai/               # Multi-model service (OpenAI/Claude/Gemini/Ollama)
+│   │   ├── guardrails/          # 51-attack GenAI security catalog
+│   │   ├── ingestion/           # RSS/Atom parser + document ingestor
+│   │   ├── threat_actors/       # Threat actor profiles + alias resolution
+│   │   ├── users/               # User management, feeds, watchlist
+│   │   └── watchlist/           # Keyword watchlists
+│   ├── migrations/              # Alembic (021 versions)
+│   └── tests/                   # pytest (17 test files)
+│
+├── frontend-nextjs/             # Next.js 15 (TypeScript)
+│   ├── app/
+│   │   ├── (auth)/              # Login, register, SSO callback
+│   │   └── (protected)/         # All authenticated pages
+│   ├── components/              # Shared UI components
+│   ├── views/                   # Full page views
+│   │   ├── Feeds.tsx            # Article feed with sidebar filter
+│   │   ├── ThreatIntelligence.tsx  # 7-panel TI Center
+│   │   └── ...
+│   ├── api/client.ts            # Axios API client (all endpoints)
+│   └── store/                   # Zustand state stores
+│
+├── config/
+│   └── seed-sources.json        # 230 curated feed sources
+│
+├── docker-compose.yml           # 4 services: backend, frontend, postgres, redis
+└── .env.docker                  # Default environment variables
+```
+
+---
+
+## Common Commands
 
 ```bash
-# Clone and navigate
-cd threat-intel-platform
-
 # Start all services
-docker compose up -d
-
-# Access services
-# Frontend: http://localhost:3000
-# Backend: http://localhost:8000
-# API Docs: http://localhost:8000/docs
-```
-
-### Create Initial Admin User
-
-Set environment variables before starting the application:
-
-```bash
-# Required for admin user creation (minimum 12 characters)
-export ADMIN_PASSWORD="YourSecurePassword123!"
-export ADMIN_EMAIL="admin@yourcompany.com"
-
-# Then start the application
 docker-compose up -d
+
+# Rebuild after code changes
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
+
+# Run backend tests
+docker-compose exec backend pytest -q
+
+# Run Alembic migrations
+docker-compose exec backend alembic upgrade head
+
+# Seed database manually (if needed)
+curl -X POST http://localhost:8000/setup/seed
+
+# Stop everything
+docker-compose down
+
+# Full clean rebuild (resets DB)
+docker-compose down -v && docker-compose up -d --build
 ```
 
-### Create Additional Users
-
-Use the Admin panel in the web UI or the API:
+### Local Development (without Docker)
 
 ```bash
-# Via API (after logging in as admin)
-curl -X POST http://localhost:8000/users/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "analyst@example.com",
-    "username": "analyst",
-    "password": "SecurePassword123!",
-    "role": "TI",
-    "full_name": "Security Analyst"
-  }'
+# Backend
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Frontend
+cd frontend-nextjs
+npm install
+npm run dev
 ```
 
-## Key Features
+---
 
-✅ **Article Ingestion & Triage**
-- RSS/Atom feed parser with deduplication
-- Article normalization & sanitization
-- State machine: NEW → TRIAGED → IN_ANALYSIS → REVIEWED → REPORTED/ARCHIVED
-- High-priority watchlist filtering
+## Ports
 
-✅ **GenAI-Powered Intelligence Extraction**
-- Automatic IOC/IOA/TTP extraction using OpenAI GPT-4
-- Versioned prompt templates
-- MITRE ATT&CK mapping
-- Confidence scoring
+| Port | Service | URL |
+|------|---------|-----|
+| 3000 | Frontend (Next.js) | http://localhost:3000 |
+| 8000 | Backend (FastAPI) | http://localhost:8000 |
+| 8000 | Swagger API Docs | http://localhost:8000/docs |
+| 8000 | Health check | http://localhost:8000/health |
+| 8000 | Prometheus metrics | http://localhost:8000/metrics |
 
-✅ **Threat Hunting**
-- Generate platform-specific hunt queries (XSIAM, Defender, Wiz)
-- Manual & automated hunt execution
-- Execution audit trail
-- Results tracking
+---
 
-✅ **Reports & Sharing**
-- Executive, technical, comprehensive report templates
-- Email & Slack distribution (configurable)
-- Analyst marks as REPORTED
+## API Overview
 
-✅ **Enterprise Security**
-- JWT + SAML SSO (Okta/Azure AD/ADFS)
-- Role-based access control (RBAC): Admin, TI, TH, IR, Viewer
-- Time-based OTP optional
-- Append-only audit logs with correlation IDs
-- Rate limiting (planned)
+All endpoints are under the `/api` prefix. Full interactive docs at `/docs`.
 
-## API Documentation
+| Router | Prefix | Key Endpoints |
+|--------|--------|---------------|
+| Auth | `/api/auth` | login, register, logout, refresh, me |
+| Articles | `/api/articles` | CRUD, triage, status, intelligence, summarize |
+| Sources | `/api/sources` | CRUD, ingest-now, refresh settings |
+| Intelligence | `/api/articles/intelligence` | list, summary, MITRE matrix, correlation, landscape |
+| Threat Actors | `/api/threat-actors` | CRUD, sync, enrich, get-intelligence |
+| Hunt Queries | `/api/hunts` | generate, list, execute, executions |
+| Users | `/api/users` | CRUD, feeds, watchlist, categories |
+| Admin | `/api/admin` | sources, guardrails, prompts, skills, analytics |
+| GenAI | `/api/genai` | providers, models, functions, logs, quotas |
+| Audit | `/api/audit` | logs with filtering |
+| Reports | `/api/articles/reports` | generate PDF/DOCX |
+| Watchlist | `/api/watchlist` | keywords, categories |
 
-After starting Docker:
-```
-http://localhost:8000/docs
-```
+---
 
-### Preview docs locally
+## Security Notes
 
-If you want to render `docs/API.md` to HTML locally, you can either use the `tools` container (no host installs needed) or install tools locally.
+- Change `SECRET_KEY` before any production deployment
+- `ADMIN_PASSWORD` must be at least 12 characters
+- CORS wildcard (`*`) is blocked — always set explicit `CORS_ORIGINS`
+- SSRF protection: feed URLs are checked against private IP ranges
+- All connector API keys are AES-encrypted at rest
+- Rate limiting via Redis on all API endpoints
+- Append-only audit log — no delete or update operations
 
-- Use the Docker-based tools container (recommended):
-
-```bash
-# Build the tools image (only needed once)
-docker compose build tools
-
-# Start a tools container in the background
-docker compose up -d tools
-
-# Exec into the container
-docker compose exec tools bash
-
-# Inside container: install markdownlint CLI (optional)
-npm install -g markdownlint-cli
-
-# Lint markdown
-markdownlint "docs/**/*.md"
-
-# Render API.md to HTML (output written into repository .artifacts so host can open it)
-mkdir -p .artifacts && pandoc docs/API.md -s -o .artifacts/API-preview.html
-# exit container and open the preview on macOS
-exit
-open .artifacts/API-preview.html
-```
-
-- Or install locally with Homebrew:
-
-```bash
-brew install pandoc node
-npx markdownlint-cli "docs/**/*.md"
-pandoc docs/API.md -s -o /tmp/API-Preview.html
-open /tmp/API-Preview.html
-```
-
-- If you prefer not to install tools locally, push a branch/PR to GitHub; the repository's `markdown-preview` workflow will render `docs/API.md` and upload an HTML artifact named `api-doc-preview`.
-
-### Run frontend tests in Docker
-
-To run frontend unit tests (without installing Node on the host):
-
-```bash
-# Build and start tools container (has node/pandoc)
-docker compose build tools && docker compose up -d tools
-
-# Install frontend deps and run tests inside the container
-docker compose exec tools bash -lc "cd frontend && npm ci && npm test -- --watchAll=false"
-```
-
-### Run Playwright E2E (in container)
-
-Playwright requires browser tooling; run it in the tools container (may require installing Playwright browsers once):
-
-```bash
-docker compose exec tools bash
-cd frontend
-npm ci
-npx playwright install
-npm run build
-# serve build and run playwright tests (or run playwright against your running dev frontend)
-npx http-server ./build -p 3000 -c-1 &
-npx playwright test
-```
-
-This approach avoids changing your host environment and keeps test tooling containerized.
-
-### Main Endpoints
-
-**Auth**
-- `POST /auth/register` - Register user
-- `POST /auth/login` - Login with MFA optional
-- `GET /auth/me` - Current user info
-
-**Articles**
-- `GET /articles/triage` - Triage queue (paginated)
-- `GET /articles/{id}` - Article details + intelligence
-- `PATCH /articles/{id}/status` - Update status
-- `PATCH /articles/{id}/analysis` - Add summaries
-
-**Hunts**
-- `POST /hunts/generate` - Generate query from article
-- `POST /hunts/{id}/execute` - Run hunt on platform
-- `GET /hunts/{id}/executions` - Execution history
-
-**Reports**
-- `POST /reports/` - Generate from articles
-- `GET /reports/{id}` - Retrieve report
-- `POST /reports/{id}/share` - Share via email
-
-**Sources**
-- `GET /sources/` - List feed sources
-- `POST /sources/` - Add new source
-- `POST /sources/{id}/ingest` - Manual trigger
-
-## Environment Configuration
-
-```bash
-cp backend/.env.example backend/.env
-# Edit .env with your credentials:
-# - OPENAI_API_KEY
-# - XSIAM_API_KEY / DEFENDER_CLIENT_SECRET / WIZ_CLIENT_SECRET
-# - SLACK_BOT_TOKEN
-# - SAML_METADATA_URL (if using SSO)
-```
-
-### MyFeeds Docker Environment
-
-1. Copy `.env.myfeeds.example` to `.env.myfeeds` and adjust the secrets/URLs for the MyFeeds fork.
-2. Ensure `BACKEND_PORT` and `FRONTEND_PORT` are set in `.env.myfeeds` (defaults are `18000` and `13000`).
-3. Start the MyFeeds stack so it runs alongside the default setup:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.myfeeds.yml --env-file .env.myfeeds up -d
-```
-
-4. Backend: `http://localhost:18000`, Frontend: `http://localhost:13000`.
-5. To stop it: `docker compose -f docker-compose.yml -f docker-compose.myfeeds.yml --env-file .env.myfeeds down`.
-
-## Deployment
-
-### Docker Local
-```bash
-docker-compose -f infra/docker-compose.yml up -d
-```
-
-### Kubernetes
-```bash
-kubectl apply -f infra/namespace.yaml
-kubectl apply -f infra/k8s-manifests.yaml
-```
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions.
-
-## Security
-
-- **Threat Model**: See [docs/SECURITY.md](docs/SECURITY.md)
-- **Secrets Management**: Use `.env` locally, K8s secrets in prod
-- **Input Validation**: Pydantic + HTML sanitization (Bleach)
-- **SSRF Prevention**: Domain allowlists per feed source
-- **Audit Trail**: Immutable logging to PostgreSQL
-
-## Development
-
-```bash
-# Run backend tests (inside container)
-docker-compose -f infra/docker-compose.yml exec backend pytest -q
-
-# Run frontend unit tests (locally)
-cd frontend && npm ci && npm test -- --watchAll=false
-
-# Run frontend Playwright E2E locally
-cd frontend && npm ci && npm run playwright:install && npm run build
-# serve the build in the background and run tests
-npx http-server ./build -p 3000 -c-1 &
-cd frontend && npx playwright test
-
-# Logs
-docker-compose -f infra/docker-compose.yml logs -f backend
-
-# Database migrations
-docker-compose -f infra/docker-compose.yml exec backend alembic upgrade head
-```
-
-**CI**
-- Backend tests run in `.github/workflows/ci.yml` on push/PR. This job runs a Python matrix and uploads coverage (requires `CODECOV_TOKEN` secret to publish to Codecov).
-- Playwright E2E run in `.github/workflows/e2e.yml` on push/PR.
-
-
-## Project Structure
-
-```
-backend/           # FastAPI application
-  ├── app/
-  │   ├── auth/            # Authentication & RBAC
-  │   ├── articles/        # Article APIs
-  │   ├── hunts/           # Hunt generation & execution
-  │   ├── ingestion/       # Feed parsing
-  │   ├── extraction/      # IOC/TTP extraction
-  │   ├── genai/           # GenAI orchestration
-  │   ├── reports/         # Report generation
-  │   ├── notifications/   # Email/Slack
-  │   ├── audit/           # Audit logging
-  │   └── core/            # Config, DB, logging
-  └── migrations/          # Alembic DB versions
-
-frontend/          # React application
-  └── src/
-      ├── api/             # API client
-      ├── pages/           # React components
-      └── store/           # Zustand state
-
-infra/
-  ├── docker-compose.yml   # Local dev
-  ├── Dockerfile.*         # Multi-stage builds
-  ├── k8s-manifests.yaml   # Kubernetes
-  └── namespace.yaml
-
-config/
-  └── seed-sources.json    # Default feeds
-```
-
-## Support & Contributing
-
-- **Issues**: File on GitHub
-- **Questions**: Check docs/
-- **Security**: Report privately to security team
+---
 
 ## License
 
-**PolyForm Noncommercial 1.0.0** - Community use only. Commercial sale prohibited.
+**PolyForm Noncommercial 1.0.0** — Free for community and non-commercial use. Commercial sale or SaaS deployment prohibited.
 
 See [LICENSE](LICENSE).
