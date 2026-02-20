@@ -8,7 +8,8 @@ import {
   Trash2, Check, X, Database, Radar, Brain, BarChart3, Grid3X3,
   Info, ArrowRight, Zap, Settings, Activity, Clock, Bug, Server, Lock, Layers,
 } from 'lucide-react';
-import { articlesAPI } from '@/api/client';
+import { articlesAPI, userFeedsAPI, sourcesAPI } from '@/api/client';
+import FileUploadDropzone from '@/components/FileUploadDropzone';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import ArticleDetailDrawer from '@/components/ArticleDetailDrawer';
 
@@ -66,7 +67,17 @@ interface CorrelationData {
   total_clusters: number;
 }
 
-type PanelType = 'command_center' | 'ioc_explorer' | 'mitre_matrix' | 'threat_actors' | 'correlation' | 'ai_analysis';
+interface UploadResult {
+  status: 'success' | 'error' | 'duplicate';
+  filename: string;
+  message: string;
+  articleTitle?: string;
+  executiveSummary?: string;
+  iocCount?: number;
+  ttpCount?: number;
+}
+
+type PanelType = 'command_center' | 'ioc_explorer' | 'mitre_matrix' | 'threat_actors' | 'correlation' | 'ai_analysis' | 'intel_ingestion';
 type TimeRange = '24h' | '7d' | '30d' | '90d' | 'all';
 type SourceCategory = 'all' | 'open_source' | 'external' | 'internal';
 
@@ -116,6 +127,7 @@ const PANELS: { key: PanelType; label: string; icon: React.ComponentType<{ class
   { key: 'threat_actors', label: 'Threat Actors', icon: Users },
   { key: 'correlation', label: 'Correlation', icon: Link2 },
   { key: 'ai_analysis', label: 'AI Analysis', icon: Brain },
+  { key: 'intel_ingestion', label: 'Intel Ingestion', icon: Upload },
 ];
 
 const MITRE_TACTIC_ORDER = [
@@ -187,6 +199,14 @@ export default function ThreatIntelligence() {
   // Manual IOC form
   const [manualForm, setManualForm] = useState({ value: '', intelligence_type: 'IOC', ioc_type: 'ip', confidence: 70, evidence: '', notes: '' });
   const [importText, setImportText] = useState('');
+
+  // Intel Ingestion state
+  const [uploading, setUploading] = useState(false);
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
+  const [ingestUrl, setIngestUrl] = useState('');
+  const [ingestTitle, setIngestTitle] = useState('');
+  const [ingestFeedType, setIngestFeedType] = useState('rss');
+  const [ingesting, setIngesting] = useState(false);
 
   // Refs
   const mitreFramework = useRef<'attack' | 'atlas'>('attack');
@@ -377,6 +397,69 @@ export default function ThreatIntelligence() {
       setError(err?.response?.data?.detail || 'Bulk import failed');
     } finally {
       setLoadingKey('import', false);
+    }
+  };
+
+  // ---- Intel Ingestion handlers ----
+
+  const handleFilesSelected = async (files: File[]) => {
+    setUploading(true);
+    const results: UploadResult[] = [];
+    for (const file of files) {
+      try {
+        const response = (await userFeedsAPI.uploadDocument(file, { title: file.name })) as any;
+        const data = response.data || response;
+        results.push({
+          status: data.status === 'duplicate' ? 'duplicate' : 'success',
+          filename: file.name,
+          message: data.message || 'Document ingested successfully',
+          articleTitle: data.article_title,
+          executiveSummary: data.executive_summary,
+          iocCount: data.ioc_count || 0,
+          ttpCount: data.ttp_count || 0,
+        });
+      } catch (err: any) {
+        results.push({
+          status: 'error',
+          filename: file.name,
+          message: err.response?.data?.detail || err.message || 'Failed to process document',
+        });
+      }
+    }
+    setUploadResults(prev => [...results, ...prev].slice(0, 50));
+    setUploading(false);
+    fetchSummary();
+    fetchItems(1);
+  };
+
+  const handleIngestUrl = async () => {
+    if (!ingestUrl.trim()) return;
+    setIngesting(true);
+    try {
+      const response = (await sourcesAPI.createSource({
+        name: ingestTitle || ingestUrl,
+        url: ingestUrl,
+        feed_type: ingestFeedType,
+        auto_ingest: true,
+      })) as any;
+      const data = response.data || response;
+      setUploadResults(prev => [{
+        status: 'success',
+        filename: ingestTitle || ingestUrl,
+        message: `Feed added and ingestion triggered. Source ID: ${data.id || 'created'}`,
+        iocCount: 0,
+        ttpCount: 0,
+      }, ...prev].slice(0, 50));
+      setIngestUrl('');
+      setIngestTitle('');
+    } catch (err: any) {
+      setUploadResults(prev => [{
+        status: 'error',
+        filename: ingestTitle || ingestUrl,
+        message: err.response?.data?.detail || err.message || 'Failed to add feed',
+      }, ...prev].slice(0, 50));
+    } finally {
+      setIngesting(false);
     }
   };
 
@@ -1269,6 +1352,176 @@ export default function ThreatIntelligence() {
           ) : (
             <EmptyState message="No analysis generated yet"
               sub="Choose a focus area above to generate a targeted AI threat brief, or click Generate for a full landscape overview" />
+          )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PANEL 7: INTEL INGESTION                                     */}
+      {/* ============================================================ */}
+      {activePanel === 'intel_ingestion' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Upload className="w-4 h-4 text-primary" /> Intelligence Ingestion Hub
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Upload documents, add feeds, or paste URLs. GenAI extracts IOCs, TTPs, and threat actors automatically.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* LEFT: Document Upload */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b border-border pb-2">
+                <FileText className="w-4 h-4 text-primary" />
+                <h4 className="text-xs font-semibold text-foreground">Upload Documents</h4>
+                <span className="text-[10px] text-muted-foreground ml-auto">PDF, Word, Excel, CSV, HTML, TXT — 50MB max</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Upload threat reports, intel bulletins, IOC lists, or research documents.
+                GenAI will read each file like a TI researcher — extracting all indicators,
+                TTPs, and threat actor mentions into searchable intelligence.
+              </p>
+              <FileUploadDropzone
+                onFilesSelected={handleFilesSelected}
+                accept=".pdf,.docx,.doc,.xlsx,.csv,.html,.htm,.txt"
+                maxSize={50 * 1024 * 1024}
+                maxFiles={5}
+                disabled={uploading}
+              />
+              {uploading && (
+                <div className="p-3 bg-blue-500/10 text-blue-700 rounded-lg flex items-center gap-2 text-xs">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing documents with GenAI — extracting IOCs, TTPs, threat actors...
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT: Feed / URL Ingestion */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b border-border pb-2">
+                <Globe className="w-4 h-4 text-primary" />
+                <h4 className="text-xs font-semibold text-foreground">Ingest Feed or URL</h4>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Add an RSS/Atom feed or a webpage URL. Joti will fetch, parse, and extract intelligence continuously.
+              </p>
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'rss', label: 'RSS Feed' },
+                    { value: 'atom', label: 'Atom Feed' },
+                    { value: 'website', label: 'Webpage' },
+                  ].map(ft => (
+                    <button key={ft.value} onClick={() => setIngestFeedType(ft.value)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors text-center',
+                        ingestFeedType === ft.value
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted text-foreground border-border hover:border-primary/50'
+                      )}>
+                      {ft.label}
+                    </button>
+                  ))}
+                </div>
+                <input type="url" value={ingestUrl} onChange={e => setIngestUrl(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleIngestUrl()}
+                  placeholder={ingestFeedType === 'website' ? 'https://example.com/threat-intel' : 'https://example.com/rss.xml'}
+                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                <input type="text" value={ingestTitle} onChange={e => setIngestTitle(e.target.value)}
+                  placeholder="Feed name (optional)"
+                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                <button onClick={handleIngestUrl} disabled={ingesting || !ingestUrl.trim()}
+                  className="w-full px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2">
+                  {ingesting ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</> : <><Plus className="w-4 h-4" /> Add &amp; Ingest</>}
+                </button>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 space-y-1.5">
+                <p className="text-[10px] font-semibold text-foreground">Supported Sources</p>
+                {[
+                  'CISA, MITRE, US-CERT advisories',
+                  'Vendor blogs (Microsoft, CrowdStrike, Mandiant)',
+                  'IOC feeds (Abuse.ch, URLhaus, OTX)',
+                  'Any RSS/Atom cybersecurity feed',
+                ].map((tip, i) => (
+                  <p key={i} className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                    <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" /> {tip}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Ingestion History */}
+          {uploadResults.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-foreground flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-primary" /> Ingestion History
+                </h4>
+                <button onClick={() => setUploadResults([])}
+                  className="text-[10px] text-muted-foreground hover:text-foreground">Clear</button>
+              </div>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {uploadResults.map((result, i) => (
+                  <div key={i} className={cn(
+                    'p-3 rounded-lg border text-sm',
+                    result.status === 'success' ? 'bg-green-500/5 border-green-500/30'
+                      : result.status === 'duplicate' ? 'bg-amber-500/5 border-amber-500/30'
+                        : 'bg-red-500/5 border-red-500/30'
+                  )}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-foreground text-xs truncate max-w-xs">
+                        {result.articleTitle || result.filename}
+                      </span>
+                      <div className="flex gap-2 flex-shrink-0">
+                        {(result.iocCount ?? 0) > 0 && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-red-700 flex items-center gap-1">
+                            <Shield className="w-3 h-3" /> {result.iocCount} IOCs
+                          </span>
+                        )}
+                        {(result.ttpCount ?? 0) > 0 && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-orange-500/10 text-orange-700 flex items-center gap-1">
+                            <Crosshair className="w-3 h-3" /> {result.ttpCount} TTPs
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className={cn('text-[10px] mt-0.5',
+                      result.status === 'success' ? 'text-green-600'
+                        : result.status === 'duplicate' ? 'text-amber-600' : 'text-red-600'
+                    )}>{result.message}</p>
+                    {result.executiveSummary && (
+                      <p className="text-[10px] text-muted-foreground mt-1 italic line-clamp-2">{result.executiveSummary}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Info box when no history */}
+          {uploadResults.length === 0 && (
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
+              <p className="text-xs font-semibold text-foreground mb-1 flex items-center gap-2">
+                <Info className="w-3.5 h-3.5 text-blue-500" /> How GenAI Processes Your Documents
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                {[
+                  { icon: FileText, label: 'Reads Full Content', desc: 'Parses PDF, Word, Excel, CSV, HTML and plain text completely' },
+                  { icon: Brain, label: 'GenAI Extraction', desc: 'Extracts IOCs (12 types), MITRE TTPs, threat actors, CVEs, and infrastructure' },
+                  { icon: Database, label: 'Searchable Intel', desc: 'Stored as intelligence articles — searchable by IOC, TTP, actor, or filename' },
+                ].map(({ icon: Icon, label, desc }) => (
+                  <div key={label} className="text-center p-2">
+                    <Icon className="w-5 h-5 text-blue-500 mx-auto mb-1.5" />
+                    <p className="text-[11px] font-medium text-foreground">{label}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

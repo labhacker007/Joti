@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
   Bookmark,
@@ -28,8 +28,6 @@ import { formatRelativeTime, cn } from '@/lib/utils';
 import { Pagination } from '@/components/Pagination';
 import { isSafeExternalUrl } from '@/utils/url';
 import ArticleDetailDrawer from '@/components/ArticleDetailDrawer';
-import FileUploadDropzone from '@/components/FileUploadDropzone';
-
 interface Article {
   id: string;
   title: string;
@@ -53,16 +51,6 @@ interface Counts {
   total: number;
   unread: number;
   watchlist_matches: number;
-}
-
-interface UploadResult {
-  status: 'success' | 'error' | 'duplicate';
-  filename: string;
-  message: string;
-  articleTitle?: string;
-  executiveSummary?: string;
-  iocCount?: number;
-  ttpCount?: number;
 }
 
 const TIME_RANGES = [
@@ -111,6 +99,7 @@ function getSourceFavicon(sourceUrl?: string): string | null {
 
 export default function Feeds() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -124,9 +113,12 @@ export default function Feeds() {
   const [viewMode, setViewMode] = useState<'list' | 'card'>('list');
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   
-  // Get source/feed filter from URL params
-  const [sourceFilter, setSourceFilter] = useState<number | null>(null);
-  const [userFeedFilter, setUserFeedFilter] = useState<number | null>(null);
+  // Get source/feed filter reactively from URL params
+  const sourceFilterParam = searchParams.get('source_id');
+  const userFeedFilterParam = searchParams.get('user_feed_id');
+  const sourceFilter = sourceFilterParam ? parseInt(sourceFilterParam) : null;
+  const userFeedFilter = userFeedFilterParam ? parseInt(userFeedFilterParam) : null;
+  const [activeSourceName, setActiveSourceName] = useState<string | null>(null);
 
   // Add Feed state
   const [showAddFeed, setShowAddFeed] = useState(false);
@@ -134,11 +126,6 @@ export default function Feeds() {
   const [newFeedName, setNewFeedName] = useState('');
   const [newFeedType, setNewFeedType] = useState('rss');
   const [addingFeed, setAddingFeed] = useState(false);
-
-  // Upload state
-  const [showUpload, setShowUpload] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
 
   // Refresh state
   const [refreshing, setRefreshing] = useState(false);
@@ -172,16 +159,36 @@ export default function Feeds() {
     fetchQuote();
   }, []);
 
-  // Read URL params for source/feed filtering
+  // Reset to page 1 and load source name when source filter changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const sourceId = params.get('source_id');
-      const userFeedId = params.get('user_feed_id');
-      setSourceFilter(sourceId ? parseInt(sourceId) : null);
-      setUserFeedFilter(userFeedId ? parseInt(userFeedId) : null);
-    }
-  }, []);
+    setCurrentPage(1);
+    if (viewMode === 'card') { setArticles([]); setHasMore(true); }
+
+    // Fetch source name for active filter
+    const loadSourceName = async () => {
+      if (sourceFilter) {
+        try {
+          const res = (await sourcesAPI.getSource(String(sourceFilter))) as any;
+          const data = res?.data || res;
+          setActiveSourceName(data?.name || `Source #${sourceFilter}`);
+        } catch {
+          setActiveSourceName(`Source #${sourceFilter}`);
+        }
+      } else if (userFeedFilter) {
+        try {
+          const res = (await userFeedsAPI.getMyFeeds()) as any;
+          const feeds = res?.data || res || [];
+          const feed = feeds.find((f: any) => String(f.id) === String(userFeedFilter));
+          setActiveSourceName(feed?.name || `Feed #${userFeedFilter}`);
+        } catch {
+          setActiveSourceName(`Feed #${userFeedFilter}`);
+        }
+      } else {
+        setActiveSourceName(null);
+      }
+    };
+    loadSourceName();
+  }, [sourceFilter, userFeedFilter]);
 
   // Track previous page to detect "load more" vs "new filter"
   const prevPageRef = useRef(currentPage);
@@ -322,35 +329,6 @@ export default function Feeds() {
     }
   };
 
-  const handleFilesSelected = async (files: File[]) => {
-    setUploading(true);
-    const results: UploadResult[] = [];
-    for (const file of files) {
-      try {
-        const response = (await userFeedsAPI.uploadDocument(file, {
-          title: file.name,
-        })) as any;
-        const data = response.data || response;
-        results.push({
-          status: data.status === 'duplicate' ? 'duplicate' : 'success',
-          filename: file.name,
-          message: data.message || 'Document ingested successfully',
-          articleTitle: data.article_title,
-          executiveSummary: data.executive_summary,
-          iocCount: data.ioc_count || 0,
-          ttpCount: data.ttp_count || 0,
-        });
-      } catch (err: any) {
-        const detail =
-          err.response?.data?.detail || err.message || 'Failed to process document';
-        results.push({ status: 'error', filename: file.name, message: detail });
-      }
-    }
-    setUploadResults((prev) => [...results, ...prev]);
-    setUploading(false);
-    fetchArticles();
-  };
-
   const markAllAsRead = async () => {
     try {
       await articlesAPI.markAllAsRead();
@@ -480,14 +458,6 @@ export default function Feeds() {
             Add Feed
           </button>
           <button
-            onClick={() => { setShowUpload(true); setShowAddFeed(false); }}
-            className="px-3 py-1.5 bg-secondary text-secondary-foreground rounded-lg text-xs font-medium hover:bg-secondary/80 flex items-center gap-1.5"
-            title="Upload document for analysis"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            Upload
-          </button>
-          <button
             onClick={() => router.push('/watchlist')}
             className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-xs font-medium hover:bg-accent flex items-center gap-1.5 border border-border"
             title="Watchlist keywords"
@@ -606,79 +576,21 @@ export default function Feeds() {
         </div>
       )}
 
-      {/* Upload Document Modal Overlay */}
-      {showUpload && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => { setShowUpload(false); setUploadResults([]); }} />
-          <div className="relative bg-card border border-border rounded-xl p-5 shadow-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-foreground">Upload Document</h3>
-            <button onClick={() => { setShowUpload(false); setUploadResults([]); }} className="p-1 hover:bg-muted rounded">
-              <X className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            Upload PDFs, Word docs, Excel sheets, or text files. GenAI will extract IOCs, TTPs, and generate summaries.
-          </p>
-          <FileUploadDropzone
-            onFilesSelected={handleFilesSelected}
-            accept=".pdf,.docx,.doc,.xlsx,.csv,.html,.htm,.txt"
-            maxSize={50 * 1024 * 1024}
-            maxFiles={5}
-            disabled={uploading}
-          />
-          {uploading && (
-            <div className="mt-3 p-3 bg-blue-500/10 text-blue-700 rounded-md flex items-center gap-2 text-sm">
-              <Loader className="w-4 h-4 animate-spin" />
-              Processing documents...
-            </div>
-          )}
-          {uploadResults.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {uploadResults.map((result, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'p-3 rounded-md border text-sm',
-                    result.status === 'success'
-                      ? 'bg-green-500/5 border-green-500/30'
-                      : result.status === 'duplicate'
-                        ? 'bg-amber-500/5 border-amber-500/30'
-                        : 'bg-red-500/5 border-red-500/30'
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-foreground">
-                      {result.articleTitle || result.filename}
-                    </span>
-                    <div className="flex gap-2">
-                      {(result.iocCount ?? 0) > 0 && (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-700 flex items-center gap-1">
-                          <Shield className="w-3 h-3" />
-                          {result.iocCount} IOCs
-                        </span>
-                      )}
-                      {(result.ttpCount ?? 0) > 0 && (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-500/10 text-orange-700 flex items-center gap-1">
-                          <Brain className="w-3 h-3" />
-                          {result.ttpCount} TTPs
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <p className={`text-xs mt-1 ${
-                    result.status === 'success' ? 'text-green-600' : result.status === 'duplicate' ? 'text-amber-600' : 'text-red-600'
-                  }`}>
-                    {result.message}
-                  </p>
-                  {result.executiveSummary && (
-                    <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{result.executiveSummary}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          </div>
+      {/* Active source filter banner */}
+      {activeSourceName && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 border border-primary/20 rounded-lg text-xs">
+          <Globe className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+          <span className="text-foreground">
+            Showing: <strong>{activeSourceName}</strong>
+          </span>
+          <span className="text-muted-foreground ml-1">— other filters (unread, watchlist, time) still apply</span>
+          <button
+            onClick={() => router.push('/feeds')}
+            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+          >
+            <X className="w-3 h-3" />
+            Clear
+          </button>
         </div>
       )}
 

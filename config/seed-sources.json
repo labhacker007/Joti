@@ -202,5 +202,29 @@
 
   {"name": "Hacking Articles", "url": "https://www.hackingarticles.in/feed/", "feed_type": "rss", "description": "Penetration testing tutorials and offensive security research"},
   {"name": "PentesterLab Blog", "url": "https://pentesterlab.com/blog/feed", "feed_type": "rss", "description": "Web penetration testing techniques and vulnerability research"},
-  {"name": "OffSec Blog", "url": "https://www.offsec.com/blog/feed/", "feed_type": "rss", "description": "Offensive security training and research from Offensive Security"}
+  {"name": "OffSec Blog", "url": "https://www.offsec.com/blog/feed/", "feed_type": "rss", "description": "Offensive security training and research from Offensive Security"},
+
+  {"name": "Google TAG Blog", "url": "https://blog.google/threat-analysis-group/rss/", "feed_type": "rss", "description": "Government-backed hacking and zero-day research from Google TAG"},
+  {"name": "GitHub Security Lab", "url": "https://securitylab.github.com/feed.xml", "feed_type": "rss", "description": "CodeQL vulnerability research and supply chain security from GitHub"},
+  {"name": "Snyk Vulnerability DB", "url": "https://security.snyk.io/rss.xml", "feed_type": "rss", "description": "Open source vulnerability database from Snyk"},
+  {"name": "CERT/CC Notes", "url": "https://www.kb.cert.org/vuls/atomfeed/", "feed_type": "atom", "description": "Vulnerability notes database from CERT Coordination Center"},
+  {"name": "VulDB Recent Vulnerabilities", "url": "https://vuldb.com/?rss.recent", "feed_type": "rss", "description": "Recent vulnerability disclosures from VulDB"},
+  {"name": "Full Disclosure Mailing List", "url": "https://seclists.org/rss/fulldisclosure.rss", "feed_type": "rss", "description": "Full disclosure security vulnerability announcements"},
+  {"name": "Bugtraq Mailing List", "url": "https://seclists.org/rss/bugtraq.rss", "feed_type": "rss", "description": "Bugtraq security vulnerability discussion and disclosure"},
+  {"name": "Eclypsium Blog", "url": "https://eclypsium.com/blog/feed/", "feed_type": "rss", "description": "Firmware and supply chain security research from Eclypsium"},
+  {"name": "Quarkslab Blog", "url": "https://blog.quarkslab.com/feeds/all.atom.xml", "feed_type": "atom", "description": "Reverse engineering and vulnerability research from Quarkslab"},
+  {"name": "NCC Group Research Blog", "url": "https://research.nccgroup.com/feed/", "feed_type": "rss", "description": "Security research and technical advisories from NCC Group"},
+  {"name": "Volexity Blog", "url": "https://www.volexity.com/blog/feed/", "feed_type": "rss", "description": "Memory forensics and incident response intelligence from Volexity"},
+  {"name": "Sysdig Threat Research", "url": "https://sysdig.com/blog/category/threat-research/feed/", "feed_type": "rss", "description": "Container and cloud security threat research from Sysdig"},
+  {"name": "CISA Known Exploited Vulnerabilities", "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json", "feed_type": "website", "description": "CISA KEV catalog of actively exploited vulnerabilities"},
+  {"name": "NSA Cybersecurity Advisories", "url": "https://www.nsa.gov/Press-Room/Cybersecurity-Advisories-Guidance/rss/", "feed_type": "rss", "description": "NSA joint cybersecurity advisories and technical guidance"},
+  {"name": "Permiso Security Blog", "url": "https://permiso.io/blog/s/feed/", "feed_type": "rss", "description": "Cloud identity threat research from Permiso"},
+  {"name": "NCSC Technical Guidance", "url": "https://www.ncsc.gov.uk/api/1/services/v1/guidance-rss-feed.xml", "feed_type": "rss", "description": "UK NCSC technical guidance and best practice"},
+  {"name": "ENISA Threat Landscape", "url": "https://www.enisa.europa.eu/topics/threat-risk-management/threats-and-trends/rss", "feed_type": "rss", "description": "EU threat landscape reports from ENISA"},
+  {"name": "INTERPOL Cybercrime News", "url": "https://www.interpol.int/en/News-and-Events/News/category/Cybercrime/rss", "feed_type": "rss", "description": "Cybercrime news and operations from INTERPOL"},
+  {"name": "Cado Security Blog", "url": "https://www.cadosecurity.com/blog/feed/", "feed_type": "rss", "description": "Cloud and container forensics threat research from Cado"},
+  {"name": "WIZ Research Blog", "url": "https://www.wiz.io/blog/tag/research/feed", "feed_type": "rss", "description": "Cloud security vulnerability and threat research from Wiz"},
+  {"name": "Binarly Research Blog", "url": "https://www.binarly.io/blog/feed/", "feed_type": "rss", "description": "Binary analysis and firmware vulnerability research"},
+  {"name": "Synacktiv Blog", "url": "https://www.synacktiv.com/en/publications/rss", "feed_type": "rss", "description": "Offensive security research and CVE disclosures from Synacktiv"},
+  {"name": "Meta Security Blog", "url": "https://engineering.fb.com/category/security/feed/", "feed_type": "rss", "description": "Security engineering research and threat intelligence from Meta"}
 ]
