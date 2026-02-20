@@ -436,7 +436,7 @@ export const articlesAPI = {
    * Generate AI summary for article (executive + technical)
    */
   summarizeArticle: async (id: string, modelId?: string) => {
-    return post(`/articles/${id}/summarize`, modelId ? { model_id: modelId } : {});
+    return post(`/articles/${id}/summarize`, modelId ? { model_id: modelId } : {}, { timeout: 120000 });
   },
 
   /**
@@ -813,6 +813,7 @@ export const userFeedsAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 120000, // 2 min — PDF processing + GenAI extraction can exceed the default 30s
     } as any);
   },
 };
@@ -895,6 +896,9 @@ export const adminAPI = {
   },
   testGenAIProvider: async (provider: string) => {
     return post('/admin/genai/test', { provider });
+  },
+  previewPrompt: async (functionName: string) => {
+    return get(`/admin/prompts/preview?function=${encodeURIComponent(functionName)}`);
   },
 };
 

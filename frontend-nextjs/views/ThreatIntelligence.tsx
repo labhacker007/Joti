@@ -1853,6 +1853,14 @@ export default function ThreatIntelligence() {
                     {result.executiveSummary && (
                       <p className="text-[10px] text-muted-foreground mt-1 italic line-clamp-2">{result.executiveSummary}</p>
                     )}
+                    {(result.status === 'success' || result.status === 'duplicate') && ((result.iocCount ?? 0) > 0 || (result.ttpCount ?? 0) > 0) && (
+                      <button
+                        onClick={() => setActivePanel('ioc_explorer')}
+                        className="mt-1.5 text-[10px] text-primary hover:underline flex items-center gap-1"
+                      >
+                        <ArrowRight className="w-3 h-3" /> View extracted intelligence in IOC Explorer
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

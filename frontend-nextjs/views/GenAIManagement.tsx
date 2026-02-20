@@ -31,8 +31,11 @@ import {
   Rss,
   Sparkles,
   Save,
+  Shield,
+  ExternalLink,
+  FileText,
 } from 'lucide-react';
-import { genaiAPI, connectorsAPI, adminAPI } from '@/api/client';
+import { genaiAPI, connectorsAPI, adminAPI, guardrailsAPI, skillsAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
 import { cn } from '@/lib/utils';
 
@@ -207,6 +210,10 @@ export default function GenAIManagement() {
   // Function mapping states
   const [editingFunction, setEditingFunction] = useState<string | null>(null);
   const [functionEdits, setFunctionEdits] = useState<Record<string, { primary: string; secondary: string }>>({});
+  const [guardrailCount, setGuardrailCount] = useState<{ active: number; total: number } | null>(null);
+  const [skillCount, setSkillCount] = useState<{ active: number; total: number } | null>(null);
+  const [promptPreview, setPromptPreview] = useState<{ function: string; system_prompt: string; total_length: number } | null>(null);
+  const [promptPreviewLoading, setPromptPreviewLoading] = useState<string | null>(null);
 
   // Automation / scheduler states
   const [schedulerSettings, setSchedulerSettings] = useState<SchedulerSettings>({
@@ -233,6 +240,9 @@ export default function GenAIManagement() {
     }
     if (activeTab === 'automation') {
       loadAutomationSettings();
+    }
+    if (activeTab === 'functions' && guardrailCount === null) {
+      loadGuardrailsSkillsSummary();
     }
   }, [activeTab]);
 
@@ -333,6 +343,38 @@ export default function GenAIManagement() {
       setError(getErrorMessage(err));
     } finally {
       setLogsLoading(false);
+    }
+  };
+
+  const loadGuardrailsSkillsSummary = async () => {
+    try {
+      const [grRes, skRes] = await Promise.allSettled([
+        guardrailsAPI.list(),
+        skillsAPI.list(),
+      ]);
+      if (grRes.status === 'fulfilled') {
+        const data = (grRes.value as any)?.data || grRes.value;
+        const list: any[] = Array.isArray(data) ? data : data?.guardrails || data?.items || [];
+        setGuardrailCount({ active: list.filter((g: any) => g.is_active).length, total: list.length });
+      }
+      if (skRes.status === 'fulfilled') {
+        const data = (skRes.value as any)?.data || skRes.value;
+        const list: any[] = Array.isArray(data) ? data : data?.skills || data?.items || [];
+        setSkillCount({ active: list.filter((s: any) => s.is_active).length, total: list.length });
+      }
+    } catch { /* silently fail — counts are informational */ }
+  };
+
+  const handlePreviewPrompt = async (functionName: string) => {
+    setPromptPreviewLoading(functionName);
+    try {
+      const res = (await adminAPI.previewPrompt(functionName)) as any;
+      const data = res?.data || res;
+      setPromptPreview({ function: functionName, system_prompt: data.system_prompt || '', total_length: data.total_length || 0 });
+    } catch {
+      setPromptPreview({ function: functionName, system_prompt: 'Could not load prompt preview. Ensure the function is registered.', total_length: 0 });
+    } finally {
+      setPromptPreviewLoading(null);
     }
   };
 
@@ -1342,12 +1384,94 @@ export default function GenAIManagement() {
                           Save Mapping
                         </button>
                       </div>
+
+                      {/* Preview Final Prompt */}
+                      <div className="border-t border-border pt-3">
+                        <button
+                          onClick={() => handlePreviewPrompt(fn.function_name)}
+                          disabled={promptPreviewLoading === fn.function_name}
+                          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium"
+                        >
+                          {promptPreviewLoading === fn.function_name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                          Preview assembled system prompt (with guardrails &amp; persona)
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               );
             })
           )}
+
+          {/* Guardrails & Skills Summary */}
+          {functions.length > 0 && (
+            <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="w-4 h-4 text-primary" />
+                <h4 className="text-sm font-semibold text-foreground">Active Guardrails &amp; Skills</h4>
+                <span className="text-[10px] text-muted-foreground ml-auto">Applied to all GenAI functions</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-orange-500" />
+                  <div>
+                    <p className="text-xs font-medium text-foreground">
+                      {guardrailCount ? `${guardrailCount.active} active` : '—'} guardrails
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">{guardrailCount ? `${guardrailCount.total} total` : 'Loading...'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-500" />
+                  <div>
+                    <p className="text-xs font-medium text-foreground">
+                      {skillCount ? `${skillCount.active} active` : '—'} skills
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">{skillCount ? `${skillCount.total} total` : 'Loading...'}</p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground mb-2">
+                Guardrails protect against prompt injection, hallucination, PII leakage, and output formatting errors.
+                Skills add domain-specific personas and instructions to guide model behavior.
+              </p>
+              <p className="text-[10px] text-primary font-medium">
+                → Click the <strong>Guardrails &amp; Skills</strong> tab above to create, edit, import/export or seed the attack catalog
+              </p>
+              {(!guardrailCount || guardrailCount.total === 0) && (
+                <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                  <p className="text-[10px] text-amber-700 font-medium">⚠ No guardrails seeded yet. Click Guardrails &amp; Skills → Seed Catalog to add 50+ pre-built security guardrails.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ====== PROMPT PREVIEW MODAL ====== */}
+      {promptPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPromptPreview(null)}>
+          <div className="bg-card border border-border rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div>
+                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" /> System Prompt Preview
+                </h3>
+                <p className="text-[10px] text-muted-foreground">Function: <strong>{promptPreview.function}</strong> · {promptPreview.total_length} chars</p>
+              </div>
+              <button onClick={() => setPromptPreview(null)} className="text-muted-foreground hover:text-foreground p-1">
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <pre className="text-xs text-foreground/80 font-mono whitespace-pre-wrap leading-relaxed bg-muted/30 rounded-lg p-3">
+                {promptPreview.system_prompt}
+              </pre>
+            </div>
+            <div className="px-4 py-2 border-t border-border flex items-center gap-2 text-[10px] text-muted-foreground">
+              <Shield className="w-3 h-3" /> This prompt includes active guardrails and skill personas injected at runtime.
+            </div>
+          </div>
         </div>
       )}
 

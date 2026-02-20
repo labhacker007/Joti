@@ -296,10 +296,8 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
           : null
       );
     } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      if (detail) {
-        setError(detail);
-      }
+      const detail = err?.response?.data?.detail || err?.message || 'Summary generation failed — ensure a GenAI provider is configured in Admin → AI Engine';
+      setError(detail);
     } finally {
       setSummarizing(false);
     }
@@ -551,6 +549,15 @@ export default function ArticleDetailDrawer({ articleId, onClose, onBookmarkTogg
               <p className="text-xs text-muted-foreground italic">
                 {article.genai_analysis_remarks}
               </p>
+            )}
+
+            {/* No summary placeholder */}
+            {!article.executive_summary && !article.technical_summary && !summarizing && !error && (
+              <div className="p-4 bg-muted/20 border border-dashed border-border rounded-lg text-center">
+                <Sparkles className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+                <p className="text-sm font-medium text-muted-foreground">No AI summary generated yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Click <strong className="text-foreground">AI Summarize</strong> above to generate executive &amp; technical summaries</p>
+              </div>
             )}
 
             {/* Executive Summary — rendered as HTML */}
