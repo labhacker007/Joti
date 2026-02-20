@@ -175,6 +175,7 @@ export default function GenAIManagement() {
   // Provider config states
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
+  const [ollamaModel, setOllamaModel] = useState('llama3:latest');
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [savingProvider, setSavingProvider] = useState<string | null>(null);
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
@@ -255,6 +256,13 @@ export default function GenAIManagement() {
           }
         });
         setSavedKeys(keys);
+        // Pre-populate Ollama settings from saved config
+        if (keys['ollama_base_url'] && keys['ollama_base_url'] !== '********') {
+          setOllamaUrl(keys['ollama_base_url']);
+        }
+        if (keys['ollama_model'] && keys['ollama_model'] !== '********') {
+          setOllamaModel(keys['ollama_model']);
+        }
       }
 
       if (ollamaRes.status === 'fulfilled') {
@@ -323,9 +331,20 @@ export default function GenAIManagement() {
       setError('');
 
       if (provider.isLocal) {
-        // Save Ollama URL
-        await genaiAPI.setupOllama({ url: ollamaUrl, auto_detect: true });
-        setSuccess(`Ollama configured at ${ollamaUrl}`);
+        // Test & save Ollama connection
+        const res = await genaiAPI.setupOllama({ url: ollamaUrl, model: ollamaModel, auto_detect: true, set_as_primary: true }) as any;
+        const data = res?.data || res;
+        // Update URL field if auto-corrected (e.g. localhost → host.docker.internal)
+        if (data?.url && data.url !== ollamaUrl) {
+          setOllamaUrl(data.url);
+        }
+        let msg = data?.message || `Ollama connected at ${data?.url || ollamaUrl}`;
+        if (data?.pull_suggestion) {
+          msg += ` — ${data.pull_suggestion}`;
+        }
+        setSuccess(msg);
+        // Switch to library tab so admin can see/pull models
+        setActiveTab('ollama');
       } else {
         const key = apiKeys[provider.provider];
         if (!key?.trim()) {
@@ -580,7 +599,7 @@ export default function GenAIManagement() {
         <div className="space-y-4">
           {PROVIDER_DEFS.map((provider) => {
             const status = getProviderStatus(provider.provider);
-            const isConnected = status?.status === 'available' || status?.status === 'connected';
+            const isConnected = status?.status === 'available' || status?.status === 'connected' || (provider.isLocal && ollamaConnected);
             const hasKey = !!savedKeys[provider.keyField];
             const isSaving = savingProvider === provider.provider;
             const isTesting = testingProvider === provider.provider;
@@ -617,7 +636,7 @@ export default function GenAIManagement() {
                         Not Configured
                       </span>
                     )}
-                    {(isConnected || hasKey) && (
+                    {(isConnected || hasKey || (provider.isLocal && ollamaConnected)) && (
                       <button
                         onClick={() => handleTestProvider(provider.provider)}
                         disabled={isTesting}
@@ -633,22 +652,34 @@ export default function GenAIManagement() {
                 {/* Provider Config */}
                 <div className="border-t border-border p-4 bg-muted/30">
                   {provider.isLocal ? (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={ollamaUrl}
-                        onChange={(e) => setOllamaUrl(e.target.value)}
-                        placeholder="http://localhost:11434"
-                        className="flex-1 px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                      <button
-                        onClick={() => handleSaveProviderKey(provider)}
-                        disabled={isSaving}
-                        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm flex items-center gap-2"
-                      >
-                        <Link2 className="w-4 h-4" />
-                        {isSaving ? 'Connecting...' : 'Connect'}
-                      </button>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={ollamaUrl}
+                          onChange={(e) => setOllamaUrl(e.target.value)}
+                          placeholder="http://localhost:11434"
+                          className="flex-1 px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <input
+                          type="text"
+                          value={ollamaModel}
+                          onChange={(e) => setOllamaModel(e.target.value)}
+                          placeholder="llama3:latest"
+                          className="w-36 px-3 py-2 bg-background border border-input rounded-md text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <button
+                          onClick={() => handleSaveProviderKey(provider)}
+                          disabled={isSaving}
+                          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm flex items-center gap-2 whitespace-nowrap"
+                        >
+                          <Link2 className="w-4 h-4" />
+                          {isSaving ? 'Connecting...' : 'Test & Connect'}
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Docker tip: Use <code className="bg-muted px-1 rounded">http://host.docker.internal:11434</code> to reach Ollama on your host machine.
+                      </p>
                     </div>
                   ) : (
                     <div className="flex gap-2">

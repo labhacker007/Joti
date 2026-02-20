@@ -1384,10 +1384,11 @@ async def get_available_models(
 
 @router.get("/genai/ollama/library")
 async def get_ollama_model_library(
+    db: Session = Depends(get_db),
     current_user: User = Depends(require_permission(MANAGE_CONNECTORS))
 ):
     """Get the Ollama model library with installation status and sizes.
-    
+
     Returns a comprehensive list of popular Ollama models with:
     - Model name and size
     - Whether it's installed locally
@@ -1395,7 +1396,7 @@ async def get_ollama_model_library(
     - Actual disk size if installed
     """
     import httpx
-    
+
     # Comprehensive model library with sizes and descriptions
     MODEL_LIBRARY = [
         {"name": "llama3.3:latest", "size": "43GB", "description": "Latest Llama 3.3 - best overall quality", "category": "General"},
@@ -1450,13 +1451,21 @@ async def get_ollama_model_library(
     ollama_connected = False
     connected_url = None
     
-    possible_urls = [
+    # Read saved URL from DB first (set by admin via setup endpoint)
+    saved_url_config = db.query(SystemConfiguration).filter(
+        SystemConfiguration.category == "genai",
+        SystemConfiguration.key == "ollama_base_url"
+    ).first()
+    saved_url = saved_url_config.value if saved_url_config else None
+
+    possible_urls = list(dict.fromkeys(filter(None, [
+        saved_url,
         settings.OLLAMA_BASE_URL,
         "http://host.docker.internal:11434",
         "http://localhost:11434",
         "http://ollama:11434",
-    ]
-    
+    ])))
+
     for url in possible_urls:
         if not url:
             continue
