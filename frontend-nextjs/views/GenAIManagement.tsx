@@ -216,7 +216,23 @@ export default function GenAIManagement() {
 
       if (providerRes.status === 'fulfilled') {
         const data = (providerRes.value as any)?.data || providerRes.value;
-        setProviders(Array.isArray(data) ? data : data?.providers || []);
+        // Backend returns {providers: {openai:{...}, ollama:{...}}, ...}
+        // Convert the provider dict to an array so .find()/.map() work
+        const raw = data?.providers ?? data;
+        if (Array.isArray(raw)) {
+          setProviders(raw);
+        } else if (raw && typeof raw === 'object') {
+          setProviders(
+            Object.entries(raw).map(([key, val]: [string, any]) => ({
+              provider: key,
+              status: val.status ?? 'unknown',
+              models: val.available_models ?? [],
+              ...val,
+            }))
+          );
+        } else {
+          setProviders([]);
+        }
       }
 
       if (modelRes.status === 'fulfilled') {
