@@ -1720,6 +1720,10 @@ class AICorrelateRequest(BaseModel):
     time_range: str = "7d"
 
 
+class AICampaignBriefRequest(BaseModel):
+    time_range: str = "7d"
+
+
 def _get_or_create_internal_article(db: Session) -> Article:
     """Get or create the pseudo-article for internal intelligence submissions."""
     internal_article = db.query(Article).filter(
@@ -2090,6 +2094,161 @@ def get_correlation_insights(
         "total_shared_iocs": len(shared_iocs),
         "total_clusters": len(clusters),
     }
+
+
+@router.post("/intelligence/ai-campaign-brief")
+async def get_ai_campaign_brief(
+    request: AICampaignBriefRequest,
+    current_user: User = Depends(require_permission(Permission.ARTICLES_ANALYZE.value)),
+    db: Session = Depends(get_db)
+):
+    """AI-powered campaign attribution brief from correlated intelligence clusters."""
+    from sqlalchemy import func
+    from app.models import ExtractedIntelligenceType
+    from app.genai.provider import get_model_manager
+    from datetime import timedelta
+
+    now = datetime.utcnow()
+    time_map = {"24h": 1, "7d": 7, "30d": 30, "90d": 90}
+    days = time_map.get(request.time_range, 7)
+    start_date = now - timedelta(days=days)
+
+    # Re-run correlation logic to get current cluster data
+    shared_iocs_q = db.query(
+        ExtractedIntelligence.value,
+        ExtractedIntelligence.meta,
+        func.count(func.distinct(ExtractedIntelligence.article_id)).label("article_count"),
+        func.array_agg(func.distinct(Article.title)).label("article_titles"),
+        func.array_agg(func.distinct(Article.id)).label("article_ids"),
+    ).join(Article).filter(
+        ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.IOC,
+        ExtractedIntelligence.created_at >= start_date,
+    ).group_by(
+        ExtractedIntelligence.value, ExtractedIntelligence.meta
+    ).having(
+        func.count(func.distinct(ExtractedIntelligence.article_id)) >= 2
+    ).order_by(desc("article_count")).limit(30).all()
+
+    # Top threat actors in window
+    top_actors = db.query(
+        ExtractedIntelligence.value,
+        func.count(ExtractedIntelligence.id).label("count")
+    ).filter(
+        ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.THREAT_ACTOR,
+        ExtractedIntelligence.created_at >= start_date,
+    ).group_by(ExtractedIntelligence.value).order_by(desc("count")).limit(10).all()
+
+    # Top TTPs
+    top_ttps = db.query(
+        ExtractedIntelligence.mitre_id,
+        ExtractedIntelligence.value,
+        func.count(ExtractedIntelligence.id).label("count")
+    ).filter(
+        ExtractedIntelligence.intelligence_type == ExtractedIntelligenceType.TTP,
+        ExtractedIntelligence.created_at >= start_date,
+    ).group_by(
+        ExtractedIntelligence.mitre_id, ExtractedIntelligence.value
+    ).order_by(desc("count")).limit(10).all()
+
+    # Build clusters
+    article_ioc_map: dict = {}
+    for ioc_value, meta, article_count, article_titles, article_ids in shared_iocs_q:
+        for aid, atitle in zip(article_ids or [], article_titles or []):
+            if aid not in article_ioc_map:
+                article_ioc_map[aid] = {"title": atitle, "shared_iocs": set()}
+            article_ioc_map[aid]["shared_iocs"].add(ioc_value)
+
+    clusters = []
+    seen: set = set()
+    for aid, info in article_ioc_map.items():
+        if aid in seen:
+            continue
+        cluster = {"articles": [{"id": aid, "title": info["title"]}], "shared_iocs": list(info["shared_iocs"])}
+        seen.add(aid)
+        for other_aid, other_info in article_ioc_map.items():
+            if other_aid in seen:
+                continue
+            overlap = info["shared_iocs"] & other_info["shared_iocs"]
+            if len(overlap) >= 2:
+                cluster["articles"].append({"id": other_aid, "title": other_info["title"]})
+                cluster["shared_iocs"] = list(set(cluster["shared_iocs"]) | overlap)
+                seen.add(other_aid)
+        if len(cluster["articles"]) >= 2:
+            clusters.append(cluster)
+
+    if not shared_iocs_q and not clusters:
+        return {
+            "brief": "Insufficient correlation data to generate a campaign brief. Run correlation analysis first and ensure there are articles with shared IOCs.",
+            "model_used": None,
+            "time_range": request.time_range,
+            "clusters_analyzed": 0,
+            "shared_iocs_analyzed": 0,
+        }
+
+    # Build context for GenAI
+    iocs_text = "\n".join([
+        f"- {v} (type: {(m or {}).get('type', 'unknown')}, seen in {ac} articles: {', '.join((t or [])[:3])})"
+        for v, m, ac, t, _ in shared_iocs_q[:20]
+    ])
+    clusters_text = ""
+    for i, c in enumerate(clusters[:5], 1):
+        clusters_text += f"\nCluster {i}: {len(c['articles'])} articles, {len(c['shared_iocs'])} shared IOCs\n"
+        clusters_text += f"  Articles: {', '.join(a['title'] for a in c['articles'][:3])}\n"
+        clusters_text += f"  Shared IOCs: {', '.join(c['shared_iocs'][:6])}\n"
+    actors_text = "\n".join([f"- {v} ({c} mentions)" for v, c in top_actors])
+    ttps_text = "\n".join([f"- {mid or 'N/A'}: {v} ({c}x)" for mid, v, c in top_ttps])
+
+    context = f"""Threat Intelligence Correlation Data — Time Window: {request.time_range}
+
+Shared IOCs (indicators appearing across multiple articles):
+{iocs_text or 'None'}
+
+Article Clusters (groups of articles sharing 2+ IOCs):
+{clusters_text or 'No clusters found'}
+
+Referenced Threat Actors:
+{actors_text or 'None identified'}
+
+Active MITRE ATT&CK Techniques:
+{ttps_text or 'None identified'}"""
+
+    try:
+        model_manager = get_model_manager()
+        primary_model = model_manager.get_primary_model()
+
+        result = await model_manager.generate_with_fallback(
+            system_prompt="""You are a senior threat intelligence analyst specializing in campaign attribution and threat actor tracking.
+Based on the correlated intelligence data provided, write a campaign attribution brief that covers:
+
+1. **Campaign Overview** — What appears to be happening? Is this a single coordinated campaign or multiple distinct activities?
+2. **Likely Threat Actor(s)** — Based on TTPs, infrastructure patterns, and article context, which threat actor groups are likely responsible? Include confidence level.
+3. **Infrastructure Analysis** — What does the shared IOC infrastructure tell us about the attacker's operations?
+4. **Kill Chain Stage** — Where in the MITRE ATT&CK kill chain is this campaign currently operating?
+5. **Target Profile** — Who appears to be targeted? Which sectors/regions?
+6. **Detection & Hunting Priorities** — What should the SOC focus on immediately? Which shared IOCs should be blocklisted?
+7. **Analyst Confidence** — Rate your overall confidence in this attribution (Low/Medium/High) and explain why.
+
+Be specific and actionable. Reference actual IOCs and TTPs from the data. Format as markdown.""",
+            user_prompt=f"Generate a campaign attribution brief from this correlation data:\n\n{context}",
+            preferred_model=primary_model,
+        )
+
+        brief = result.get("response", "")
+        model_used = result.get("model_used", primary_model)
+
+        return {
+            "brief": brief,
+            "model_used": model_used,
+            "time_range": request.time_range,
+            "clusters_analyzed": len(clusters),
+            "shared_iocs_analyzed": len(shared_iocs_q),
+        }
+    except Exception as e:
+        logger.error("ai_campaign_brief_failed", error=str(e))
+        raise HTTPException(
+            status_code=503,
+            detail=f"AI campaign brief generation failed: {str(e)}. Ensure a GenAI provider is configured."
+        )
 
 
 # ============ MANUAL GENAI ENDPOINTS ============

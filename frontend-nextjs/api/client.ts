@@ -590,6 +590,13 @@ export const articlesAPI = {
   },
 
   /**
+   * Generate AI campaign attribution brief from correlated intelligence
+   */
+  getCampaignBrief: async (params?: { time_range?: string }) => {
+    return post('/articles/intelligence/ai-campaign-brief', params || {});
+  },
+
+  /**
    * Batch review intelligence items
    */
   batchReviewIntelligence: async (data: { intel_ids: number[]; is_reviewed?: boolean; is_false_positive?: boolean }) => {

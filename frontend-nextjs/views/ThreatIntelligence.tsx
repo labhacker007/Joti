@@ -206,6 +206,8 @@ export default function ThreatIntelligence() {
   const [currentPage, setCurrentPage] = useState(1);
   const [mitreMatrix, setMitreMatrix] = useState<MitreMatrixData | null>(null);
   const [correlationData, setCorrelationData] = useState<CorrelationData | null>(null);
+  const [campaignBrief, setCampaignBrief] = useState('');
+  const [campaignBriefMeta, setCampaignBriefMeta] = useState<{ clusters: number; iocs: number; model: string } | null>(null);
   const [landscapeSummary, setLandscapeSummary] = useState('');
   const [lastCorrelationRun, setLastCorrelationRun] = useState<Date | null>(null);
   const [lastAnalysisRun, setLastAnalysisRun] = useState<{ time: Date; focus: string } | null>(null);
@@ -307,6 +309,24 @@ export default function ThreatIntelligence() {
       setLastCorrelationRun(new Date());
     } catch { /* silent */ } finally {
       setLoadingKey('correlation', false);
+    }
+  }, [timeRange]);
+
+  const fetchCampaignBrief = useCallback(async () => {
+    try {
+      setLoadingKey('campaignBrief', true);
+      const res = await articlesAPI.getCampaignBrief({ time_range: timeRange }) as any;
+      const data = res?.data || res;
+      setCampaignBrief(data?.brief || 'No brief generated.');
+      setCampaignBriefMeta({
+        clusters: data?.clusters_analyzed ?? 0,
+        iocs: data?.shared_iocs_analyzed ?? 0,
+        model: data?.model_used || 'AI',
+      });
+    } catch (err: any) {
+      setCampaignBrief('Failed to generate campaign brief. Ensure a GenAI provider is configured.');
+    } finally {
+      setLoadingKey('campaignBrief', false);
     }
   }, [timeRange]);
 
@@ -1332,11 +1352,20 @@ export default function ThreatIntelligence() {
                 </p>
               )}
             </div>
-            <button onClick={fetchCorrelation} disabled={loading.correlation}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
-              {loading.correlation ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              {correlationData ? 'Re-analyze' : 'Analyze'}
-            </button>
+            <div className="flex items-center gap-2">
+              {correlationData && (
+                <button onClick={fetchCampaignBrief} disabled={loading.campaignBrief}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors">
+                  {loading.campaignBrief ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
+                  AI Campaign Brief
+                </button>
+              )}
+              <button onClick={fetchCorrelation} disabled={loading.correlation}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
+                {loading.correlation ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                {correlationData ? 'Re-analyze' : 'Analyze'}
+              </button>
+            </div>
           </div>
 
           {/* How It Works Banner */}
@@ -1478,6 +1507,46 @@ export default function ThreatIntelligence() {
                   sub={`No shared indicators detected across articles in the ${timeRange} window. Try a wider time range.`} />
               )}
 
+              {/* AI Campaign Brief */}
+              {loading.campaignBrief && (
+                <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 flex items-center gap-3">
+                  <Loader2 className="w-4 h-4 text-purple-500 animate-spin flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Generating AI Campaign Attribution Brief...</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Analyzing IOC patterns and cluster relationships</p>
+                  </div>
+                </div>
+              )}
+              {!loading.campaignBrief && campaignBrief && (
+                <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Brain className="w-3.5 h-3.5 text-purple-500" />
+                      AI Campaign Attribution Brief
+                    </p>
+                    {campaignBriefMeta && (
+                      <p className="text-[10px] text-muted-foreground">
+                        {campaignBriefMeta.clusters} clusters · {campaignBriefMeta.iocs} IOCs · {campaignBriefMeta.model}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground leading-relaxed prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{
+                      __html: campaignBrief
+                        .replace(/^## (.+)$/gm, '<h3 class="font-semibold text-foreground mt-4 mb-1.5 text-sm">$1</h3>')
+                        .replace(/^### (.+)$/gm, '<h4 class="font-semibold text-foreground mt-3 mb-1">$1</h4>')
+                        .replace(/\*\*(.+?)\*\*/g, '<strong class="text-foreground">$1</strong>')
+                        .replace(/^- (.+)$/gm, '<li class="ml-3 list-disc">$1</li>')
+                        .replace(/\n\n/g, '<br/>')
+                    }}
+                  />
+                  <button onClick={() => { setCampaignBrief(''); setCampaignBriefMeta(null); }}
+                    className="mt-3 text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1">
+                    <X className="w-3 h-3" /> Dismiss
+                  </button>
+                </div>
+              )}
+
               {/* Next Steps */}
               {(correlationData.shared_iocs.length > 0 || correlationData.clusters.length > 0) && (
                 <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4">
@@ -1488,8 +1557,8 @@ export default function ThreatIntelligence() {
                     {[
                       'Copy high-frequency shared IOCs and add to your SIEM/firewall blocklist',
                       'Click article titles in clusters to review the full threat context',
+                      'Click "AI Campaign Brief" to get AI attribution and hunting priorities',
                       'Switch to IOC Explorer and filter by these indicators for deeper investigation',
-                      'Run AI Analysis to generate a threat landscape brief based on this data',
                     ].map((step, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
                         <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />

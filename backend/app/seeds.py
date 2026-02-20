@@ -2,7 +2,7 @@
 import json
 import os
 from app.core.database import SessionLocal
-from app.models import FeedSource, WatchListKeyword, ConnectorConfig, User, UserRole, Skill, Guardrail
+from app.models import FeedSource, WatchListKeyword, ConnectorConfig, User, UserRole, Skill, Guardrail, SystemConfiguration
 from app.auth.security import hash_password
 from datetime import datetime
 
@@ -218,6 +218,9 @@ def seed_database():
 
         # Seed guardrails
         _seed_guardrails(db)
+
+        # Seed GenAI function configurations
+        _seed_genai_functions(db)
 
         db.commit()
         print("\n✅ Database seeding complete!")
@@ -555,6 +558,82 @@ def _seed_guardrails(db):
                 print(f"✓ Added catalog guardrail: {seed['name']}")
     except ImportError:
         print("⚠ Attack catalog not available, skipping catalog guardrails")
+
+
+def _seed_genai_functions(db):
+    """Seed GenAI function configurations so Admin → AI Engine → Functions tab is pre-populated."""
+    functions = [
+        {
+            "function_name": "article_summarization",
+            "display_name": "Article Summarization",
+            "description": "Generates executive and technical summaries for threat intelligence articles. Extracts key findings, affected systems, and recommended actions.",
+        },
+        {
+            "function_name": "intel_extraction",
+            "display_name": "Intel Extraction",
+            "description": "Extracts IOCs (IPs, domains, hashes, CVEs), MITRE ATT&CK TTPs, threat actor names, and malware families from article content using deep NLP analysis.",
+        },
+        {
+            "function_name": "hunt_query_generation",
+            "display_name": "Hunt Query Generation",
+            "description": "Generates platform-specific threat hunting queries (XSIAM XQL, Defender KQL, Splunk SPL, Wiz GraphQL) from extracted IOCs and TTPs.",
+        },
+        {
+            "function_name": "hunt_title",
+            "display_name": "Hunt Title Generation",
+            "description": "Auto-generates concise, descriptive titles for hunt queries based on the threat context and targeted indicators.",
+        },
+        {
+            "function_name": "threat_landscape",
+            "display_name": "Threat Landscape Analysis",
+            "description": "Generates comprehensive AI threat landscape briefs covering current threat posture, active TTPs, top threat actors, and SOC recommendations based on aggregated intelligence.",
+        },
+        {
+            "function_name": "campaign_attribution",
+            "display_name": "Campaign Attribution",
+            "description": "Analyzes correlated article clusters and shared IOCs to attribute threat campaigns to known actors, assess campaign scope, and recommend hunting priorities.",
+        },
+        {
+            "function_name": "threat_actor_enrichment",
+            "display_name": "Threat Actor Enrichment",
+            "description": "Enriches threat actor profiles with GenAI-generated intelligence: aliases, origin country, motivation, target sectors, TTPs, and associated tools from article context.",
+        },
+        {
+            "function_name": "ioc_context",
+            "display_name": "IOC Context & Explanation",
+            "description": "Provides contextual explanation for individual IOCs — what they are, why they're significant, associated threat actors, and suggested defensive actions.",
+        },
+    ]
+
+    for fn in functions:
+        existing = db.query(SystemConfiguration).filter(
+            SystemConfiguration.category == "genai_functions",
+            SystemConfiguration.key == fn["function_name"]
+        ).first()
+        value = json.dumps({
+            "display_name": fn["display_name"],
+            "description": fn["description"],
+            "primary_model_id": None,
+            "secondary_model_id": None,
+        })
+        if not existing:
+            db.add(SystemConfiguration(
+                category="genai_functions",
+                key=fn["function_name"],
+                value=value,
+                value_type="json",
+                description=f"Function mapping for {fn['function_name']}",
+            ))
+            print(f"✓ Added GenAI function: {fn['display_name']}")
+        else:
+            # Update description/display_name but don't overwrite model assignments
+            try:
+                current = json.loads(existing.value) if existing.value else {}
+                current["display_name"] = fn["display_name"]
+                current["description"] = fn["description"]
+                existing.value = json.dumps(current)
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
