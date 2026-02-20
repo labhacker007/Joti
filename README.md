@@ -73,6 +73,36 @@ docker-compose exec backend pytest -q
 docker-compose exec backend alembic upgrade head
 ```
 
+## User Management
+
+Manage users from the CLI using `manage.py` (available inside the backend container):
+
+```bash
+# List all users
+docker-compose exec backend python manage.py listusers
+
+# Create an admin superuser (interactive)
+docker-compose exec backend python manage.py createsuperuser
+
+# Create an admin superuser (non-interactive)
+docker-compose exec backend python manage.py createsuperuser \
+  --email admin@example.com --password secret123
+
+# Create a regular user
+docker-compose exec backend python manage.py createuser \
+  --email analyst@example.com --password secret123 --role ANALYST
+
+# Available roles: ADMIN, ANALYST, ENGINEER, MANAGER, EXECUTIVE, VIEWER
+
+# Change a user's password
+docker-compose exec backend python manage.py changepassword \
+  --email user@example.com --password newpassword
+
+# Deactivate / reactivate a user
+docker-compose exec backend python manage.py deactivateuser --email user@example.com
+docker-compose exec backend python manage.py activateuser --email user@example.com
+```
+
 ## GenAI Setup (Optional)
 
 By default the app uses **Ollama** (local, free). To switch providers, edit `.env`:
