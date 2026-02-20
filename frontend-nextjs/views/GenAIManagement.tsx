@@ -293,21 +293,42 @@ export default function GenAIManagement() {
         }
       }
 
+      let resolvedModels: ModelInfo[] = [];
       if (modelRes.status === 'fulfilled') {
         const data = (modelRes.value as any)?.data || modelRes.value;
         const rawModels: any[] = Array.isArray(data) ? data : (data?.models || []);
         // Normalize: backend returns is_enabled, frontend interface uses enabled
-        setModels(rawModels.map((m: any) => ({
+        resolvedModels = rawModels.map((m: any) => ({
           ...m,
           id: String(m.id),
           name: m.name || m.display_name || m.model_name || m.model_identifier || 'Unknown',
           enabled: m.enabled !== undefined ? m.enabled : (m.is_enabled ?? false),
-        })));
+        }));
+        setModels(resolvedModels);
       }
 
       if (funcRes.status === 'fulfilled') {
         const data = (funcRes.value as any)?.data || funcRes.value;
-        setFunctions(Array.isArray(data) ? data : []);
+        let fns: FunctionConfig[] = Array.isArray(data) ? data : [];
+
+        // Auto-assign the first enabled model to any function that has no primary model set
+        const firstEnabled = resolvedModels.find((m) => m.enabled);
+        if (firstEnabled) {
+          const defaultModelId = (firstEnabled as any).model_identifier || firstEnabled.name || firstEnabled.id;
+          const needsDefault = fns.filter((fn) => !fn.primary_model_id);
+          if (needsDefault.length > 0) {
+            fns = fns.map((fn) => ({
+              ...fn,
+              primary_model_id: fn.primary_model_id || defaultModelId,
+            }));
+            // Persist the defaults to the backend (fire-and-forget)
+            needsDefault.forEach((fn) => {
+              genaiAPI.updateFunctionConfig(fn.function_name, { primary_model_id: defaultModelId }).catch(() => {});
+            });
+          }
+        }
+
+        setFunctions(fns);
       }
 
       if (configRes.status === 'fulfilled') {

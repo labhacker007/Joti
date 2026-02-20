@@ -25,6 +25,7 @@ from app.auth.rbac import Permission
 from app.models import (
     GenAIFunctionConfig, Prompt, PromptExecutionLog, User
 )
+from app.genai.models import GenAIModelRegistry
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
@@ -230,6 +231,12 @@ async def seed_default_functions(
     current_user: User = Depends(require_permission(Permission.ADMIN_GENAI.value))
 ):
     """Create default GenAI function configurations (idempotent — skips existing)."""
+    # Pick the first enabled model as the default primary model for new functions
+    default_model = db.query(GenAIModelRegistry).filter(
+        GenAIModelRegistry.is_enabled == True
+    ).order_by(GenAIModelRegistry.id).first()
+    default_model_id = default_model.model_identifier if default_model else None
+
     created = []
     skipped = []
     for fn in DEFAULT_FUNCTION_SEEDS:
@@ -239,16 +246,20 @@ async def seed_default_functions(
         if existing:
             existing.display_name = fn["display_name"]
             existing.description = fn["description"]
+            # Fill in default model if not already assigned
+            if not existing.primary_model_id and default_model_id:
+                existing.primary_model_id = default_model_id
             skipped.append(fn["function_name"])
         else:
             db.add(GenAIFunctionConfig(
                 function_name=fn["function_name"],
                 display_name=fn["display_name"],
                 description=fn["description"],
+                primary_model_id=default_model_id,
             ))
             created.append(fn["function_name"])
     db.commit()
-    return {"created": created, "updated": skipped, "total": len(DEFAULT_FUNCTION_SEEDS)}
+    return {"created": created, "updated": skipped, "total": len(DEFAULT_FUNCTION_SEEDS), "default_model": default_model_id}
 
 
 @router.get("/", response_model=List[FunctionConfigResponse])
