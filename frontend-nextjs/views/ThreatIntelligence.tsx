@@ -6,6 +6,7 @@ import {
   Search, ChevronDown, ChevronRight, ExternalLink, Eye, CheckCircle, XCircle,
   Copy, Target, Plus, Upload, Download, Sparkles, Link2, Users, Loader2,
   Trash2, Check, X, Database, Radar, Brain, BarChart3, Grid3X3,
+  Info, ArrowRight, Zap, Settings, Activity, Clock, Bug, Server, Lock, Layers,
 } from 'lucide-react';
 import { articlesAPI } from '@/api/client';
 import { cn, formatRelativeTime } from '@/lib/utils';
@@ -90,6 +91,17 @@ const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: 'all', label: 'All' },
 ];
 
+const FOCUS_AREAS: { value: string | undefined; label: string; desc: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: undefined,        label: 'Full Landscape',  desc: 'Overall threat activity overview',    icon: Brain },
+  { value: 'ransomware',     label: 'Ransomware',      desc: 'Active groups, TTPs, targets',         icon: Lock },
+  { value: 'apt',            label: 'APT / Nation-State', desc: 'State-sponsored threat actors',    icon: Target },
+  { value: 'vulnerabilities',label: 'Vulnerabilities', desc: 'CVEs, patch status, exploits in wild', icon: Bug },
+  { value: 'phishing',       label: 'Phishing / BEC',  desc: 'Email threats, credential harvesting', icon: Mail },
+  { value: 'supply_chain',   label: 'Supply Chain',    desc: 'Software & vendor compromise risk',    icon: Layers },
+  { value: 'cloud',          label: 'Cloud Security',  desc: 'AWS/Azure/GCP threats & misconfigs',   icon: Server },
+  { value: 'malware',        label: 'Malware / Tooling', desc: 'Active malware families & TTPs',    icon: AlertTriangle },
+];
+
 const SOURCE_CATEGORIES: { value: SourceCategory; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'all', label: 'All Sources', icon: Database },
   { value: 'open_source', label: 'Open Source', icon: Globe },
@@ -155,6 +167,8 @@ export default function ThreatIntelligence() {
   const [mitreMatrix, setMitreMatrix] = useState<MitreMatrixData | null>(null);
   const [correlationData, setCorrelationData] = useState<CorrelationData | null>(null);
   const [landscapeSummary, setLandscapeSummary] = useState('');
+  const [lastCorrelationRun, setLastCorrelationRun] = useState<Date | null>(null);
+  const [lastAnalysisRun, setLastAnalysisRun] = useState<{ time: Date; focus: string } | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -231,6 +245,7 @@ export default function ThreatIntelligence() {
       setLoadingKey('correlation', true);
       const res = await articlesAPI.getCorrelation({ time_range: timeRange }) as any;
       setCorrelationData(res?.data || res);
+      setLastCorrelationRun(new Date());
     } catch { /* silent */ } finally {
       setLoadingKey('correlation', false);
     }
@@ -243,8 +258,9 @@ export default function ThreatIntelligence() {
       const res = await articlesAPI.getAILandscape({ time_range: timeRange, focus_area: focus }) as any;
       const data = res?.data || res;
       setLandscapeSummary(data?.summary || 'No summary generated.');
+      setLastAnalysisRun({ time: new Date(), focus: focus || 'Full Landscape' });
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || 'Failed to generate landscape summary.';
+      const detail = err?.response?.data?.detail || 'Failed to generate landscape summary. Make sure a GenAI provider is configured in Admin → AI Engine.';
       setError(detail);
     } finally {
       setLoadingKey('landscape', false);
@@ -934,39 +950,91 @@ export default function ThreatIntelligence() {
       {/* ============================================================ */}
       {activePanel === 'correlation' && (
         <div className="space-y-4">
+          {/* Header */}
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Link2 className="w-4 h-4 text-primary" /> Cross-Source Correlation
-            </h3>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Link2 className="w-4 h-4 text-primary" /> Cross-Source Correlation
+              </h3>
+              {lastCorrelationRun && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Clock className="w-3 h-3" />
+                  Last run: {lastCorrelationRun.toLocaleTimeString()} · window: {timeRange}
+                </p>
+              )}
+            </div>
             <button onClick={fetchCorrelation} disabled={loading.correlation}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
               {loading.correlation ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              Analyze
+              {correlationData ? 'Re-analyze' : 'Analyze'}
             </button>
           </div>
 
+          {/* How It Works Banner */}
+          <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-foreground mb-1">How Cross-Source Correlation Works</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Correlation scans all ingested articles within your selected time window and finds{' '}
+                  <strong className="text-foreground">indicators that appear in multiple articles</strong> — IPs, domains, hashes, CVEs, and more.
+                  When the same IOC shows up in 2+ articles, it becomes a <strong className="text-foreground">Shared IOC</strong>.
+                  Articles sharing 3+ IOCs are grouped into <strong className="text-foreground">Clusters</strong>, which often
+                  signal a coordinated campaign or related threat activity.
+                </p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5">
+                  <span className="flex items-center gap-1 text-[10px] text-blue-600 font-medium">
+                    <span className="w-4 h-4 rounded-full bg-blue-500/20 text-blue-600 flex items-center justify-center text-[9px] font-bold">1</span>
+                    Set time window (top-right)
+                  </span>
+                  <ArrowRight className="w-3 h-3 text-blue-400 hidden sm:block" />
+                  <span className="flex items-center gap-1 text-[10px] text-blue-600 font-medium">
+                    <span className="w-4 h-4 rounded-full bg-blue-500/20 text-blue-600 flex items-center justify-center text-[9px] font-bold">2</span>
+                    Click Analyze
+                  </span>
+                  <ArrowRight className="w-3 h-3 text-blue-400 hidden sm:block" />
+                  <span className="flex items-center gap-1 text-[10px] text-blue-600 font-medium">
+                    <span className="w-4 h-4 rounded-full bg-blue-500/20 text-blue-600 flex items-center justify-center text-[9px] font-bold">3</span>
+                    Investigate clusters &amp; shared IOCs
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {loading.correlation ? <Spinner /> : !correlationData ? (
-            <EmptyState message="Run correlation analysis" sub="Click Analyze to find shared indicators across articles" />
+            <EmptyState message="No correlation data yet"
+              sub="Click Analyze to scan your articles for shared indicators across sources" />
           ) : (
-            <div className="space-y-6">
-              {/* Stats */}
+            <div className="space-y-5">
+              {/* Stats row */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-card border border-border rounded-lg p-4">
-                  <p className="text-xs text-muted-foreground">Shared IOCs</p>
-                  <p className="text-xl font-bold text-foreground">{correlationData.total_shared_iocs}</p>
-                  <p className="text-[10px] text-muted-foreground">IOCs appearing in 2+ articles</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Shared IOCs</p>
+                  <p className="text-2xl font-bold text-foreground">{correlationData.total_shared_iocs}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">indicators seen in 2+ articles</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-4">
-                  <p className="text-xs text-muted-foreground">Article Clusters</p>
-                  <p className="text-xl font-bold text-foreground">{correlationData.total_clusters}</p>
-                  <p className="text-[10px] text-muted-foreground">Groups of articles sharing indicators</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Article Clusters</p>
+                  <p className="text-2xl font-bold text-foreground">{correlationData.total_clusters}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">groups sharing 3+ indicators</p>
                 </div>
               </div>
 
               {/* Shared IOCs */}
               {correlationData.shared_iocs.length > 0 && (
                 <div className="bg-card border border-border rounded-xl p-4">
-                  <h4 className="text-xs font-semibold text-foreground mb-3">Shared Indicators</h4>
+                  <h4 className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1.5">
+                    <Link2 className="w-3.5 h-3.5 text-primary" />
+                    Shared Indicators
+                    <span className="ml-auto text-[10px] text-muted-foreground font-normal">
+                      Showing {Math.min(correlationData.shared_iocs.length, 20)} of {correlationData.shared_iocs.length}
+                    </span>
+                  </h4>
+                  <p className="text-[10px] text-muted-foreground mb-3">
+                    These IOCs appeared across multiple articles — high-frequency hits may indicate active infrastructure.
+                  </p>
                   <div className="space-y-2">
                     {correlationData.shared_iocs.slice(0, 20).map((ioc, i) => (
                       <div key={i} className="flex items-start gap-3 p-2 bg-muted/30 rounded-lg">
@@ -977,12 +1045,14 @@ export default function ThreatIntelligence() {
                         <div className="flex-1 min-w-0">
                           <p className="font-mono text-xs text-foreground truncate">{ioc.value}</p>
                           <p className="text-[10px] text-muted-foreground mt-0.5">
-                            Found in {ioc.article_count} articles: {ioc.article_titles.slice(0, 3).join(' | ')}
-                            {ioc.article_count > 3 && ` +${ioc.article_count - 3} more`}
+                            Seen in <strong>{ioc.article_count}</strong> articles:{' '}
+                            {ioc.article_titles.slice(0, 2).join(' · ')}
+                            {ioc.article_count > 2 && ` +${ioc.article_count - 2} more`}
                           </p>
                         </div>
                         <button onClick={() => copyToClipboard(ioc.value)}
-                          className="text-muted-foreground hover:text-foreground">
+                          title="Copy to clipboard"
+                          className="text-muted-foreground hover:text-foreground flex-shrink-0">
                           <Copy className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -991,26 +1061,40 @@ export default function ThreatIntelligence() {
                 </div>
               )}
 
-              {/* Clusters */}
+              {/* Article Clusters */}
               {correlationData.clusters.length > 0 && (
                 <div className="bg-card border border-border rounded-xl p-4">
-                  <h4 className="text-xs font-semibold text-foreground mb-3">Article Clusters</h4>
+                  <h4 className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-primary" />
+                    Article Clusters
+                  </h4>
+                  <p className="text-[10px] text-muted-foreground mb-3">
+                    Each cluster is a group of articles sharing 3+ IOCs — likely describing the same threat campaign or actor.
+                  </p>
                   <div className="space-y-3">
                     {correlationData.clusters.map((cluster, i) => (
-                      <div key={i} className="p-3 bg-muted/30 rounded-lg">
-                        <p className="text-xs font-medium text-foreground mb-1">
-                          Cluster {i + 1}: {cluster.articles.length} articles share {cluster.shared_iocs.length} IOCs
-                        </p>
+                      <div key={i} className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                            Cluster {i + 1}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {cluster.articles.length} articles · {cluster.shared_iocs.length} shared IOCs
+                          </span>
+                        </div>
                         <div className="flex flex-wrap gap-1 mb-2">
-                          {cluster.shared_iocs.slice(0, 5).map((ioc, j) => (
+                          {cluster.shared_iocs.slice(0, 6).map((ioc, j) => (
                             <span key={j} className="font-mono text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded">{ioc}</span>
                           ))}
+                          {cluster.shared_iocs.length > 6 && (
+                            <span className="text-[10px] text-muted-foreground px-1.5 py-0.5">+{cluster.shared_iocs.length - 6} more</span>
+                          )}
                         </div>
-                        <div className="space-y-0.5">
+                        <div className="space-y-0.5 pl-1 border-l-2 border-primary/20">
                           {cluster.articles.map(a => (
                             <button key={a.id} onClick={() => setSelectedArticleId(String(a.id))}
                               className="block text-[10px] text-primary hover:underline truncate max-w-full text-left">
-                              {a.title}
+                              → {a.title}
                             </button>
                           ))}
                         </div>
@@ -1021,7 +1105,30 @@ export default function ThreatIntelligence() {
               )}
 
               {correlationData.shared_iocs.length === 0 && correlationData.clusters.length === 0 && (
-                <EmptyState message="No correlations found" sub={`No shared indicators detected in the ${timeRange} time range`} />
+                <EmptyState message="No correlations found"
+                  sub={`No shared indicators detected across articles in the ${timeRange} window. Try a wider time range.`} />
+              )}
+
+              {/* Next Steps */}
+              {(correlationData.shared_iocs.length > 0 || correlationData.clusters.length > 0) && (
+                <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-green-500" /> Recommended Next Steps
+                  </p>
+                  <ul className="space-y-1.5">
+                    {[
+                      'Copy high-frequency shared IOCs and add to your SIEM/firewall blocklist',
+                      'Click article titles in clusters to review the full threat context',
+                      'Switch to IOC Explorer and filter by these indicators for deeper investigation',
+                      'Run AI Analysis to generate a threat landscape brief based on this data',
+                    ].map((step, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                        <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
+                        {step}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )}
@@ -1033,34 +1140,117 @@ export default function ThreatIntelligence() {
       {/* ============================================================ */}
       {activePanel === 'ai_analysis' && (
         <div className="space-y-4">
+          {/* Header */}
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Brain className="w-4 h-4 text-primary" /> AI Threat Landscape Analysis
-            </h3>
-            <div className="flex items-center gap-2">
-              <button onClick={() => fetchLandscape()} disabled={loading.landscape}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
-                {loading.landscape ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                Generate Analysis
-              </button>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Brain className="w-4 h-4 text-primary" /> AI Threat Landscape Analysis
+              </h3>
+              {lastAnalysisRun && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Clock className="w-3 h-3" />
+                  Last: {lastAnalysisRun.time.toLocaleTimeString()} · {lastAnalysisRun.focus} · window: {timeRange}
+                </p>
+              )}
+            </div>
+            <button onClick={() => fetchLandscape()} disabled={loading.landscape}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
+              {loading.landscape ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              Generate
+            </button>
+          </div>
+
+          {/* How It Works Banner */}
+          <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <Info className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-foreground mb-1">How AI Analysis Works</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  AI Analysis uses your configured GenAI model (OpenAI, Claude, Gemini, or Ollama) to read all extracted
+                  intelligence from your feeds and generate a <strong className="text-foreground">plain-language threat landscape brief</strong>{' '}
+                  — current trends, dominant attack patterns, active threat actors, and recommended focus areas for your SOC team.
+                </p>
+                {/* Workflow steps */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5">
+                  <span className="flex items-center gap-1 text-[10px] text-purple-600 font-medium">
+                    <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-600 flex items-center justify-center text-[9px] font-bold">1</span>
+                    Set time window (top-right)
+                  </span>
+                  <ArrowRight className="w-3 h-3 text-purple-400 hidden sm:block" />
+                  <span className="flex items-center gap-1 text-[10px] text-purple-600 font-medium">
+                    <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-600 flex items-center justify-center text-[9px] font-bold">2</span>
+                    Select a focus area below
+                  </span>
+                  <ArrowRight className="w-3 h-3 text-purple-400 hidden sm:block" />
+                  <span className="flex items-center gap-1 text-[10px] text-purple-600 font-medium">
+                    <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-600 flex items-center justify-center text-[9px] font-bold">3</span>
+                    Click Generate (or use a focus card)
+                  </span>
+                </div>
+                {/* Admin note */}
+                <div className="flex items-center gap-1.5 mt-2.5 text-[10px] text-amber-600">
+                  <Settings className="w-3 h-3 flex-shrink-0" />
+                  <span>
+                    Requires a GenAI provider configured in{' '}
+                    <strong>Admin → AI Engine → Provider Setup</strong>.
+                    Supports OpenAI, Anthropic Claude, Google Gemini, and Ollama.
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Focus Areas */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs text-muted-foreground mr-1">Focus:</span>
-            {['All', 'Ransomware', 'APT', 'Vulnerabilities', 'Phishing', 'Supply Chain'].map(focus => (
-              <button key={focus}
-                onClick={() => fetchLandscape(focus === 'All' ? undefined : focus.toLowerCase())}
-                disabled={loading.landscape}
-                className="px-2.5 py-1 text-[10px] font-medium bg-secondary text-foreground rounded-full border border-border hover:bg-secondary/80 disabled:opacity-50">
-                {focus}
-              </button>
-            ))}
+          {/* Focus Area Grid */}
+          <div>
+            <p className="text-xs font-medium text-foreground mb-2">Select Focus Area &amp; Generate:</p>
+            <div className="grid grid-cols-2 gap-2">
+              {FOCUS_AREAS.map(f => {
+                const FIcon = f.icon;
+                return (
+                  <button key={f.label}
+                    onClick={() => fetchLandscape(f.value)}
+                    disabled={loading.landscape}
+                    className={cn(
+                      'flex items-start gap-2.5 p-3 rounded-lg border text-left transition-colors',
+                      'bg-card border-border hover:border-primary/50 hover:bg-primary/5',
+                      'disabled:opacity-50 disabled:cursor-not-allowed',
+                    )}>
+                    <FIcon className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-foreground leading-none mb-0.5">{f.label}</p>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">{f.desc}</p>
+                    </div>
+                    {loading.landscape ? (
+                      <Loader2 className="w-3 h-3 animate-spin text-muted-foreground flex-shrink-0 ml-auto mt-0.5" />
+                    ) : (
+                      <Sparkles className="w-3 h-3 text-muted-foreground flex-shrink-0 ml-auto mt-0.5 opacity-40" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {loading.landscape ? <Spinner /> : landscapeSummary ? (
+          {/* Result */}
+          {loading.landscape ? (
+            <div className="space-y-2">
+              <Spinner />
+              <p className="text-[10px] text-center text-muted-foreground">Analyzing intelligence data — this may take 15–30 seconds...</p>
+            </div>
+          ) : landscapeSummary ? (
             <div className="bg-card border border-border rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-primary" />
+                  <span>AI-generated · {lastAnalysisRun?.focus || 'Full Landscape'} · {timeRange} window</span>
+                </p>
+                <button onClick={() => setLandscapeSummary('')}
+                  title="Clear analysis"
+                  className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <div className="prose prose-sm max-w-none text-sm text-foreground leading-relaxed"
                 dangerouslySetInnerHTML={{
                   __html: landscapeSummary
@@ -1078,7 +1268,7 @@ export default function ThreatIntelligence() {
             </div>
           ) : (
             <EmptyState message="No analysis generated yet"
-              sub="Click 'Generate Analysis' to create an AI-powered threat landscape brief" />
+              sub="Choose a focus area above to generate a targeted AI threat brief, or click Generate for a full landscape overview" />
           )}
         </div>
       )}
