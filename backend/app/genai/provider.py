@@ -289,7 +289,7 @@ class OllamaProvider(BaseGenAIProvider):
         import httpx
         
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=300.0) as client:
                 response = await client.post(
                     f"{self.base_url}/api/generate",
                     json={

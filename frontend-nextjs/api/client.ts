@@ -1039,7 +1039,7 @@ export const genaiAPI = {
   },
   // Admin GenAI test
   testProvider: async (provider: string, testType?: string) => {
-    return post('/admin/genai/test', { provider, test_type: testType || 'summary' });
+    return post('/admin/genai/test', { provider, test_type: testType || 'summary' }, { timeout: 360000 });
   },
   // Cybersecurity quote/joke
   getCyberQuote: async () => {

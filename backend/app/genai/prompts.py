@@ -282,3 +282,107 @@ def get_ioc_extraction_prompt(title: str, content: str) -> str:
         title=title,
         content=content
     )
+
+
+# ============================================================================
+# PROMPT MANAGER CLASS
+# ============================================================================
+
+class PromptManager:
+    """Builds structured system/user prompt pairs for all GenAI functions."""
+
+    def __init__(self, db_session=None, enable_rag: bool = False):
+        self.db_session = db_session
+        self.enable_rag = enable_rag
+
+    def build_summary_prompt(
+        self,
+        content: str,
+        summary_type: str = "executive",
+        ioc_count: int = 0,
+        ttp_count: int = 0,
+        threat_actors: str = "Unknown",
+        severity: str = "Medium",
+        iocs: str = "",
+        ttps: str = "",
+    ) -> Dict:
+        """Build system + user prompts for executive or technical summarization."""
+        if summary_type == "technical":
+            system = PERSONAS["technical"]
+            user = (
+                f"Write a detailed technical analysis of this cybersecurity article.\n\n"
+                f"Threat Actor(s): {threat_actors}\n"
+                f"Severity: {severity}\n"
+                f"IOC Count: {ioc_count}\n"
+                f"TTP Count: {ttp_count}\n"
+            )
+            if iocs:
+                user += f"\nExtracted IOCs:\n{iocs}\n"
+            if ttps:
+                user += f"\nMITRE ATT&CK Techniques:\n{ttps}\n"
+            user += f"\n**Article Content:**\n{content}\n\n**Technical Analysis:**"
+        else:
+            system = PERSONAS["executive"]
+            user = (
+                f"Write an executive threat briefing for this cybersecurity article.\n\n"
+                f"Threat Actor(s): {threat_actors}\n"
+                f"Severity: {severity}\n"
+                f"IOC Count: {ioc_count}\n"
+                f"TTP Count: {ttp_count}\n"
+                f"\n**Article Content:**\n{content}\n\n**Executive Threat Briefing:**"
+            )
+        return {"system": system, "user": user}
+
+    def build_hunt_query_prompt(
+        self,
+        platform: str,
+        iocs: str,
+        ttps: str,
+        context: str = "",
+        article_title: str = "",
+        article_summary: str = "",
+        technical_summary: str = "",
+    ) -> Dict:
+        """Build system + user prompts for hunt query generation."""
+        platform_hint = platform.upper()
+        system = (
+            f"You are an expert threat hunter who writes production-ready {platform_hint} detection queries. "
+            "Generate only the query code — no explanations, no markdown fences."
+        )
+        user = f"Generate a {platform_hint} threat hunting query for the following intelligence.\n\n"
+        if article_title:
+            user += f"Article: {article_title}\n"
+        if context:
+            user += f"Context: {context}\n"
+        if article_summary:
+            user += f"\nArticle Summary:\n{article_summary}\n"
+        if technical_summary:
+            user += f"\nTechnical Summary:\n{technical_summary}\n"
+        user += f"\nIOCs:\n{iocs}\n\nMITRE ATT&CK Techniques:\n{ttps}\n\nQuery:"
+        return {"system": system, "user": user, "kb_sources": []}
+
+    def build_comprehensive_hunt_prompt(
+        self,
+        platform: str,
+        article_title: str,
+        article_content: str,
+        technical_summary: str,
+        iocs: str,
+        ttps: str,
+    ) -> Dict:
+        """Build comprehensive hunt query prompt with full article context."""
+        platform_hint = platform.upper()
+        system = (
+            f"You are an expert threat hunter who writes production-ready {platform_hint} detection queries. "
+            "Use ALL provided IOCs and TTPs. Generate only the query code — no explanations, no markdown fences."
+        )
+        user = (
+            f"Generate a comprehensive {platform_hint} threat hunting query.\n\n"
+            f"Article: {article_title}\n\n"
+            f"Article Content:\n{article_content}\n\n"
+            f"Technical Summary:\n{technical_summary}\n\n"
+            f"IOCs:\n{iocs}\n\n"
+            f"MITRE ATT&CK Techniques:\n{ttps}\n\n"
+            "Query:"
+        )
+        return {"system": system, "user": user, "kb_sources": []}
