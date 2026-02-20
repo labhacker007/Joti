@@ -5,11 +5,16 @@ from app.core.database import SessionLocal
 from app.models import FeedSource, WatchListKeyword, ConnectorConfig, Skill, Guardrail, SystemConfiguration
 from datetime import datetime
 
-# Get the project root directory (parent of backend/)
+# Resolve config file path — works in both Docker and local dev
+# In Docker:    /app/app/seeds.py → _BACKEND_DIR=/app  → /app/config/seed-sources.json ✓
+# In local dev: backend/app/seeds.py → _BACKEND_DIR=backend/ → falls back to _PROJECT_ROOT
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _BACKEND_DIR = os.path.dirname(_SCRIPT_DIR)
 _PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)
-_CONFIG_FILE = os.path.join(_PROJECT_ROOT, "config", "seed-sources.json")
+# Try the directory containing the app/ package first (Docker layout), then one level up (local layout)
+_CONFIG_FILE = os.path.join(_BACKEND_DIR, "config", "seed-sources.json")
+if not os.path.exists(_CONFIG_FILE):
+    _CONFIG_FILE = os.path.join(_PROJECT_ROOT, "config", "seed-sources.json")
 
 
 def run_migrations(db):
@@ -42,22 +47,14 @@ def seed_database():
         # No admin user is created automatically.
         # Run: docker-compose exec backend python manage.py createsuperuser
 
-        # Load feed sources - try multiple paths
+        # Load feed sources
         sources_data = []
-        config_paths = [
-            _CONFIG_FILE,
-            "config/seed-sources.json",
-            "../config/seed-sources.json",
-            os.path.join(os.getcwd(), "config", "seed-sources.json")
-        ]
-        for config_path in config_paths:
-            if os.path.exists(config_path):
-                with open(config_path, "r") as f:
-                    sources_data = json.load(f)
-                print(f"✓ Loaded sources from {config_path}")
-                break
+        if os.path.exists(_CONFIG_FILE):
+            with open(_CONFIG_FILE, "r") as f:
+                sources_data = json.load(f)
+            print(f"✓ Loaded sources from {_CONFIG_FILE}")
         else:
-            print("⚠ No seed-sources.json found, skipping feed sources")
+            print(f"⚠ No seed-sources.json found at {_CONFIG_FILE}, skipping feed sources")
         
         for source_data in sources_data:
             existing = db.query(FeedSource).filter(FeedSource.url == source_data["url"]).first()

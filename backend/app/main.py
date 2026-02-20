@@ -77,16 +77,9 @@ async def lifespan(app: FastAPI):
         db.close()
         if user_count == 0:
             logger.info("database_empty_seeding")
-            import os
-            original_cwd = os.getcwd()
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            os.chdir(project_root)
-            try:
-                from app.seeds import seed_database
-                seed_database()
-                logger.info("database_seeded_successfully")
-            finally:
-                os.chdir(original_cwd)
+            from app.seeds import seed_database
+            seed_database()
+            logger.info("database_seeded_successfully")
     except Exception as e:
         logger.error("auto_seed_failed", error=str(e))
 
