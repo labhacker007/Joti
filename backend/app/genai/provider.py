@@ -45,6 +45,7 @@ def get_api_key(provider: str) -> Optional[str]:
         'openai': settings.OPENAI_API_KEY,
         'anthropic': settings.ANTHROPIC_API_KEY or getattr(settings, 'CLAUDE_API_KEY', None),
         'gemini': settings.GEMINI_API_KEY,
+        'kimi': getattr(settings, 'KIMI_API_KEY', None),
     }
     
     # First try environment variable
@@ -67,13 +68,15 @@ def get_model_name(provider: str) -> Optional[str]:
         'anthropic': settings.ANTHROPIC_MODEL,
         'gemini': settings.GEMINI_MODEL if hasattr(settings, 'GEMINI_MODEL') else None,
         'ollama': settings.OLLAMA_MODEL,
+        'kimi': getattr(settings, 'KIMI_MODEL', None),
     }
-    
+
     defaults = {
         'openai': 'gpt-4-turbo-preview',
         'anthropic': 'claude-3-5-sonnet-20241022',
         'gemini': 'gemini-1.5-pro',
         'ollama': 'llama3:latest',
+        'kimi': 'kimi-k2-0711-preview',
     }
     
     # First try environment variable
@@ -260,6 +263,69 @@ class ClaudeProvider(BaseGenAIProvider):
             return {"raw_analysis": response, "parse_error": True}
 
 
+class KimiProvider(BaseGenAIProvider):
+    """Moonshot AI Kimi provider (Kimi K2 / 2.5).
+
+    Uses an OpenAI-compatible REST API at https://api.moonshot.cn/v1.
+    Supported models: kimi-k2-0711-preview, moonshot-v1-8k,
+                      moonshot-v1-32k, moonshot-v1-128k
+    Get an API key at https://platform.moonshot.cn
+    """
+
+    _BASE_URL = "https://api.moonshot.cn/v1"
+
+    def __init__(self, api_key: str = None, model: str = None):
+        self.api_key = api_key or get_api_key('kimi')
+        self.model = model or get_model_name('kimi')
+
+    async def generate(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
+        from openai import AsyncOpenAI
+
+        if not self.api_key:
+            raise ValueError(
+                "Kimi API key not configured. "
+                "Please set it in Admin > AI Engine > Providers."
+            )
+
+        client = AsyncOpenAI(api_key=self.api_key, base_url=self._BASE_URL)
+
+        try:
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=kwargs.get("temperature", 0.2),
+                max_tokens=kwargs.get("max_tokens", 2000),
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error("kimi_generation_failed", error=str(e))
+            raise
+
+    async def analyze_results(self, hunt_results: Dict, context: Dict) -> Dict:
+        system_prompt = (
+            "You are a senior threat intelligence analyst. Analyze hunt results and "
+            "provide findings in JSON format with keys: executive_summary, risk_level, "
+            "risk_justification, affected_systems, recommended_actions, confirmed_iocs"
+        )
+        user_prompt = (
+            f"Hunt Context: {json.dumps(context)}\n\n"
+            f"Hunt Results: {json.dumps(hunt_results)}\n\n"
+            "Provide your analysis in JSON format."
+        )
+
+        response = await self.generate(system_prompt, user_prompt, temperature=0.1)
+
+        try:
+            if "```json" in response:
+                response = response.split("```json")[1].split("```")[0]
+            return json.loads(response)
+        except json.JSONDecodeError:
+            return {"raw_analysis": response, "parse_error": True}
+
+
 class OllamaProvider(BaseGenAIProvider):
     """Ollama local LLM provider (Llama, Mistral, etc.).
     
@@ -333,6 +399,7 @@ class GenAIProviderFactory:
         "openai": OpenAIProvider,
         "gemini": GeminiProvider,
         "claude": ClaudeProvider,
+        "kimi": KimiProvider,
         "ollama": OllamaProvider,
     }
     
@@ -462,7 +529,28 @@ class GenAIModelManager:
                         "description": "Google Gemini via API",
                         "is_free": False
                     })
-        
+
+        # Check Kimi (Moonshot AI)
+        kimi_key = get_api_key('kimi')
+        if kimi_key:
+            model_id = "kimi"
+            model_name = get_model_name('kimi')
+            if model_id not in seen_identifiers:
+                seen_identifiers.add(model_id)
+                if model_id in registry_models:
+                    models.append(registry_models[model_id])
+                else:
+                    models.append({
+                        "id": model_id,
+                        "name": "Kimi (Moonshot AI)",
+                        "model": model_name,
+                        "provider": "kimi",
+                        "type": "api",
+                        "status": "available",
+                        "description": "Kimi K2 / 2.5 via Moonshot AI API",
+                        "is_free": False
+                    })
+
         # Check Ollama (local)
         ollama_models = await self._check_ollama()
         for model in ollama_models:
@@ -622,6 +710,8 @@ class GenAIModelManager:
             return ClaudeProvider()
         elif model_id == "gemini":
             return GeminiProvider()
+        elif model_id == "kimi":
+            return KimiProvider()
         else:
             # Default to Ollama
             return OllamaProvider()

@@ -75,6 +75,18 @@ async def get_provider_status(
             "model": settings.GEMINI_MODEL,
             "status": "not_configured" if not settings.GEMINI_API_KEY else "configured",
             "available_models": ["gemini-pro", "gemini-1.5-pro"] if settings.GEMINI_API_KEY else []
+        },
+        "kimi": {
+            "name": "Kimi (Moonshot AI)",
+            "configured": bool(getattr(settings, 'KIMI_API_KEY', None)),
+            "api_key_required": True,
+            "has_api_key": bool(getattr(settings, 'KIMI_API_KEY', None)),
+            "is_local": False,
+            "is_free": False,
+            "model": getattr(settings, 'KIMI_MODEL', 'kimi-k2-0711-preview'),
+            "status": "not_configured" if not getattr(settings, 'KIMI_API_KEY', None) else "configured",
+            "available_models": ["kimi-k2-0711-preview", "moonshot-v1-128k", "moonshot-v1-32k", "moonshot-v1-8k"]
+                                if getattr(settings, 'KIMI_API_KEY', None) else []
         }
     }
     
@@ -138,6 +150,11 @@ async def get_provider_status(
                 is_usable = True
             else:
                 reason = "Gemini API key not configured. Set GEMINI_API_KEY in environment."
+        elif provider == "kimi":
+            if providers["kimi"]["has_api_key"]:
+                is_usable = True
+            else:
+                reason = "Kimi API key not configured. Add it in Admin > AI Engine > Providers."
         
         usable_models.append({
             "id": model.id,

@@ -130,6 +130,8 @@ class Settings(BaseSettings):
     CLAUDE_API_KEY: Optional[str] = None  # Legacy alias
     ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
     CLAUDE_MODEL: str = "claude-3-5-sonnet-20241022"  # Legacy alias
+    KIMI_API_KEY: Optional[str] = None  # Moonshot AI (Kimi)
+    KIMI_MODEL: str = "kimi-k2-0711-preview"  # Kimi K2 / 2.5
     # Ollama - Local LLM (default for local testing)
     # Ollama v0.14.2 - Using llama3:latest (8B) model
     OLLAMA_BASE_URL: str = "http://host.docker.internal:11434"  # Docker-friendly default

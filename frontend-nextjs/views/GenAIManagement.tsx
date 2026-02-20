@@ -154,6 +154,12 @@ const PROVIDER_DEFS: ProviderConfig[] = [
     description: 'Gemini 1.5 Pro, Gemini 1.5 Flash',
   },
   {
+    provider: 'kimi',
+    label: 'Kimi (Moonshot AI)',
+    keyField: 'KIMI_API_KEY',
+    description: 'Kimi K2 / 2.5 — kimi-k2-0711-preview, moonshot-v1-128k',
+  },
+  {
     provider: 'ollama',
     label: 'Ollama (Local)',
     keyField: '',
