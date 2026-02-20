@@ -2812,6 +2812,10 @@ async def get_genai_functions(
                 "description": data.get("description", ""),
                 "primary_model_id": data.get("primary_model_id"),
                 "secondary_model_id": data.get("secondary_model_id"),
+                "total_requests": data.get("total_requests", 0),
+                "total_tokens": data.get("total_tokens", 0),
+                "total_cost": data.get("total_cost", 0.0),
+                "active_prompt_name": data.get("active_prompt_name"),
                 "updated_at": config.updated_at.isoformat() if config.updated_at else None,
             })
         except Exception:

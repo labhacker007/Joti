@@ -1135,8 +1135,8 @@ export default function GenAIManagement() {
                         </p>
                       </div>
                       <div className="text-right text-xs text-muted-foreground">
-                        <p>{fn.total_requests} requests</p>
-                        <p>${fn.total_cost.toFixed(4)} cost</p>
+                        <p>{fn.total_requests ?? 0} requests</p>
+                        <p>${(fn.total_cost ?? 0).toFixed(4)} cost</p>
                       </div>
                     </div>
                   </div>
