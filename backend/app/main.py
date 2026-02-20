@@ -388,7 +388,7 @@ def seed_database_setup(request: Request):
         
         return {
             "success": True,
-            "message": "Database seeded successfully! Admin credentials are set via ADMIN_EMAIL and ADMIN_PASSWORD environment variables.",
+            "message": "Database seeded successfully! Create an admin user with: docker-compose exec backend python manage.py createsuperuser",
             "sources_added": source_count
         }
     except Exception as e:

@@ -23,12 +23,11 @@ cd Joti
 cp .env.example .env
 ```
 
-Open `.env` and replace the three `CHANGEME` values:
+Open `.env` and replace the two `CHANGEME` values:
 
 ```env
 POSTGRES_PASSWORD=your_db_password
 SECRET_KEY=your_secret_key_min_32_chars
-ADMIN_PASSWORD=your_admin_password
 ```
 
 **3. Start the app**
@@ -39,7 +38,15 @@ docker-compose up -d
 
 The first run builds images and may take 2–3 minutes.
 
-**4. Access**
+**4. Create your admin user**
+
+```bash
+docker-compose exec backend python manage.py createsuperuser
+```
+
+You will be prompted for email, username, and password.
+
+**5. Access**
 
 | Service | URL |
 |---------|-----|
@@ -47,7 +54,7 @@ The first run builds images and may take 2–3 minutes.
 | Backend API | http://localhost:8000 |
 | API Docs (Swagger) | http://localhost:8000/docs |
 
-Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` from your `.env` (defaults: `admin@localhost`).
+Log in with the credentials you set in step 4.
 
 ## Stopping
 

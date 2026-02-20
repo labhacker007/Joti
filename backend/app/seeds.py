@@ -2,8 +2,7 @@
 import json
 import os
 from app.core.database import SessionLocal
-from app.models import FeedSource, WatchListKeyword, ConnectorConfig, User, UserRole, Skill, Guardrail, SystemConfiguration
-from app.auth.security import hash_password
+from app.models import FeedSource, WatchListKeyword, ConnectorConfig, Skill, Guardrail, SystemConfiguration
 from datetime import datetime
 
 # Get the project root directory (parent of backend/)
@@ -40,45 +39,8 @@ def seed_database():
     run_migrations(db)
     
     try:
-        # Create default admin user with password from environment variable
-        # SECURITY: Admin password MUST be set via ADMIN_PASSWORD environment variable
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
-            admin_password = os.environ.get("ADMIN_PASSWORD")
-            if not admin_password:
-                print("⚠ ADMIN_PASSWORD not set - skipping admin user creation")
-                print("  Set ADMIN_PASSWORD environment variable to create admin user")
-            else:
-                # Validate password strength
-                if len(admin_password) < 8:
-                    print("⚠ ADMIN_PASSWORD must be at least 8 characters - skipping admin user creation")
-                else:
-                    admin = User(
-                        email=os.environ.get("ADMIN_EMAIL", "admin@localhost"),
-                        username="admin",
-                        hashed_password=hash_password(admin_password),
-                        role=UserRole.ADMIN,
-                        is_active=True,
-                        full_name="Administrator"
-                    )
-                    db.add(admin)
-                    print("✓ Created admin user (password from ADMIN_PASSWORD env var)")
-
-        # Create tarun admin user
-        tarun = db.query(User).filter(User.username == "tarun").first()
-        if not tarun:
-            tarun_password = os.environ.get("ADMIN_PASSWORD", "")
-            if tarun_password and len(tarun_password) >= 8:
-                tarun = User(
-                    email="tarun@joti.local",
-                    username="tarun",
-                    hashed_password=hash_password(tarun_password),
-                    role=UserRole.ADMIN,
-                    is_active=True,
-                    full_name="Tarun (Admin)"
-                )
-                db.add(tarun)
-                print("✓ Created tarun admin user")
+        # No admin user is created automatically.
+        # Run: docker-compose exec backend python manage.py createsuperuser
 
         # Load feed sources - try multiple paths
         sources_data = []
