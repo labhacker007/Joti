@@ -16,6 +16,68 @@ _CONFIG_FILE = os.path.join(_BACKEND_DIR, "config", "seed-sources.json")
 if not os.path.exists(_CONFIG_FILE):
     _CONFIG_FILE = os.path.join(_PROJECT_ROOT, "config", "seed-sources.json")
 
+# Top 50 curated threat intelligence sources — always embedded as a fallback.
+# If seed-sources.json is present its entries are merged on top (de-duped by URL).
+_DEFAULT_SOURCES = [
+    # ── Core News ──────────────────────────────────────────────────────────────
+    {"name": "CISA Cybersecurity Advisories",      "url": "https://www.cisa.gov/uscert/ncas/alerts.xml",                              "feed_type": "rss",  "description": "Official CISA cybersecurity alerts and advisories"},
+    {"name": "US-CERT Current Activity",           "url": "https://www.cisa.gov/uscert/ncas/current-activity.xml",                    "feed_type": "rss",  "description": "Current cybersecurity activity and alerts from US-CERT"},
+    {"name": "SANS Internet Storm Center",         "url": "https://isc.sans.edu/rssfeed.xml",                                         "feed_type": "rss",  "description": "Daily cyber attack trends and threat indicators from SANS ISC"},
+    {"name": "BleepingComputer",                   "url": "https://www.bleepingcomputer.com/feed/",                                   "feed_type": "rss",  "description": "Breaking news on malware, ransomware, vulnerabilities, and data breaches"},
+    {"name": "The Hacker News",                    "url": "https://feeds.feedburner.com/TheHackersNews",                              "feed_type": "rss",  "description": "Cybersecurity news, hacking, and security vulnerabilities"},
+    {"name": "Dark Reading",                       "url": "https://www.darkreading.com/rss.xml",                                      "feed_type": "rss",  "description": "Comprehensive enterprise security news and analysis"},
+    {"name": "SecurityWeek",                       "url": "https://feeds.feedburner.com/securityweek",                               "feed_type": "rss",  "description": "Cybersecurity news, insights, and expert analysis"},
+    {"name": "Krebs on Security",                  "url": "https://krebsonsecurity.com/feed/",                                        "feed_type": "rss",  "description": "In-depth cybersecurity investigation and analysis by Brian Krebs"},
+    {"name": "The Record by Recorded Future",      "url": "https://therecord.media/feed",                                            "feed_type": "rss",  "description": "Cybersecurity news from Recorded Future"},
+    {"name": "Help Net Security",                  "url": "https://www.helpnetsecurity.com/feed/",                                    "feed_type": "rss",  "description": "IT security news, reviews, and product information"},
+    {"name": "Security Affairs",                   "url": "https://securityaffairs.com/feed",                                        "feed_type": "rss",  "description": "Information security news, hacking, and data breaches"},
+    {"name": "Infosecurity Magazine",              "url": "https://www.infosecurity-magazine.com/rss/news/",                         "feed_type": "rss",  "description": "Information security news and analysis"},
+    # ── Major Vendor Research ──────────────────────────────────────────────────
+    {"name": "Mandiant Blog",                      "url": "https://www.mandiant.com/resources/blog/rss.xml",                         "feed_type": "rss",  "description": "Threat research, APT analysis, and incident response from Mandiant"},
+    {"name": "Talos Intelligence Blog",            "url": "https://blog.talosintelligence.com/feeds/posts/default",                  "feed_type": "atom", "description": "Threat intelligence and vulnerability research from Cisco Talos"},
+    {"name": "CrowdStrike Blog",                   "url": "https://www.crowdstrike.com/blog/feed/",                                  "feed_type": "rss",  "description": "Threat hunting, adversary intelligence, and endpoint protection insights"},
+    {"name": "Palo Alto Unit 42",                  "url": "https://unit42.paloaltonetworks.com/feed/",                               "feed_type": "rss",  "description": "Threat research from Palo Alto Networks Unit 42"},
+    {"name": "Microsoft Security Blog",            "url": "https://www.microsoft.com/en-us/security/blog/feed/",                     "feed_type": "rss",  "description": "Security research and threat intelligence from Microsoft"},
+    {"name": "Kaspersky Securelist",               "url": "https://securelist.com/feed/",                                            "feed_type": "rss",  "description": "Advanced threat research and APT tracking from Kaspersky Lab"},
+    {"name": "Sophos News",                        "url": "https://news.sophos.com/feed/",                                           "feed_type": "rss",  "description": "Threat research, malware analysis, and security news from Sophos"},
+    {"name": "Check Point Research",               "url": "https://research.checkpoint.com/feed/",                                   "feed_type": "rss",  "description": "Vulnerability research and threat intelligence from Check Point"},
+    {"name": "SentinelOne Blog",                   "url": "https://www.sentinelone.com/blog/feed/",                                  "feed_type": "rss",  "description": "Threat research and endpoint security from SentinelOne"},
+    {"name": "IBM Security Intelligence",          "url": "https://securityintelligence.com/feed/",                                  "feed_type": "rss",  "description": "Threat intelligence and security research from IBM X-Force"},
+    {"name": "ESET WeLiveSecurity",                "url": "https://www.welivesecurity.com/feed/",                                    "feed_type": "rss",  "description": "Expert cybersecurity insights and threat research from ESET"},
+    {"name": "Trend Micro Research",               "url": "https://www.trendmicro.com/en_us/research.rss.xml",                      "feed_type": "rss",  "description": "Cybersecurity research and threat analysis from Trend Micro"},
+    {"name": "Fortinet Threat Research",           "url": "https://www.fortinet.com/blog/threat-research.rss",                      "feed_type": "rss",  "description": "FortiGuard Labs threat research and analysis"},
+    {"name": "Malwarebytes Labs",                  "url": "https://blog.malwarebytes.com/feed/",                                     "feed_type": "rss",  "description": "Malware analysis, threat intelligence, and cybersecurity research"},
+    # ── Government / CERT ─────────────────────────────────────────────────────
+    {"name": "NSA Cybersecurity Advisories",       "url": "https://www.nsa.gov/Press-Room/Cybersecurity-Advisories-Guidance/rss/",  "feed_type": "rss",  "description": "NSA joint cybersecurity advisories and technical guidance"},
+    {"name": "NCSC UK Advisories",                 "url": "https://www.ncsc.gov.uk/api/1/services/v1/report-rss-feed.xml",          "feed_type": "rss",  "description": "UK National Cyber Security Centre security advisories"},
+    {"name": "ASD ACSC Advisories",                "url": "https://www.cyber.gov.au/sites/default/files/cyber.gov.au.rss",          "feed_type": "rss",  "description": "Australian Cyber Security Centre alerts and advisories"},
+    {"name": "NVD Recent Vulnerabilities",         "url": "https://nvd.nist.gov/feeds/xml/cve/misc/nvd-rss.xml",                   "feed_type": "rss",  "description": "Recent vulnerabilities from NIST National Vulnerability Database"},
+    {"name": "Microsoft MSRC",                     "url": "https://msrc.microsoft.com/blog/feed",                                   "feed_type": "rss",  "description": "Microsoft Security Response Center vulnerability disclosures"},
+    {"name": "CERT/CC Notes",                      "url": "https://www.kb.cert.org/vuls/atomfeed/",                                 "feed_type": "atom", "description": "Vulnerability notes database from CERT Coordination Center"},
+    {"name": "JPCERT/CC Blog",                     "url": "https://blogs.jpcert.or.jp/en/atom.xml",                                 "feed_type": "atom", "description": "Japan Computer Emergency Response Team malware analysis"},
+    # ── Threat Research & DFIR ────────────────────────────────────────────────
+    {"name": "Google Project Zero",                "url": "https://googleprojectzero.blogspot.com/feeds/posts/default",             "feed_type": "atom", "description": "Zero-day vulnerability research from Google Project Zero"},
+    {"name": "Google TAG Blog",                    "url": "https://blog.google/threat-analysis-group/rss/",                        "feed_type": "rss",  "description": "Government-backed hacking and zero-day research from Google TAG"},
+    {"name": "The DFIR Report",                    "url": "https://thedfirreport.com/feed/",                                        "feed_type": "rss",  "description": "Detailed incident response case studies and IOC reporting"},
+    {"name": "Volexity Blog",                      "url": "https://www.volexity.com/blog/feed/",                                    "feed_type": "rss",  "description": "Memory forensics and incident response intelligence from Volexity"},
+    {"name": "Red Canary Blog",                    "url": "https://redcanary.com/blog/feed/",                                       "feed_type": "rss",  "description": "Threat detection research and real-world attack analysis"},
+    {"name": "Elastic Security Labs",              "url": "https://www.elastic.co/security-labs/rss/feed.xml",                     "feed_type": "rss",  "description": "Threat research and detection engineering from Elastic Security"},
+    {"name": "NCC Group Research",                 "url": "https://research.nccgroup.com/feed/",                                   "feed_type": "rss",  "description": "Penetration testing research and security consulting insights"},
+    {"name": "Trail of Bits Blog",                 "url": "https://blog.trailofbits.com/feed/",                                    "feed_type": "rss",  "description": "Software security research, fuzzing, and vulnerability discovery"},
+    # ── Vulnerability & Exploit ───────────────────────────────────────────────
+    {"name": "Exploit Database",                   "url": "https://www.exploit-db.com/rss.xml",                                    "feed_type": "rss",  "description": "Latest exploits and vulnerable software from Exploit-DB"},
+    {"name": "Rapid7 Blog",                        "url": "https://blog.rapid7.com/rss/",                                          "feed_type": "rss",  "description": "Vulnerability research, threat intelligence, and security operations"},
+    {"name": "Qualys Security Blog",               "url": "https://blog.qualys.com/feed",                                          "feed_type": "rss",  "description": "Vulnerability management and cloud security research"},
+    {"name": "Tenable Blog",                       "url": "https://www.tenable.com/blog/feed",                                     "feed_type": "rss",  "description": "Vulnerability research and exposure management insights"},
+    {"name": "HackerOne Disclosed Reports",        "url": "https://hackerone.com/hacktivity.rss",                                  "feed_type": "rss",  "description": "Publicly disclosed vulnerability reports from HackerOne"},
+    # ── Threat Intelligence Platforms ─────────────────────────────────────────
+    {"name": "Recorded Future Blog",               "url": "https://www.recordedfuture.com/blog/rss.xml",                           "feed_type": "rss",  "description": "Threat intelligence research and analysis from Recorded Future"},
+    {"name": "Abuse.ch URLhaus",                   "url": "https://urlhaus.abuse.ch/feeds/rss/",                                   "feed_type": "rss",  "description": "Malicious URL tracking and sharing from abuse.ch"},
+    {"name": "VirusTotal Blog",                    "url": "https://blog.virustotal.com/feeds/posts/default",                       "feed_type": "atom", "description": "Malware analysis and threat intelligence from VirusTotal"},
+    {"name": "Any.run Blog",                       "url": "https://any.run/cybersecurity-blog/feed/",                              "feed_type": "rss",  "description": "Interactive malware analysis and threat research from ANY.RUN"},
+    {"name": "Intezer Blog",                       "url": "https://intezer.com/blog/feed/",                                        "feed_type": "rss",  "description": "Code reuse analysis and malware genetics research from Intezer"},
+]
+
 
 def run_migrations(db):
     """Run any pending schema migrations."""
@@ -47,14 +109,19 @@ def seed_database():
         # No admin user is created automatically.
         # Run: docker-compose exec backend python manage.py createsuperuser
 
-        # Load feed sources
-        sources_data = []
+        # Load feed sources — start with embedded top-50, then merge JSON extras
+        sources_data = list(_DEFAULT_SOURCES)
         if os.path.exists(_CONFIG_FILE):
             with open(_CONFIG_FILE, "r") as f:
-                sources_data = json.load(f)
-            print(f"✓ Loaded sources from {_CONFIG_FILE}")
+                json_sources = json.load(f)
+            existing_urls = {s["url"] for s in sources_data}
+            for s in json_sources:
+                if s["url"] not in existing_urls:
+                    sources_data.append(s)
+                    existing_urls.add(s["url"])
+            print(f"✓ Merged {len(json_sources)} sources from {_CONFIG_FILE} (total: {len(sources_data)})")
         else:
-            print(f"⚠ No seed-sources.json found at {_CONFIG_FILE}, skipping feed sources")
+            print(f"ℹ No seed-sources.json found — seeding {len(sources_data)} embedded default sources")
         
         for source_data in sources_data:
             existing = db.query(FeedSource).filter(FeedSource.url == source_data["url"]).first()
