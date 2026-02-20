@@ -529,7 +529,7 @@ export default function ThreatIntelligence() {
       })) as any;
       const data = response.data || response;
       setUploadResults(prev => [{
-        status: 'success',
+        status: 'success' as const,
         filename: ingestTitle || ingestUrl,
         message: `Feed added and ingestion triggered. Source ID: ${data.id || 'created'}`,
         iocCount: 0,
@@ -539,7 +539,7 @@ export default function ThreatIntelligence() {
       setIngestTitle('');
     } catch (err: any) {
       setUploadResults(prev => [{
-        status: 'error',
+        status: 'error' as const,
         filename: ingestTitle || ingestUrl,
         message: err.response?.data?.detail || err.message || 'Failed to add feed',
       }, ...prev].slice(0, 50));
