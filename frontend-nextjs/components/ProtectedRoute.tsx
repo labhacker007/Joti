@@ -65,9 +65,9 @@ function ProtectedRoute({
   const checkAccess = useCallback((
     pages: { key: string }[],
     effectiveRole: string | null,
-    currentPath: string
+    currentPath: string | null
   ) => {
-    const pageKey = requiredPageKey || PATH_TO_PAGE_KEY[currentPath as keyof typeof PATH_TO_PAGE_KEY];
+    const pageKey = requiredPageKey || PATH_TO_PAGE_KEY[(currentPath ?? '') as keyof typeof PATH_TO_PAGE_KEY];
 
     if (!pageKey) {
       // Unknown page - allow access if user is authenticated
