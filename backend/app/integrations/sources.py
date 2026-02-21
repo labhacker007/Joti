@@ -662,7 +662,7 @@ def trigger_feed_ingestion(
 
 @router.post("/ingest-all")
 def trigger_all_ingestion(
-    current_user: User = Depends(require_permission(Permission.SOURCES_MANAGE.value)),
+    current_user: User = Depends(require_permission(Permission.SOURCES_READ.value)),
     db: Session = Depends(get_db)
 ):
     """Trigger ingestion for all active feed sources."""

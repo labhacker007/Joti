@@ -131,6 +131,7 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
 
   // Refresh state
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState('');
 
   // Dynamic quote/joke
   const [dynamicQuote, setDynamicQuote] = useState<{ text: string; author: string } | null>(null);
@@ -350,25 +351,35 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
   const handleRefreshFeeds = async () => {
     setRefreshing(true);
     try {
-      await sourcesAPI.ingestAll();
-      // Also refresh the quote
+      const res = (await sourcesAPI.ingestAll()) as any;
+      const data = res?.data || res;
+      const newArticles: number = data?.total_new_articles ?? 0;
+      const sourcesCount: number = data?.results?.length ?? 0;
+
+      // Refresh article list and counts immediately after ingest completes
+      await Promise.all([fetchArticles(), fetchCounts()]);
+
+      // Show result summary briefly
+      if (newArticles > 0) {
+        setRefreshMessage(`Fetched ${newArticles} new article${newArticles !== 1 ? 's' : ''} from ${sourcesCount} source${sourcesCount !== 1 ? 's' : ''}`);
+      } else {
+        setRefreshMessage(`All ${sourcesCount} source${sourcesCount !== 1 ? 's' : ''} up to date`);
+      }
+      setTimeout(() => setRefreshMessage(''), 4000);
+
+      // Also refresh the quote silently
       try {
-        const res = (await genaiAPI.getCyberQuote()) as any;
-        const data = res.data || res;
-        if (data?.text) {
-          setDynamicQuote({ text: data.text, author: data.author || 'Joti AI' });
-        }
+        const qRes = (await genaiAPI.getCyberQuote()) as any;
+        const qData = qRes.data || qRes;
+        if (qData?.text) setDynamicQuote({ text: qData.text, author: qData.author || 'Joti AI' });
       } catch { /* silent */ }
-      // Wait briefly then refresh articles
-      setTimeout(() => {
-        fetchArticles();
-        fetchCounts();
-        setRefreshing(false);
-      }, 2000);
     } catch (err: any) {
       console.error('Refresh feeds failed:', err);
-      setRefreshing(false);
+      setRefreshMessage('Refresh failed — check your connection');
+      setTimeout(() => setRefreshMessage(''), 4000);
       fetchArticles();
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -476,6 +487,14 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
             <RefreshCw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
             {refreshing ? 'Refreshing...' : 'Refresh'}
           </button>
+          {refreshMessage && (
+            <span className={cn(
+              'text-xs px-2 py-1 rounded-md font-medium transition-opacity',
+              refreshMessage.includes('failed') ? 'text-red-400 bg-red-500/10' : 'text-green-400 bg-green-500/10'
+            )}>
+              {refreshMessage}
+            </span>
+          )}
         </div>
 
         {/* Center: Time Range */}

@@ -8,8 +8,6 @@ import {
   CheckCircle,
   Eye,
   RefreshCw,
-  ChevronDown,
-  ChevronRight,
   Pencil,
   Search,
   X,
@@ -85,8 +83,6 @@ export default function Watchlist() {
   const [newCategory, setNewCategory] = useState('');
   const [adding, setAdding] = useState(false);
 
-  // Category card expansion
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
 
   useEffect(() => { loadWatchlist(); }, []);
@@ -117,12 +113,9 @@ export default function Watchlist() {
         setSuccess('Personal keyword added');
         await loadPersonalKeywords();
       } else {
-        const addedCategory = newCategory || 'Ungrouped';
         await watchlistAPI.addKeyword(newKeyword.trim(), newCategory || undefined);
         setSuccess('Keyword added to watchlist');
         await loadWatchlist();
-        // Auto-expand the category group where the keyword was placed
-        setExpandedCategory(addedCategory);
       }
       setNewKeyword(''); setNewCategory(''); setShowAddPanel(false);
     } catch (err: any) {
@@ -197,20 +190,6 @@ export default function Watchlist() {
   const q = searchFilter.toLowerCase();
   const filteredItems = q ? items.filter((i) => i.keyword.toLowerCase().includes(q)) : items;
   const filteredPersonal = q ? personalKeywords.filter((k) => k.keyword.toLowerCase().includes(q)) : personalKeywords;
-
-  // Group by category
-  const grouped = filteredItems.reduce<Record<string, WatchlistItem[]>>((acc, item) => {
-    const cat = item.category || 'Ungrouped';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(item);
-    return acc;
-  }, {});
-
-  const groupOrder = [...CATEGORIES, 'Ungrouped'];
-  const sortedGroups = Object.keys(grouped).sort((a, b) => {
-    const ai = groupOrder.indexOf(a); const bi = groupOrder.indexOf(b);
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
 
   const activeCount = items.filter((k) => k.is_active).length;
 
@@ -334,7 +313,7 @@ export default function Watchlist() {
         </div>
       )}
 
-      {/* ── Global Keywords — Category Card Grid ── */}
+      {/* ── Global Keywords — Flat List ── */}
       {activeTab === 'global' && (
         <>
           {loading ? (
@@ -347,114 +326,88 @@ export default function Watchlist() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {sortedGroups.map((group) => {
-                const groupItems = grouped[group];
-                const colors = CATEGORY_COLORS[group] || DEFAULT_CAT_COLOR;
-                const activeInGroup = groupItems.filter((i) => i.is_active).length;
-                const isExpanded = expandedCategory === group;
-
+            <div className="bg-card border border-border rounded-lg divide-y divide-border">
+              {filteredItems.map((item) => {
+                const colors = CATEGORY_COLORS[item.category || ''] || DEFAULT_CAT_COLOR;
                 return (
                   <div
-                    key={group}
+                    key={item.id}
                     className={cn(
-                      'border rounded-lg overflow-hidden transition-all cursor-pointer',
-                      colors.border, colors.bg,
-                      isExpanded && 'col-span-2 sm:col-span-3 lg:col-span-4'
+                      'flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors',
+                      !item.is_active && 'opacity-60'
                     )}
                   >
-                    {/* Card header */}
-                    <button
-                      onClick={() => setExpandedCategory(isExpanded ? null : group)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                    >
-                      <div className={cn('w-2 h-2 rounded-full flex-shrink-0', colors.dot)} />
-                      <div className="flex-1 min-w-0">
-                        <p className={cn('text-xs font-semibold truncate', colors.text)}>
-                          {group}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {groupItems.length} keyword{groupItems.length !== 1 ? 's' : ''} &middot; {activeInGroup} active
-                        </p>
-                      </div>
-                      {isExpanded
-                        ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                        : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                      }
-                    </button>
+                    {/* Active status dot */}
+                    <div className={cn(
+                      'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                      item.is_active ? 'bg-green-500' : 'bg-muted-foreground/30'
+                    )} />
 
-                    {/* Expanded keyword list */}
-                    {isExpanded && (
-                      <div className="border-t border-border/50 bg-card">
-                        {groupItems.map((item) => (
-                          <div
-                            key={item.id}
-                            className={cn(
-                              'flex items-center gap-2.5 px-3 py-2 group hover:bg-muted/50 transition-colors',
-                              !item.is_active && 'opacity-50'
-                            )}
-                          >
-                            {/* Toggle — admin only */}
-                            {isAdmin ? (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleToggle(item.id, item.is_active); }}
-                                className={cn(
-                                  'relative inline-flex h-4 w-7 items-center rounded-full transition-colors flex-shrink-0',
-                                  item.is_active ? 'bg-primary' : 'bg-muted-foreground/30'
-                                )}
-                              >
-                                <span className={cn(
-                                  'inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm',
-                                  item.is_active ? 'translate-x-3.5' : 'translate-x-0.5'
-                                )} />
-                              </button>
-                            ) : (
-                              <div className={cn(
-                                'w-2 h-2 rounded-full flex-shrink-0',
-                                item.is_active ? 'bg-primary' : 'bg-muted-foreground/30'
-                              )} />
-                            )}
+                    {/* Keyword */}
+                    <span className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">
+                      {item.keyword}
+                    </span>
 
-                            <span className="text-xs text-foreground font-medium truncate flex-1 min-w-0">
-                              {item.keyword}
-                            </span>
+                    {/* Category badge */}
+                    {item.category && (
+                      <span className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 border',
+                        colors.bg, colors.text, colors.border
+                      )}>
+                        {item.category}
+                      </span>
+                    )}
 
-                            {/* Edit category — admin only */}
-                            {isAdmin && (
-                              <>
-                                {editingCategory === item.id ? (
-                                  <select
-                                    autoFocus
-                                    value={item.category || ''}
-                                    onChange={(e) => handleCategoryChange(item.id, e.target.value)}
-                                    onBlur={() => setEditingCategory(null)}
-                                    className="px-1.5 py-0.5 bg-background border border-input rounded text-[10px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary flex-shrink-0"
-                                  >
-                                    <option value="">Ungrouped</option>
-                                    {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                                  </select>
-                                ) : (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setEditingCategory(item.id); }}
-                                    className="p-0.5 text-muted-foreground hover:text-foreground rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                    title="Change category"
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </button>
-                                )}
+                    {/* Enable / Disable button */}
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleToggle(item.id, item.is_active)}
+                        className={cn(
+                          'text-[10px] px-2 py-1 rounded border font-medium flex-shrink-0 transition-colors',
+                          item.is_active
+                            ? 'border-orange-500/30 text-orange-500 hover:bg-orange-500/10'
+                            : 'border-green-500/30 text-green-500 hover:bg-green-500/10'
+                        )}
+                      >
+                        {item.is_active ? 'Disable' : 'Enable'}
+                      </button>
+                    )}
 
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                                  className="p-0.5 text-muted-foreground hover:text-red-600 rounded hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                  title="Remove"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                    {/* Edit (change category) */}
+                    {isAdmin && (
+                      editingCategory === item.id ? (
+                        <select
+                          autoFocus
+                          value={item.category || ''}
+                          onChange={(e) => handleCategoryChange(item.id, e.target.value)}
+                          onBlur={() => setEditingCategory(null)}
+                          className="px-1.5 py-1 bg-background border border-input rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary flex-shrink-0"
+                        >
+                          <option value="">No category</option>
+                          {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                      ) : (
+                        <button
+                          onClick={() => setEditingCategory(item.id)}
+                          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0 transition-colors"
+                          title="Edit category"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          Edit
+                        </button>
+                      )
+                    )}
+
+                    {/* Delete */}
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-red-500/20 text-red-500 hover:bg-red-500/10 flex-shrink-0 transition-colors"
+                        title="Delete keyword"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Delete
+                      </button>
                     )}
                   </div>
                 );
