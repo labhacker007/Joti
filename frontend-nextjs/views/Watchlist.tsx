@@ -358,18 +358,20 @@ export default function Watchlist() {
                       </span>
                     )}
 
-                    {/* Enable / Disable button */}
+                    {/* Enable / Disable toggle */}
                     {isAdmin && (
                       <button
                         onClick={() => handleToggle(item.id, item.is_active)}
+                        title={item.is_active ? 'Disable' : 'Enable'}
                         className={cn(
-                          'text-[10px] px-2 py-1 rounded border font-medium flex-shrink-0 transition-colors',
-                          item.is_active
-                            ? 'border-orange-500/30 text-orange-500 hover:bg-orange-500/10'
-                            : 'border-green-500/30 text-green-500 hover:bg-green-500/10'
+                          'relative inline-flex h-4 w-7 items-center rounded-full flex-shrink-0 transition-colors',
+                          item.is_active ? 'bg-primary' : 'bg-muted-foreground/30'
                         )}
                       >
-                        {item.is_active ? 'Disable' : 'Enable'}
+                        <span className={cn(
+                          'inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm',
+                          item.is_active ? 'translate-x-3.5' : 'translate-x-0.5'
+                        )} />
                       </button>
                     )}
 
@@ -389,11 +391,10 @@ export default function Watchlist() {
                       ) : (
                         <button
                           onClick={() => setEditingCategory(item.id)}
-                          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0 transition-colors"
+                          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0 transition-colors"
                           title="Edit category"
                         >
-                          <Pencil className="w-3 h-3" />
-                          Edit
+                          <Pencil className="w-3.5 h-3.5" />
                         </button>
                       )
                     )}
@@ -402,11 +403,10 @@ export default function Watchlist() {
                     {isAdmin && (
                       <button
                         onClick={() => handleDelete(item.id)}
-                        className="flex items-center gap-1 text-[10px] px-2 py-1 rounded border border-red-500/20 text-red-500 hover:bg-red-500/10 flex-shrink-0 transition-colors"
+                        className="p-1 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10 flex-shrink-0 transition-colors"
                         title="Delete keyword"
                       >
-                        <Trash2 className="w-3 h-3" />
-                        Delete
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>

@@ -105,6 +105,10 @@ class User(Base):
     otp_enabled = Column(Boolean, default=False)
     otp_secret = Column(String, nullable=True)
 
+    # User profile customization
+    avatar_id = Column(String(50), nullable=True, default=None)  # e.g. "owl", "fox", "robot"
+    notification_preferences = Column(JSON, nullable=True, default=None)  # browser push notification settings
+
     last_login = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

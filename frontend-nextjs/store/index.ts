@@ -22,6 +22,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const adminFlag = !!(user && user.role && user.role === 'ADMIN');
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('authUser', JSON.stringify(user));
     set({
       user,
       accessToken,
@@ -42,6 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setUser: (user: User) => {
     const isAdmin = !!(user && user.role && user.role === 'ADMIN');
+    localStorage.setItem('authUser', JSON.stringify(user));
     set({ user, isAdmin });
   },
 
@@ -49,6 +51,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('impersonationState');
+    localStorage.removeItem('authUser');
     set({
       user: null,
       accessToken: null,
@@ -115,10 +118,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const accessToken = localStorage.getItem('accessToken');
       const refreshToken = localStorage.getItem('refreshToken');
+      const userJson = localStorage.getItem('authUser');
       if (accessToken) {
+        const user = userJson ? JSON.parse(userJson) as User : null;
+        const isAdmin = !!(user && user.role && user.role === 'ADMIN');
         set({
           accessToken,
-          refreshToken
+          refreshToken,
+          ...(user ? { user, isAdmin } : {})
         });
       }
     } catch (e) {

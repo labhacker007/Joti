@@ -574,6 +574,8 @@ CONFIGURATION_TEMPLATES = {
         {"key": "anthropic_model", "description": "Anthropic Model (e.g., claude-3-opus)", "value_type": "string"},
         {"key": "gemini_api_key", "description": "Google Gemini API Key", "is_sensitive": True},
         {"key": "gemini_model", "description": "Gemini Model", "value_type": "string"},
+        {"key": "kimi_api_key", "description": "Kimi (Moonshot AI) API Key", "is_sensitive": True},
+        {"key": "kimi_model", "description": "Kimi Model (e.g., kimi-k2-0711-preview)", "value_type": "string"},
         {"key": "ollama_base_url", "description": "Ollama Base URL", "value_type": "string"},
         {"key": "ollama_model", "description": "Ollama Model", "value_type": "string"},
         {"key": "auto_summarize_on_ingestion", "description": "Automatically summarize articles on ingestion", "value_type": "bool"},
@@ -1862,12 +1864,31 @@ async def test_genai_generation(
             raise HTTPException(status_code=400, detail=f"Unknown test type: {request.test_type}")
     
     except Exception as e:
-        logger.error("genai_test_failed", provider=provider, error=str(e))
+        error_str = str(e)
+        logger.error("genai_test_failed", provider=provider, error=error_str)
+
+        # Build a helpful, provider-specific suggestion
+        if provider == "ollama":
+            suggestion = (
+                f"Ollama is configured at: {settings.OLLAMA_BASE_URL}. "
+                "From inside Docker, the backend reaches your host machine via 'host.docker.internal'. "
+                "Make sure Ollama is running on your host (run: ollama serve) and is listening on port 11434. "
+                "If Ollama is running but still failing, check that OLLAMA_BASE_URL in your .env matches the host address."
+            )
+        elif provider == "openai":
+            suggestion = "Check that OPENAI_API_KEY is set correctly in your environment and the key has sufficient quota."
+        elif provider in ("anthropic", "claude"):
+            suggestion = "Check that ANTHROPIC_API_KEY is set correctly in your environment."
+        elif provider == "gemini":
+            suggestion = "Check that GEMINI_API_KEY is set correctly in your environment."
+        else:
+            suggestion = f"Make sure the '{provider}' provider is configured correctly in your environment variables."
+
         return {
             "status": "failed",
             "provider": provider,
-            "error": "genai_test_failed",
-            "suggestion": "Make sure your GenAI provider is configured correctly. For Ollama, ensure it's running at the configured URL."
+            "error": error_str,
+            "suggestion": suggestion,
         }
 
 
@@ -2080,17 +2101,43 @@ async def get_function_guardrails(
     if function_name == "global":
         return await get_global_guardrails(current_user, db)
     
-    functions = get_all_functions()
-    if function_name not in functions and function_name not in DEFAULT_GUARDRAILS:
+    from app.models import GenAIFunctionConfig, Prompt, PromptSkill, PromptGuardrail, Skill, Guardrail as GuardrailModel
+
+    # Accept both legacy prompt-function names AND new GenAIFunctionConfig names
+    legacy_functions = get_all_functions()
+    db_fn_config = db.query(GenAIFunctionConfig).filter(
+        GenAIFunctionConfig.function_name == function_name
+    ).first()
+
+    if function_name not in legacy_functions and function_name not in DEFAULT_GUARDRAILS and not db_fn_config:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Unknown function: {function_name}. Available: {functions}"
+            detail=f"Unknown function: {function_name}. Available: {legacy_functions}"
         )
-    
-    # Get default guardrails
-    defaults = []
-    
-    # Map function name to guardrail category
+
+    # If function has an active prompt in the DB, return its linked skills + guardrails
+    db_skills = []
+    db_guardrails = []
+    if db_fn_config and db_fn_config.active_prompt_id:
+        prompt_skills = db.query(PromptSkill).filter(
+            PromptSkill.prompt_id == db_fn_config.active_prompt_id
+        ).order_by(PromptSkill.order).all()
+        for ps in prompt_skills:
+            skill = db.query(Skill).filter(Skill.id == ps.skill_id).first()
+            if skill:
+                db_skills.append({"id": skill.id, "name": skill.name, "category": skill.category,
+                                   "description": skill.description})
+
+        prompt_guardrails = db.query(PromptGuardrail).filter(
+            PromptGuardrail.prompt_id == db_fn_config.active_prompt_id
+        ).order_by(PromptGuardrail.order).all()
+        for pg in prompt_guardrails:
+            gr = db.query(GuardrailModel).filter(GuardrailModel.id == pg.guardrail_id).first()
+            if gr:
+                db_guardrails.append({"id": gr.id, "name": gr.name, "type": gr.type,
+                                      "description": gr.description, "action": gr.action})
+
+    # Legacy defaults from prompts_newlook.py DEFAULT_GUARDRAILS (kept for backwards compat)
     category_map = {
         "ioc_extraction": "ioc_extraction",
         "ttp_extraction": "ttp_extraction",
@@ -2102,24 +2149,20 @@ async def get_function_guardrails(
         "hunt_query_splunk": "hunt_query",
         "hunt_query_wiz": "hunt_query",
     }
-    
     category = category_map.get(function_name, function_name)
-    if category in DEFAULT_GUARDRAILS:
-        defaults = DEFAULT_GUARDRAILS[category]
-    
-    # Always include global guardrails
+    legacy_defaults = DEFAULT_GUARDRAILS.get(category, [])
     global_guardrails = DEFAULT_GUARDRAILS.get("global", [])
-    
-    # Check for custom overrides
+
+    # Check for custom overrides in SystemConfiguration
     config = db.query(SystemConfiguration).filter(
         SystemConfiguration.category == "guardrails",
         SystemConfiguration.key == function_name
     ).first()
-    
+
     custom = []
     is_custom = False
     last_updated = None
-    
+
     if config and config.value:
         try:
             custom = json.loads(config.value)
@@ -2127,15 +2170,18 @@ async def get_function_guardrails(
             last_updated = config.updated_at.isoformat() if config.updated_at else None
         except json.JSONDecodeError:
             pass
-    
+
     return {
         "function_name": function_name,
         "global_guardrails": global_guardrails,
-        "function_guardrails": defaults,
+        "function_guardrails": legacy_defaults,
+        "db_skills": db_skills,
+        "db_guardrails": db_guardrails,
         "custom_guardrails": custom,
         "is_custom": is_custom,
         "last_updated": last_updated,
-        "effective_guardrails": custom if is_custom else defaults
+        "effective_guardrails": custom if is_custom else legacy_defaults,
+        "has_active_prompt": bool(db_fn_config and db_fn_config.active_prompt_id),
     }
 
 
@@ -2836,81 +2882,198 @@ async def get_expert_personas(
 @router.get("/prompts/preview", summary="Preview a generated prompt")
 async def preview_prompt(
     function: str,
-    persona: str = "threat_intelligence",
+    persona: str = "analyst",
     current_user: User = Depends(require_permission(MANAGE_USERS)),
     db: Session = Depends(get_db)
 ):
-    """Preview what a generated prompt will look like with current guardrails."""
-    from app.genai.prompts import PromptManager, PromptFunction, DEFAULT_GUARDRAILS, EXPERT_PERSONAS
-    
-    # Handle "global" function specially - show global guardrails
-    if function == "global":
-        global_guardrails = DEFAULT_GUARDRAILS.get("global", [])
-        guardrails_text = "\n".join([f"- {g['name']}: {g['description']}" for g in global_guardrails])
-        
-        return {
-            "function": "global",
-            "persona": persona,
-            "system_prompt": f"""GLOBAL GUARDRAILS (Applied to all functions):
+    """
+    Preview the compiled system + user prompt for a GenAI function.
+    Includes active skills and guardrail annotations from the database.
+    """
+    from app.genai.prompts import PromptManager, PERSONAS
+    from app.models import Skill, Guardrail, GenAIFunctionConfig, Prompt, PromptSkill, PromptGuardrail
 
-{guardrails_text}
+    manager = PromptManager(db_session=db)
 
-These guardrails are automatically included in every GenAI prompt to ensure:
-- Accurate and reliable threat intelligence
-- Properly formatted outputs
-- Safe and appropriate responses
-- Consistent quality across all functions""",
-            "user_prompt": "[Global guardrails are injected into the system prompt for all functions]",
-            "total_length": len(guardrails_text) + 200
-        }
-    
+    # Check if function has a DB-linked prompt with specific skills/guardrails
+    fn_config = db.query(GenAIFunctionConfig).filter(
+        GenAIFunctionConfig.function_name == function
+    ).first()
+
+    # Prefer function-specific skills/guardrails from the active prompt
+    if fn_config and fn_config.active_prompt_id:
+        prompt_skills = db.query(PromptSkill).filter(
+            PromptSkill.prompt_id == fn_config.active_prompt_id
+        ).order_by(PromptSkill.order).all()
+        active_skills = [db.query(Skill).filter(Skill.id == ps.skill_id).first()
+                         for ps in prompt_skills]
+        active_skills = [s for s in active_skills if s]
+
+        prompt_guardrails = db.query(PromptGuardrail).filter(
+            PromptGuardrail.prompt_id == fn_config.active_prompt_id
+        ).order_by(PromptGuardrail.order).all()
+        active_guardrails = [db.query(Guardrail).filter(Guardrail.id == pg.guardrail_id).first()
+                             for pg in prompt_guardrails]
+        active_guardrails = [g for g in active_guardrails if g]
+    else:
+        # Fall back to all active skills/guardrails
+        active_skills = db.query(Skill).filter(Skill.is_active == True).all()
+        active_guardrails = db.query(Guardrail).filter(Guardrail.is_active == True).all()
+
+    skills_summary = "\n".join(
+        f"  [{s.category or 'general'}] {s.name}: {(s.description or '')[:80]}"
+        for s in active_skills[:15]
+    ) or "  (none active)"
+
+    guardrails_summary = "\n".join(
+        f"  [{g.type}] {g.name} → {g.action} (retries={g.max_retries or 0})"
+        for g in active_guardrails[:20]
+    ) or "  (none active)"
+
+    # Map function name → prompt builder
     try:
-        prompt_function = PromptFunction(function)
-    except ValueError:
-        # Return a helpful message for unknown functions
-        available = [f.value for f in PromptFunction]
+        if function in ("intel_extraction", "extraction"):
+            prompts = manager.build_extraction_prompt(
+                content="[Sample article content: A new ransomware campaign targeting healthcare was observed. "
+                        "C2 at 185.220.101.45 and malicious-update[.]com. Hash: d41d8cd98f00b204e9800998ecf8427e. CVE-2024-1234.]",
+                source_url="https://threatpost.com/article/example",
+            )
+            summary_type = "IOC & TTP Extraction"
+
+        elif function in ("article_summarization", "summarization") or "summary" in function:
+            summary_type_key = "technical" if "technical" in function else "executive"
+            prompts = manager.build_summary_prompt(
+                content="[Sample article content: A new ransomware campaign targeting healthcare was observed...]",
+                summary_type=summary_type_key,
+                ioc_count=5,
+                ttp_count=3,
+                threat_actors="LockBit 3.0",
+                severity="High",
+            )
+            summary_type = f"{summary_type_key.capitalize()} Summary"
+
+        elif function in ("hunt_query_generation", "hunt_query", "hunt_title") or "hunt" in function:
+            platform = "xsiam"
+            if "kql" in function or "defender" in function or "sentinel" in function:
+                platform = "kql"
+            elif "spl" in function or "splunk" in function:
+                platform = "spl"
+            elif "wiz" in function:
+                platform = "wiz"
+            prompts = manager.build_hunt_query_prompt(
+                platform=platform,
+                iocs="185.220.101.45, malicious-update[.]com, d41d8cd98f00b204e9800998ecf8427e",
+                ttps="T1566.001 (Spearphishing Attachment), T1059.001 (PowerShell), T1486 (Data Encrypted for Impact)",
+                context="LockBit 3.0 ransomware campaign targeting healthcare",
+                article_title="[Sample] LockBit 3.0 targets healthcare with phishing campaign",
+            )
+            summary_type = f"Hunt Query ({platform.upper()})"
+
+        elif function == "threat_landscape":
+            prompts = {
+                "system": PERSONAS.get("technical", PERSONAS["analyst"]),
+                "user": "Analyze the following threat intelligence articles from the past 7 days and produce a threat landscape brief.\n\n"
+                        "[Sample: 15 articles covering LockBit, Scattered Spider, CVE-2024-1234 exploitation...]\n\n"
+                        "Include: top threat actors, most common TTPs, emerging attack patterns, targeted sectors.",
+            }
+            summary_type = "Threat Landscape Analysis"
+
+        elif function == "campaign_brief":
+            prompts = {
+                "system": PERSONAS.get("analyst", PERSONAS["analyst"]),
+                "user": "Generate a threat campaign brief from the following correlated intelligence cluster.\n\n"
+                        "[Sample: 5 articles sharing IOC 185.220.101.45, attributed to LockBit 3.0, targeting healthcare/finance...]\n\n"
+                        "Include: campaign name, attribution confidence, targeted sectors, shared IOCs, timeline.",
+            }
+            summary_type = "Campaign Brief"
+
+        elif function == "correlation_analysis":
+            prompts = {
+                "system": PERSONAS.get("analyst", PERSONAS["analyst"]),
+                "user": "Find correlations in the following threat intelligence articles.\n\n"
+                        "[Sample: 20 articles from past 30 days...]\n\n"
+                        "Identify: shared IOC clusters, related threat actors, cross-article TTP patterns.",
+            }
+            summary_type = "Correlation Analysis"
+
+        elif function == "threat_actor_enrichment":
+            prompts = {
+                "system": PERSONAS.get("analyst", PERSONAS["analyst"]),
+                "user": "Enrich this threat actor profile with current intelligence.\n\n"
+                        "Actor: [Sample] LockBit 3.0\nKnown aliases: ABCD Group\n\n"
+                        "[Recent articles mentioning this actor...]\n\n"
+                        "Provide: background, TTPs, targets, recent activity, attribution confidence.",
+            }
+            summary_type = "Threat Actor Enrichment"
+
+        elif function == "ioc_context":
+            prompts = {
+                "system": PERSONAS.get("analyst", PERSONAS["analyst"]),
+                "user": "Provide contextual analysis for this IOC.\n\n"
+                        "IOC: 185.220.101.45 (IPv4)\n\n"
+                        "[Articles mentioning this IOC...]\n\n"
+                        "Explain: what it is, how it fits attack chains, confidence level, defensive actions.",
+            }
+            summary_type = "IOC Context & Explanation"
+
+        elif function == "intel_ingestion":
+            prompts = {
+                "system": PERSONAS.get("analyst", PERSONAS["analyst"]),
+                "user": "Analyze this threat intelligence document and extract structured indicators.\n\n"
+                        "[Uploaded document content...]\n\n"
+                        "Extract: all IOCs (IPs, domains, hashes, CVEs), MITRE TTPs, threat actor names, malware families.",
+            }
+            summary_type = "Intel Ingestion Analysis"
+
+        else:
+            prompts = {
+                "system": PERSONAS.get(persona, PERSONAS["analyst"]),
+                "user": f"[No sample prompt template defined for function '{function}'. "
+                        f"This function will use the default analyst persona with function-specific instructions at runtime.]",
+            }
+            summary_type = function.replace("_", " ").title()
+
+    except Exception as e:
         return {
             "function": function,
             "persona": persona,
-            "system_prompt": f"Function '{function}' not found. Available functions: {', '.join(available)}",
+            "system_prompt": f"Error building prompt preview: {str(e)}",
             "user_prompt": "",
+            "skills_applied": [],
+            "guardrails_applied": [],
             "total_length": 0,
-            "error": f"Unknown function: {function}"
+            "error": str(e),
         }
-    
-    manager = PromptManager(db_session=db)
-    
-    # Generate sample prompt
-    if "extraction" in function:
-        prompts = manager.build_extraction_prompt(
-            content="[Sample article content would appear here...]",
-            source_url="https://example.com/article",
-            persona_key=persona
-        )
-    elif "summary" in function:
-        prompts = manager.build_summary_prompt(
-            content="[Sample article content would appear here...]",
-            summary_type=function.split("_")[0],
-            ioc_count=5,
-            ttp_count=3
-        )
-    elif "hunt_query" in function:
-        platform = function.replace("hunt_query_", "")
-        prompts = manager.build_hunt_query_prompt(
-            platform=platform,
-            iocs="1.2.3.4, malware.com, abc123hash",
-            ttps="T1566.001, T1059.001",
-            context="Sample threat context"
-        )
-    else:
-        prompts = {"system": "Function preview not available", "user": ""}
-    
+
+    system_text = prompts.get("system", "")
+    user_text = prompts.get("user", "")
+
+    # Annotate with skills and guardrails context
+    has_prompt = bool(fn_config and fn_config.active_prompt_id)
+    scope_label = f"function-specific for '{function}'" if has_prompt else "global (no active prompt linked)"
+    annotation = (
+        f"\n\n{'='*60}\n"
+        f"SKILLS ({len(active_skills)} — {scope_label}):\n"
+        f"{skills_summary}\n\n"
+        f"GUARDRAILS ({len(active_guardrails)} — {scope_label}):\n"
+        f"{guardrails_summary}\n"
+        f"{'='*60}\n"
+        f"NOTE: Skills inject additional instructions into the system prompt at runtime.\n"
+        f"Guardrails validate input before and output after each model call."
+    )
+
     return {
         "function": function,
+        "summary_type": summary_type,
         "persona": persona,
-        "system_prompt": prompts["system"],
-        "user_prompt": prompts["user"],
-        "total_length": len(prompts["system"]) + len(prompts["user"])
+        "system_prompt": system_text + annotation,
+        "user_prompt": user_text,
+        "skills_applied": [{"name": s.name, "category": s.category, "description": s.description} for s in active_skills],
+        "guardrails_applied": [{"name": g.name, "type": g.type, "action": g.action} for g in active_guardrails],
+        "total_length": len(system_text) + len(user_text),
+        "skill_count": len(active_skills),
+        "guardrail_count": len(active_guardrails),
+        "has_active_prompt": has_prompt,
     }
 
 

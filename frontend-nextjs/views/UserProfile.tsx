@@ -37,6 +37,65 @@ import { useTheme, themeOptions, ThemeName } from '@/contexts/ThemeContext';
 import { formatDate, cn } from '@/lib/utils';
 import { getErrorMessage } from '@/api/client';
 
+// ---- Avatar catalog (50 entries: id → emoji + label) ----
+const AVATARS: { id: string; emoji: string; label: string }[] = [
+  { id: 'owl', emoji: '🦉', label: 'Owl' },
+  { id: 'fox', emoji: '🦊', label: 'Fox' },
+  { id: 'wolf', emoji: '🐺', label: 'Wolf' },
+  { id: 'bear', emoji: '🐻', label: 'Bear' },
+  { id: 'lion', emoji: '🦁', label: 'Lion' },
+  { id: 'tiger', emoji: '🐯', label: 'Tiger' },
+  { id: 'panda', emoji: '🐼', label: 'Panda' },
+  { id: 'koala', emoji: '🐨', label: 'Koala' },
+  { id: 'penguin', emoji: '🐧', label: 'Penguin' },
+  { id: 'parrot', emoji: '🦜', label: 'Parrot' },
+  { id: 'eagle', emoji: '🦅', label: 'Eagle' },
+  { id: 'hawk', emoji: '🦆', label: 'Hawk' },
+  { id: 'dolphin', emoji: '🐬', label: 'Dolphin' },
+  { id: 'shark', emoji: '🦈', label: 'Shark' },
+  { id: 'whale', emoji: '🐳', label: 'Whale' },
+  { id: 'octopus', emoji: '🐙', label: 'Octopus' },
+  { id: 'crab', emoji: '🦀', label: 'Crab' },
+  { id: 'bee', emoji: '🐝', label: 'Bee' },
+  { id: 'butterfly', emoji: '🦋', label: 'Butterfly' },
+  { id: 'dragon', emoji: '🐉', label: 'Dragon' },
+  { id: 'phoenix', emoji: '🔥', label: 'Phoenix' },
+  { id: 'unicorn', emoji: '🦄', label: 'Unicorn' },
+  { id: 'robot', emoji: '🤖', label: 'Robot' },
+  { id: 'alien', emoji: '👽', label: 'Alien' },
+  { id: 'ninja', emoji: '🥷', label: 'Ninja' },
+  { id: 'wizard', emoji: '🧙', label: 'Wizard' },
+  { id: 'knight', emoji: '⚔️', label: 'Knight' },
+  { id: 'astronaut', emoji: '👨‍🚀', label: 'Astronaut' },
+  { id: 'scientist', emoji: '👨‍🔬', label: 'Scientist' },
+  { id: 'detective', emoji: '🕵️', label: 'Detective' },
+  { id: 'hacker', emoji: '💻', label: 'Hacker' },
+  { id: 'agent', emoji: '🕶️', label: 'Agent' },
+  { id: 'analyst', emoji: '📊', label: 'Analyst' },
+  { id: 'hunter', emoji: '🎯', label: 'Hunter' },
+  { id: 'guardian', emoji: '🛡️', label: 'Guardian' },
+  { id: 'sentinel', emoji: '🗼', label: 'Sentinel' },
+  { id: 'phantom', emoji: '👻', label: 'Phantom' },
+  { id: 'ghost', emoji: '💀', label: 'Ghost' },
+  { id: 'specter', emoji: '🌑', label: 'Specter' },
+  { id: 'viper', emoji: '🐍', label: 'Viper' },
+  { id: 'cobra', emoji: '🪱', label: 'Cobra' },
+  { id: 'python', emoji: '🐍', label: 'Python' },
+  { id: 'falcon', emoji: '🦅', label: 'Falcon' },
+  { id: 'raven', emoji: '🐦‍⬛', label: 'Raven' },
+  { id: 'sparrow', emoji: '🐦', label: 'Sparrow' },
+  { id: 'hawk2', emoji: '🦢', label: 'Swan' },
+  { id: 'lynx', emoji: '🐱', label: 'Lynx' },
+  { id: 'panther', emoji: '🐆', label: 'Panther' },
+  { id: 'jaguar', emoji: '🐅', label: 'Jaguar' },
+  { id: 'cheetah', emoji: '🐇', label: 'Cheetah' },
+];
+
+const getAvatarEmoji = (avatarId?: string | null) => {
+  if (!avatarId) return '👤';
+  return AVATARS.find(a => a.id === avatarId)?.emoji || '👤';
+};
+
 interface UserProfileData {
   id: string;
   username: string;
@@ -47,6 +106,13 @@ interface UserProfileData {
   created_at: string;
   last_login: string;
   two_factor_enabled: boolean;
+  avatar_id?: string | null;
+  notification_preferences?: {
+    browser_push_enabled?: boolean;
+    watchlist_alerts?: boolean;
+    digest_daily?: boolean;
+    push_subscription?: any;
+  } | null;
 }
 
 interface SourceItem {
@@ -138,14 +204,24 @@ export default function UserProfile() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ full_name: '', email: '' });
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
     current_password: '',
     new_password: '',
     confirm_password: '',
   });
+  const [notifPrefs, setNotifPrefs] = useState({
+    browser_push_enabled: false,
+    watchlist_alerts: true,
+    digest_daily: false,
+  });
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | 'unsupported'>('default');
+  const [savingNotif, setSavingNotif] = useState(false);
 
   const [sources, setSources] = useState<SourceItem[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(false);
@@ -276,11 +352,72 @@ export default function UserProfile() {
         full_name: response.data.full_name || '',
         email: response.data.email || '',
       });
+      // Load notification preferences
+      const np = response.data?.notification_preferences;
+      if (np) {
+        setNotifPrefs({
+          browser_push_enabled: np.browser_push_enabled ?? false,
+          watchlist_alerts: np.watchlist_alerts ?? true,
+          digest_daily: np.digest_daily ?? false,
+        });
+      }
     } catch (err: any) {
       setError(getErrorMessage(err));
       console.error('Profile error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Check browser notification permission on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushPermission(Notification.permission);
+    } else {
+      setPushPermission('unsupported');
+    }
+  }, []);
+
+  const handleSelectAvatar = async (avatarId: string) => {
+    try {
+      setSavingAvatar(true);
+      setError('');
+      await (usersAPI as any).updateMe({ avatar_id: avatarId });
+      setProfile(prev => prev ? { ...prev, avatar_id: avatarId } : prev);
+      setShowAvatarPicker(false);
+      setSuccess('Avatar updated!');
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSavingAvatar(false);
+    }
+  };
+
+  const handleRequestPushPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    const perm = await Notification.requestPermission();
+    setPushPermission(perm);
+    if (perm === 'granted') {
+      // Save push enabled preference
+      await handleSaveNotifPrefs(true);
+    }
+  };
+
+  const handleSaveNotifPrefs = async (pushEnabled?: boolean) => {
+    try {
+      setSavingNotif(true);
+      setError('');
+      const update = {
+        ...notifPrefs,
+        ...(pushEnabled !== undefined ? { browser_push_enabled: pushEnabled } : {}),
+      };
+      await (usersAPI as any).updateNotificationPreferences(update);
+      setNotifPrefs(prev => ({ ...prev, ...update }));
+      setSuccess('Notification preferences saved.');
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSavingNotif(false);
     }
   };
 
@@ -311,23 +448,22 @@ export default function UserProfile() {
         return;
       }
 
-      if (passwordData.new_password.length < 8) {
-        setError('Password must be at least 8 characters long');
+      if (passwordData.new_password.length < 12) {
+        setError('Password must be at least 12 characters long');
         return;
       }
 
-      await usersAPI.changePassword(
+      await (usersAPI as any).changePassword(
         passwordData.current_password,
-        passwordData.new_password
+        passwordData.new_password,
+        passwordData.confirm_password
       );
 
-      setSuccess('Password changed successfully');
+      setSuccess('Password changed successfully. You will be logged out shortly.');
       setShowPasswordChange(false);
-      setPasswordData({
-        current_password: '',
-        new_password: '',
-        confirm_password: '',
-      });
+      setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
+      // Redirect to login after 2s since tokens are invalidated
+      setTimeout(() => { window.location.href = '/login'; }, 2500);
     } catch (err: any) {
       setError(getErrorMessage(err));
       console.error('Password change error:', err);
@@ -758,6 +894,61 @@ export default function UserProfile() {
                 </button>
               )}
             </div>
+
+            {/* Avatar */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowAvatarPicker(true)}
+                className="relative group w-20 h-20 rounded-full bg-muted border-2 border-border hover:border-primary transition-colors flex items-center justify-center text-4xl"
+                title="Click to change avatar"
+              >
+                {getAvatarEmoji(profile?.avatar_id)}
+                <span className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <Edit2 className="w-5 h-5 text-white" />
+                </span>
+              </button>
+              <div>
+                <p className="font-semibold text-foreground text-lg">{profile.full_name || profile.username}</p>
+                <p className="text-sm text-muted-foreground">{profile.email}</p>
+                <button onClick={() => setShowAvatarPicker(true)} className="text-xs text-primary hover:underline mt-1">
+                  Change avatar
+                </button>
+              </div>
+            </div>
+
+            {/* Avatar Picker Modal */}
+            {showAvatarPicker && (
+              <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                <div className="bg-card border border-border rounded-xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-foreground">Choose Avatar</h3>
+                    <button onClick={() => setShowAvatarPicker(false)} className="text-muted-foreground hover:text-foreground">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {AVATARS.map(avatar => (
+                      <button
+                        key={avatar.id}
+                        onClick={() => handleSelectAvatar(avatar.id)}
+                        disabled={savingAvatar}
+                        title={avatar.label}
+                        className={cn(
+                          'flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all hover:border-primary hover:bg-muted',
+                          profile?.avatar_id === avatar.id
+                            ? 'border-primary bg-primary/10'
+                            : 'border-transparent bg-muted/50'
+                        )}
+                      >
+                        <span className="text-3xl">{avatar.emoji}</span>
+                        <span className="text-xs text-muted-foreground truncate w-full text-center">{avatar.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {savingAvatar && <p className="text-center text-sm text-muted-foreground mt-3">Saving...</p>}
+                </div>
+              </div>
+            )}
 
             {isEditing ? (
               <div className="space-y-4">
@@ -1555,20 +1746,57 @@ export default function UserProfile() {
 
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        Confirm Password
+                        Confirm New Password
                       </label>
-                      <input
-                        type="password"
-                        value={passwordData.confirm_password}
-                        onChange={(e) =>
-                          setPasswordData({
-                            ...passwordData,
-                            confirm_password: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={passwordData.confirm_password}
+                          onChange={(e) =>
+                            setPasswordData({ ...passwordData, confirm_password: e.target.value })
+                          }
+                          className={cn(
+                            'w-full px-4 py-2 pr-10 bg-background border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50',
+                            passwordData.confirm_password && passwordData.new_password !== passwordData.confirm_password
+                              ? 'border-red-500/50'
+                              : 'border-border'
+                          )}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {passwordData.confirm_password && passwordData.new_password !== passwordData.confirm_password && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> Passwords do not match
+                        </p>
+                      )}
                     </div>
+
+                    {/* Password requirements hint */}
+                    {passwordData.new_password && (
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p className={cn(passwordData.new_password.length >= 12 ? 'text-green-600' : 'text-red-500')}>
+                          {passwordData.new_password.length >= 12 ? '✓' : '✗'} At least 12 characters
+                        </p>
+                        <p className={cn(/[A-Z]/.test(passwordData.new_password) ? 'text-green-600' : 'text-red-500')}>
+                          {/[A-Z]/.test(passwordData.new_password) ? '✓' : '✗'} One uppercase letter
+                        </p>
+                        <p className={cn(/[a-z]/.test(passwordData.new_password) ? 'text-green-600' : 'text-red-500')}>
+                          {/[a-z]/.test(passwordData.new_password) ? '✓' : '✗'} One lowercase letter
+                        </p>
+                        <p className={cn(/\d/.test(passwordData.new_password) ? 'text-green-600' : 'text-red-500')}>
+                          {/\d/.test(passwordData.new_password) ? '✓' : '✗'} One number
+                        </p>
+                        <p className={cn(/[^A-Za-z0-9]/.test(passwordData.new_password) ? 'text-green-600' : 'text-red-500')}>
+                          {/[^A-Za-z0-9]/.test(passwordData.new_password) ? '✓' : '✗'} One special character
+                        </p>
+                      </div>
+                    )}
 
                     <div className="flex gap-2 pt-4">
                       <button
@@ -1699,67 +1927,96 @@ export default function UserProfile() {
 
         {activeTab === 'preferences' && (
           <div className="space-y-6">
-            {/* Notification Preferences */}
-            <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+            {/* Browser Push Notifications */}
+            <div className="bg-card border border-border rounded-lg p-6 space-y-4">
               <div className="flex items-center gap-3">
                 <Bell className="w-6 h-6 text-primary" />
-                <h2 className="text-xl font-bold text-foreground">Notification Preferences</h2>
+                <h2 className="text-xl font-bold text-foreground">Browser Notifications</h2>
               </div>
 
-              <div className="space-y-4">
-                {/* Email Notifications */}
-                <div className="p-4 bg-muted rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-foreground">Email Notifications</h3>
-                      <p className="text-sm text-muted-foreground">Receive updates via email</p>
+              {pushPermission === 'unsupported' ? (
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-700 dark:text-yellow-300">
+                  Browser notifications are not supported in this browser.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Permission status banner */}
+                  {pushPermission === 'denied' && (
+                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-700 dark:text-red-300">
+                      Notifications are blocked by your browser. To enable them, click the lock icon in your address bar and allow notifications for this site.
+                    </div>
+                  )}
+
+                  {/* Enable push notifications */}
+                  <div className="p-4 bg-muted rounded-lg flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">Enable Browser Notifications</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Get real-time alerts in your browser when watchlist keywords are detected in new articles.
+                      </p>
+                      {pushPermission === 'granted' && (
+                        <span className="inline-flex items-center gap-1 mt-2 text-xs text-green-600 font-medium">
+                          <CheckCircle className="w-3 h-3" /> Permission granted
+                        </span>
+                      )}
+                    </div>
+                    {pushPermission === 'granted' ? (
+                      <ToggleSwitch
+                        checked={notifPrefs.browser_push_enabled}
+                        onChange={async (val) => {
+                          setNotifPrefs(p => ({ ...p, browser_push_enabled: val }));
+                          await handleSaveNotifPrefs(val);
+                        }}
+                      />
+                    ) : (
+                      <button
+                        onClick={handleRequestPushPermission}
+                        disabled={pushPermission === 'denied'}
+                        className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
+                      >
+                        Allow Notifications
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Watchlist keyword alerts */}
+                  <div className="p-4 bg-muted rounded-lg flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">Watchlist Keyword Alerts</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Notify me when a new article matches any of my watchlist keywords (org-wide + personal).
+                      </p>
                     </div>
                     <ToggleSwitch
-                      checked={notificationPrefs.some((p) => p.type === 'email' && p.enabled)}
-                      onChange={(val) =>
-                        setNotificationPrefs([
-                          {
-                            id: '1',
-                            type: 'email',
-                            category: 'security',
-                            enabled: val,
-                            frequency: 'instant',
-                          },
-                        ])
-                      }
+                      checked={notifPrefs.watchlist_alerts}
+                      onChange={(val) => setNotifPrefs(p => ({ ...p, watchlist_alerts: val }))}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['security', 'updates', 'digest', 'promotional'].map((cat) => (
-                      <label key={cat} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          defaultChecked={cat !== 'promotional'}
-                          className="rounded border border-border"
-                        />
-                        <span className="text-sm text-foreground capitalize">{cat}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Frequency Selection */}
-                <div className="p-4 bg-muted rounded-lg">
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Notification Frequency
-                  </label>
-                  <select
-                    value={displayPrefs.itemsPerPage}
-                    onChange={(e) => setDisplayPrefs({ ...displayPrefs, itemsPerPage: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  {/* Daily digest */}
+                  <div className="p-4 bg-muted rounded-lg flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">Daily Intelligence Digest</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Receive a daily summary of top threat intelligence at 09:00 UTC.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      checked={notifPrefs.digest_daily}
+                      onChange={(val) => setNotifPrefs(p => ({ ...p, digest_daily: val }))}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => handleSaveNotifPrefs()}
+                    disabled={savingNotif}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                   >
-                    <option value={1}>Instant</option>
-                    <option value={7}>Daily</option>
-                    <option value={30}>Weekly</option>
-                    <option value={365}>Monthly</option>
-                  </select>
+                    <Save className="w-4 h-4" />
+                    {savingNotif ? 'Saving…' : 'Save Notification Settings'}
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Display Preferences */}

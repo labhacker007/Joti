@@ -83,8 +83,18 @@ export default function GuardrailsManager() {
   // Test state
   const [testGuardrailId, setTestGuardrailId] = useState<number | null>(null);
   const [testInput, setTestInput] = useState('');
+  const [testMode, setTestMode] = useState<'static' | 'live'>('live');
   const [testResult, setTestResult] = useState<{ passed: boolean; violations: string[]; action_taken?: string } | null>(null);
+  const [liveResult, setLiveResult] = useState<{
+    guardrail_name: string; guardrail_type: string; action: string;
+    system_prompt_sent: string; user_prompt_sent: string;
+    llm_response: string; model_used: string; llm_success: boolean; llm_error?: string;
+    guardrail_passed: boolean; violations: string[]; sanitized_output?: string; action_taken?: string;
+    test_passed: boolean; verdict: string; summary: string;
+  } | null>(null);
+  const [showPromptSent, setShowPromptSent] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [testError, setTestError] = useState('');
 
   // Guardrail form
   const [gForm, setGForm] = useState({
@@ -231,26 +241,41 @@ export default function GuardrailsManager() {
   };
 
   const handleTestGuardrail = async () => {
-    if (!testGuardrailId || !testInput.trim()) { setError('Enter test input'); return; }
     const guardrail = guardrails.find(g => g.id === testGuardrailId);
     if (!guardrail) return;
 
     try {
       setTesting(true);
-      setError('');
-      const res = await guardrailsAPI.test({
-        guardrail_type: guardrail.type,
-        config: guardrail.config,
-        test_input: testInput,
-      }) as any;
-      const result = res.data || res;
-      setTestResult({
-        passed: result.passed,
-        violations: result.violations || [],
-        action_taken: result.action_taken,
-      });
+      setTestError('');
+      setTestResult(null);
+      setLiveResult(null);
+
+      if (testMode === 'live') {
+        // Full end-to-end LLM test
+        const res = await guardrailsAPI.testLive({
+          guardrail_id: guardrail.id,
+          test_content: testInput.trim() || undefined,
+          function_name: 'article_summarization',
+        }) as any;
+        const result = res.data || res;
+        setLiveResult(result);
+      } else {
+        // Static regex/keyword test (original)
+        if (!testInput.trim()) { setTestError('Enter test input for static mode'); return; }
+        const res = await guardrailsAPI.test({
+          guardrail_type: guardrail.type,
+          config: guardrail.config,
+          test_input: testInput,
+        }) as any;
+        const result = res.data || res;
+        setTestResult({
+          passed: result.passed,
+          violations: result.violations || [],
+          action_taken: result.action_taken,
+        });
+      }
     } catch (err: any) {
-      setError(getErrorMessage(err));
+      setTestError(getErrorMessage(err));
     } finally {
       setTesting(false);
     }
@@ -893,54 +918,152 @@ export default function GuardrailsManager() {
       {/* Test Guardrail Modal */}
       {testGuardrailId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-foreground">Test Guardrail</h2>
-              <button onClick={() => { setTestGuardrailId(null); setTestResult(null); }} className="text-muted-foreground hover:text-foreground">
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Test Guardrail</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  <span className="font-medium text-foreground">{guardrails.find(g => g.id === testGuardrailId)?.name}</span>
+                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-muted rounded font-mono">
+                    {guardrails.find(g => g.id === testGuardrailId)?.type}
+                  </span>
+                </p>
+              </div>
+              <button onClick={() => { setTestGuardrailId(null); setTestResult(null); setLiveResult(null); setTestError(''); setTestInput(''); setShowPromptSent(false); }} className="text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-sm text-muted-foreground mb-3">
-              Testing: <span className="font-medium text-foreground">{guardrails.find(g => g.id === testGuardrailId)?.name}</span>
-            </p>
+            {/* Mode selector */}
+            <div className="flex gap-1 p-1 bg-muted rounded-lg mb-4 w-fit">
+              <button
+                onClick={() => { setTestMode('live'); setTestResult(null); setLiveResult(null); }}
+                className={cn('px-3 py-1.5 text-sm rounded-md font-medium transition-colors',
+                  testMode === 'live' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              >
+                <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5" /> Live LLM Test</span>
+              </button>
+              <button
+                onClick={() => { setTestMode('static'); setTestResult(null); setLiveResult(null); }}
+                className={cn('px-3 py-1.5 text-sm rounded-md font-medium transition-colors',
+                  testMode === 'static' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              >
+                <span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" /> Static Pattern Test</span>
+              </button>
+            </div>
+
+            {testMode === 'live' && (
+              <div className="mb-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-700 dark:text-blue-300">
+                <strong>Live LLM Test</strong> — Builds the full system prompt with the guardrail instruction injected, sends an adversarial payload to the actual LLM, then validates the response against the guardrail rules.
+                Leave the input blank to use the built-in adversarial payload for this guardrail type.
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Test Input</label>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  {testMode === 'live' ? 'Custom Test Content (optional — leave blank for adversarial auto-payload)' : 'Test Input'}
+                </label>
                 <textarea
                   value={testInput}
                   onChange={(e) => setTestInput(e.target.value)}
-                  rows={4}
-                  placeholder="Enter text to test against the guardrail..."
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  rows={testMode === 'live' ? 3 : 4}
+                  placeholder={testMode === 'live'
+                    ? 'Leave blank to use built-in adversarial payload for this guardrail type…'
+                    : 'Enter text to test against the guardrail pattern rules…'}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
                 />
               </div>
 
-              {testResult && (
-                <div className={cn(
-                  'rounded-lg p-3 border',
-                  testResult.passed
-                    ? 'bg-green-500/10 border-green-500/30'
-                    : 'bg-red-500/10 border-red-500/30'
-                )}>
+              {testError && (
+                <div className="rounded-lg p-3 border bg-red-500/10 border-red-500/30 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs text-red-600">{testError}</span>
+                </div>
+              )}
+
+              {/* Static test result */}
+              {testResult && testMode === 'static' && (
+                <div className={cn('rounded-lg p-3 border', testResult.passed ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30')}>
                   <div className="flex items-center gap-2 mb-1">
-                    {testResult.passed ? (
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-red-600" />
-                    )}
+                    {testResult.passed ? <CheckCircle className="w-4 h-4 text-green-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
                     <span className={cn('font-medium text-sm', testResult.passed ? 'text-green-600' : 'text-red-600')}>
-                      {testResult.passed ? 'Passed' : 'Failed'}
+                      {testResult.passed ? 'Pattern check passed' : 'Pattern violation detected'}
                     </span>
+                    {testResult.action_taken && <span className="text-xs text-muted-foreground ml-auto">action: {testResult.action_taken}</span>}
                   </div>
                   {testResult.violations.length > 0 && (
                     <ul className="text-xs text-red-600/80 mt-1 space-y-0.5">
-                      {testResult.violations.map((v, i) => (
-                        <li key={i}>- {v}</li>
-                      ))}
+                      {testResult.violations.map((v, i) => <li key={i}>— {v}</li>)}
                     </ul>
                   )}
+                </div>
+              )}
+
+              {/* Live test result */}
+              {liveResult && testMode === 'live' && (
+                <div className="space-y-3">
+                  {/* Verdict banner */}
+                  <div className={cn('rounded-lg p-3 border',
+                    liveResult.verdict === 'PASS' ? 'bg-green-500/10 border-green-500/30' :
+                    liveResult.verdict === 'WARN' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                    'bg-red-500/10 border-red-500/30'
+                  )}>
+                    <div className="flex items-center gap-2 mb-1">
+                      {liveResult.verdict === 'PASS' ? <CheckCircle className="w-4 h-4 text-green-600" /> :
+                       liveResult.verdict === 'WARN' ? <AlertCircle className="w-4 h-4 text-yellow-600" /> :
+                       <AlertCircle className="w-4 h-4 text-red-600" />}
+                      <span className={cn('font-semibold text-sm',
+                        liveResult.verdict === 'PASS' ? 'text-green-600' :
+                        liveResult.verdict === 'WARN' ? 'text-yellow-600' : 'text-red-600')}>
+                        {liveResult.verdict} — {liveResult.guardrail_name}
+                      </span>
+                      <span className="ml-auto text-xs text-muted-foreground font-mono">{liveResult.model_used}</span>
+                    </div>
+                    <p className="text-xs text-foreground/80">{liveResult.summary}</p>
+                    {liveResult.violations.length > 0 && (
+                      <ul className="text-xs text-red-600/80 mt-2 space-y-0.5">
+                        {liveResult.violations.map((v, i) => <li key={i}>— {v}</li>)}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* LLM Response */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-foreground uppercase tracking-wide">LLM Response</span>
+                      {!liveResult.llm_success && <span className="text-xs text-red-500">LLM failed</span>}
+                    </div>
+                    <pre className="text-xs bg-muted/50 border border-border rounded p-2 overflow-auto max-h-32 whitespace-pre-wrap font-mono">
+                      {liveResult.llm_response || '(no response)'}
+                    </pre>
+                  </div>
+
+                  {/* Prompts sent — collapsible */}
+                  <div>
+                    <button
+                      onClick={() => setShowPromptSent(p => !p)}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <span>{showPromptSent ? '▾' : '▸'}</span> View prompts sent to LLM
+                    </button>
+                    {showPromptSent && (
+                      <div className="mt-2 space-y-2">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">System prompt (with guardrail injected):</p>
+                          <pre className="text-xs bg-muted/50 border border-border rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap font-mono">
+                            {liveResult.system_prompt_sent}
+                          </pre>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">User prompt:</p>
+                          <pre className="text-xs bg-muted/50 border border-border rounded p-2 overflow-auto max-h-24 whitespace-pre-wrap font-mono">
+                            {liveResult.user_prompt_sent}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -951,16 +1074,21 @@ export default function GuardrailsManager() {
                 disabled={testing}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors font-medium"
               >
-                {testing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                {testing ? 'Testing...' : 'Run Test'}
+                {testing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                {testing ? (testMode === 'live' ? 'Running LLM test…' : 'Testing…') : (testMode === 'live' ? 'Run Live Test' : 'Run Static Test')}
               </button>
               <button
-                onClick={() => { setTestGuardrailId(null); setTestResult(null); }}
+                onClick={() => { setTestGuardrailId(null); setTestResult(null); setLiveResult(null); setTestError(''); setTestInput(''); setShowPromptSent(false); }}
                 className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
               >
                 Close
               </button>
             </div>
+            {testMode === 'live' && (
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Live test uses your configured LLM. May take 10–30s with local models.
+              </p>
+            )}
           </div>
         </div>
       )}

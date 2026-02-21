@@ -42,7 +42,9 @@ class UserResponse(BaseModel):
     is_active: bool
     last_login: Optional[datetime] = None
     created_at: datetime
-    
+    avatar_id: Optional[str] = None
+    notification_preferences: Optional[Dict] = None
+
     class Config:
         from_attributes = True
     

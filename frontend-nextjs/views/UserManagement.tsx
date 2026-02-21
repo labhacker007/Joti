@@ -8,18 +8,16 @@ import {
   Edit2,
   AlertCircle,
   CheckCircle,
-  Eye,
-  Lock,
   Users as UsersIcon,
   Shield,
   UserCheck,
+  ChevronRight,
+  X,
+  Save,
 } from 'lucide-react';
 import { usersAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
 import { formatDate, cn } from '@/lib/utils';
-import { Table, Column } from '@/components/Table';
-import { Pagination } from '@/components/Pagination';
-import { Form, FormField } from '@/components/Form';
 
 interface User {
   id: string;
@@ -31,556 +29,420 @@ interface User {
   created_at: string;
 }
 
+const ROLE_COLORS: Record<string, string> = {
+  ADMIN:     'bg-purple-500/10 text-purple-600 border-purple-500/20',
+  ANALYST:   'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  ENGINEER:  'bg-cyan-500/10 text-cyan-600 border-cyan-500/20',
+  MANAGER:   'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
+  EXECUTIVE: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  VIEWER:    'bg-gray-500/10 text-gray-500 border-gray-500/20',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  ACTIVE:    'bg-green-500/10 text-green-600',
+  INACTIVE:  'bg-gray-500/10 text-gray-500',
+  SUSPENDED: 'bg-red-500/10 text-red-600',
+};
+
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [selectedRole, setSelectedRole] = useState('USER');
 
-  const pageSize = 10;
+  // Selected user panel (view + edit)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [formData, setFormData] = useState<{ email: string; full_name: string; role: string; status: User['status'] }>({ email: '', full_name: '', role: 'VIEWER', status: 'ACTIVE' });
+  const [saving, setSaving] = useState(false);
 
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    full_name: '',
-    password: '',
-    role: 'VIEWER',
-  });
+  // Create modal
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ username: '', email: '', full_name: '', password: '', role: 'VIEWER' });
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => { fetchUsers(); }, []);
 
   useEffect(() => {
-    fetchUsers();
-  }, [currentPage, searchQuery]);
-
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setSuccess(''), 3000);
-      return () => clearTimeout(timer);
-    }
+    if (success) { const t = setTimeout(() => setSuccess(''), 3000); return () => clearTimeout(t); }
   }, [success]);
 
   const fetchUsers = async () => {
     try {
-      setLoading(true);
-      setError('');
-      const response = await usersAPI.getAllUsers(
-        currentPage,
-        pageSize
-      ) as any;
-
-      // Backend returns a flat array (not paginated), handle both formats
-      let users: User[] = Array.isArray(response)
+      setLoading(true); setError('');
+      const response = await usersAPI.getAllUsers(1, 200) as any;
+      let list: User[] = Array.isArray(response)
         ? response
         : (response.data?.items || response.items || response.data || response || []);
-
-      // Client-side filtering by search query if needed
-      if (searchQuery) {
-        users = users.filter((user: User) =>
-          user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          user.full_name.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      }
-
-      setUsers(users);
-      const total = Array.isArray(response) ? response.length : (response.data?.total || response.total || users.length);
-      setTotalPages(Math.ceil(total / pageSize));
+      setUsers(list);
     } catch (err: any) {
-      setError(err.message || 'Failed to load users');
-      console.error('Users error:', err);
-    } finally {
-      setLoading(false);
-    }
+      setError(getErrorMessage(err));
+    } finally { setLoading(false); }
   };
 
-  const handleCreateUser = async () => {
-    try {
-      setError('');
-      setSuccess('');
-
-      if (!formData.username || !formData.email || !formData.password) {
-        setError('Username, email, and password are required');
-        return;
-      }
-
-      await usersAPI.createUser({
-        username: formData.username,
-        email: formData.email,
-        full_name: formData.full_name,
-        password: formData.password,
-        role: formData.role,
-      });
-
-      setSuccess('User created successfully');
-      setShowCreateModal(false);
-      resetForm();
-      await fetchUsers();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create user');
-      console.error('Create user error:', err);
-    }
+  const openUser = (user: User) => {
+    setSelectedUser(user);
+    setFormData({ email: user.email, full_name: user.full_name || '', role: user.role, status: user.status as User['status'] });
+    setEditMode(false);
   };
 
-  const handleUpdateUser = async () => {
-    if (!editingUser) return;
-
+  const handleSaveEdit = async () => {
+    if (!selectedUser) return;
+    setSaving(true); setError('');
     try {
-      setError('');
-      setSuccess('');
-
-      const numericId = parseInt(editingUser.id, 10) || editingUser.id;
+      const numericId = parseInt(selectedUser.id, 10) || selectedUser.id;
       await usersAPI.updateUser(numericId as any, {
         full_name: formData.full_name,
         email: formData.email,
         role: formData.role,
+        status: formData.status,
       });
-
-      setSuccess('User updated successfully');
-      setEditingUser(null);
-      resetForm();
+      setSuccess('User updated');
+      setSelectedUser({ ...selectedUser, ...formData, status: formData.status as User['status'] });
+      setEditMode(false);
       await fetchUsers();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update user');
-      console.error('Update user error:', err);
-    }
+    } catch (err: any) { setError(getErrorMessage(err)); }
+    finally { setSaving(false); }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-
+  const handleDelete = async (userId: string) => {
+    if (!confirm('Delete this user?')) return;
     try {
       setError('');
-      setSuccess('');
       const numericId = parseInt(userId, 10) || userId;
       await usersAPI.deleteUser(numericId as any);
-      setSuccess('User deleted successfully');
+      setSuccess('User deleted');
+      if (selectedUser?.id === userId) setSelectedUser(null);
       await fetchUsers();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete user');
-      console.error('Delete user error:', err);
-    }
+    } catch (err: any) { setError(getErrorMessage(err)); }
   };
 
-  const handleChangeUserStatus = async (userId: string, newStatus: string) => {
+  const handleCreate = async () => {
+    if (!createForm.username || !createForm.email || !createForm.password) {
+      setError('Username, email, and password are required'); return;
+    }
+    setCreating(true); setError('');
     try {
-      setError('');
-      setSuccess('');
-      const numericId = parseInt(userId, 10) || userId;
-      // Update user with new status by calling updateUser
-      await usersAPI.updateUser(numericId as any, { status: newStatus });
-      setSuccess(`User status updated to ${newStatus}`);
+      await usersAPI.createUser(createForm);
+      setSuccess('User created');
+      setShowCreate(false);
+      setCreateForm({ username: '', email: '', full_name: '', password: '', role: 'VIEWER' });
       await fetchUsers();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update user status');
-      console.error('Status change error:', err);
-    }
+    } catch (err: any) { setError(getErrorMessage(err)); }
+    finally { setCreating(false); }
   };
 
-  const resetForm = () => {
-    setFormData({
-      username: '',
-      email: '',
-      full_name: '',
-      password: '',
-      role: 'VIEWER',
-    });
-  };
+  const q = searchQuery.toLowerCase();
+  const filtered = q
+    ? users.filter((u) =>
+        u.username.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.full_name || '').toLowerCase().includes(q)
+      )
+    : users;
 
-  const openEditModal = (user: User) => {
-    setEditingUser(user);
-    setFormData({
-      username: user.username,
-      email: user.email,
-      full_name: user.full_name,
-      password: '',
-      role: user.role,
-    });
-  };
-
-  const columns: Column<User>[] = [
-    {
-      key: 'username',
-      label: 'Username',
-      sortable: true,
-    },
-    {
-      key: 'email',
-      label: 'Email',
-      sortable: true,
-    },
-    {
-      key: 'full_name',
-      label: 'Full Name',
-      sortable: true,
-    },
-    {
-      key: 'role',
-      label: 'Role',
-      sortable: true,
-      render: (value) => (
-        <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/10 text-blue-600">
-          {value}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      sortable: true,
-      render: (value) => (
-        <span
-          className={cn(
-            'px-2 py-1 rounded text-xs font-medium',
-            value === 'ACTIVE'
-              ? 'bg-green-500/10 text-green-600'
-              : value === 'INACTIVE'
-                ? 'bg-gray-500/10 text-gray-600'
-                : 'bg-red-500/10 text-red-600'
-          )}
-        >
-          {value}
-        </span>
-      ),
-    },
-    {
-      key: 'created_at',
-      label: 'Created',
-      sortable: true,
-      render: (value) => formatDate(value),
-    },
-    {
-      key: 'id',
-      label: 'Actions',
-      render: (value, item) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => openEditModal(item)}
-            className="p-1 hover:bg-accent rounded text-blue-600"
-            title="Edit"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDeleteUser(value)}
-            className="p-1 hover:bg-accent rounded text-red-600"
-            title="Delete"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      ),
-    },
-  ];
-
-  const activeUsers = users.filter((u) => u.status === 'ACTIVE').length;
-  const adminUsers = users.filter((u) => u.role === 'ADMIN').length;
+  const activeCount = users.filter((u) => u.status === 'ACTIVE').length;
+  const adminCount  = users.filter((u) => u.role === 'ADMIN').length;
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <UsersIcon className="w-8 h-8" />
-            User Management
-          </h1>
-          <p className="text-muted-foreground mt-1">Manage system users and permissions</p>
+    <div className="space-y-4 pb-8">
+      {/* ── Header ── */}
+      <div className="flex items-center gap-3">
+        <h1 className="text-lg font-semibold text-foreground shrink-0 flex items-center gap-2">
+          <UsersIcon className="w-4 h-4" /> User Management
+        </h1>
+        <div className="flex-1" />
+        {/* Search */}
+        <div className="relative w-52 shrink-0">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search users..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-7 pr-2 py-1.5 bg-card border border-border rounded-md text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+          />
         </div>
         <button
-          onClick={() => {
-            resetForm();
-            setEditingUser(null);
-            setShowCreateModal(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:bg-primary/90 shrink-0"
         >
-          <Plus className="w-4 h-4" />
-          Add User
+          <Plus className="w-3.5 h-3.5" /> Add User
         </button>
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Total Users</p>
-          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <UsersIcon className="w-5 h-5 text-blue-600" />
-            {users.length}
+      {/* ── Stat tiles ── */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-card border border-border rounded-lg p-3">
+          <p className="text-xs text-muted-foreground">Total Users</p>
+          <p className="text-xl font-bold text-foreground flex items-center gap-2 mt-0.5">
+            <UsersIcon className="w-4 h-4 text-blue-600" /> {users.length}
           </p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Active Users</p>
-          <p className="text-2xl font-bold text-green-600 flex items-center gap-2">
-            <UserCheck className="w-5 h-5" />
-            {activeUsers}
+        <div className="bg-card border border-border rounded-lg p-3">
+          <p className="text-xs text-muted-foreground">Active</p>
+          <p className="text-xl font-bold text-green-600 flex items-center gap-2 mt-0.5">
+            <UserCheck className="w-4 h-4" /> {activeCount}
           </p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Admins</p>
-          <p className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Shield className="w-5 h-5 text-purple-600" />
-            {adminUsers}
+        <div className="bg-card border border-border rounded-lg p-3">
+          <p className="text-xs text-muted-foreground">Admins</p>
+          <p className="text-xl font-bold text-purple-600 flex items-center gap-2 mt-0.5">
+            <Shield className="w-4 h-4" /> {adminCount}
           </p>
         </div>
       </div>
 
-      {/* Error Alert */}
+      {/* ── Alerts ── */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex gap-2">
-          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-red-600">Error</p>
-            <p className="text-sm text-red-600/80">{error}</p>
-          </div>
+        <div className="p-2.5 bg-red-500/10 text-red-700 rounded-md flex items-center gap-2 text-xs">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
         </div>
       )}
-
-      {/* Success Alert */}
       {success && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 flex gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-green-600">Success</p>
-            <p className="text-sm text-green-600/80">{success}</p>
-          </div>
+        <div className="p-2.5 bg-green-500/10 text-green-700 rounded-md flex items-center gap-2 text-xs">
+          <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" /> {success}
         </div>
       )}
 
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search users..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-        />
+      {/* ── Main content: list + detail panel ── */}
+      <div className={cn('flex gap-4', selectedUser ? 'items-start' : '')}>
+        {/* User list */}
+        <div className={cn('bg-card border border-border rounded-lg overflow-hidden flex-1 min-w-0')}>
+          {/* Table header */}
+          <div className="grid grid-cols-[1fr_1.5fr_1fr_1fr_auto] gap-3 px-4 py-2 border-b border-border bg-muted/40">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Username</span>
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Email</span>
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Role</span>
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Status</span>
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-8" />
+          </div>
+
+          {loading ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">Loading users...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No users found</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {filtered.map((user) => {
+                const isSelected = selectedUser?.id === user.id;
+                return (
+                  <div
+                    key={user.id}
+                    onClick={() => openUser(user)}
+                    className={cn(
+                      'grid grid-cols-[1fr_1.5fr_1fr_1fr_auto] gap-3 px-4 py-2.5 cursor-pointer transition-colors items-center',
+                      isSelected ? 'bg-primary/5 border-l-2 border-primary' : 'hover:bg-muted/40 border-l-2 border-transparent'
+                    )}
+                  >
+                    <span className="text-sm font-medium text-foreground truncate">{user.username}</span>
+                    <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                    <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium w-fit', ROLE_COLORS[user.role] || ROLE_COLORS.VIEWER)}>
+                      {user.role}
+                    </span>
+                    <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium w-fit', STATUS_COLORS[user.status] || '')}>
+                      {user.status}
+                    </span>
+                    <ChevronRight className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', isSelected && 'rotate-90')} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── User detail / edit panel ── */}
+        {selectedUser && (
+          <div className="w-72 shrink-0 bg-card border border-border rounded-lg overflow-hidden">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
+              <span className="text-sm font-semibold text-foreground truncate">{selectedUser.username}</span>
+              <div className="flex items-center gap-1">
+                {!editMode && (
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    title="Edit"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => { setSelectedUser(null); setEditMode(false); }}
+                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-3">
+              {/* Read-only fields */}
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Username</p>
+                <p className="text-sm text-foreground">{selectedUser.username}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Member since</p>
+                <p className="text-xs text-muted-foreground">{formatDate(selectedUser.created_at)}</p>
+              </div>
+
+              {/* Editable fields */}
+              <div>
+                <label className="block text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Email</label>
+                {editMode ? (
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  />
+                ) : (
+                  <p className="text-xs text-foreground">{selectedUser.email}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Full Name</label>
+                {editMode ? (
+                  <input
+                    type="text"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  />
+                ) : (
+                  <p className="text-xs text-foreground">{selectedUser.full_name || '—'}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Role</label>
+                {editMode ? (
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  >
+                    <option value="VIEWER">Viewer</option>
+                    <option value="ANALYST">Analyst</option>
+                    <option value="ENGINEER">Engineer</option>
+                    <option value="MANAGER">Manager</option>
+                    <option value="EXECUTIVE">Executive</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                ) : (
+                  <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', ROLE_COLORS[selectedUser.role] || ROLE_COLORS.VIEWER)}>
+                    {selectedUser.role}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Status</label>
+                {editMode ? (
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as User['status'] })}
+                    className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  >
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="SUSPENDED">Suspended</option>
+                  </select>
+                ) : (
+                  <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', STATUS_COLORS[selectedUser.status] || '')}>
+                    {selectedUser.status}
+                  </span>
+                )}
+              </div>
+
+              {/* Actions */}
+              {editMode ? (
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    <Save className="w-3 h-3" />
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => { setEditMode(false); setFormData({ email: selectedUser.email, full_name: selectedUser.full_name || '', role: selectedUser.role, status: selectedUser.status as User['status'] }); }}
+                    className="flex-1 px-3 py-1.5 bg-muted text-foreground rounded text-xs font-medium hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleDelete(selectedUser.id)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded border border-red-500/20 text-red-500 text-xs font-medium hover:bg-red-500/10 transition-colors mt-2"
+                >
+                  <Trash2 className="w-3 h-3" /> Delete User
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Users Table */}
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <Table<User>
-          data={users}
-          columns={columns}
-          loading={loading}
-          empty="No users found"
-        />
-      </div>
-
-      {/* Pagination */}
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        loading={loading}
-      />
-
-      {/* Create User Modal */}
-      {showCreateModal && (
+      {/* ── Create User Modal ── */}
+      {showCreate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold text-foreground mb-4">Add New User</h2>
-
-            <div className="space-y-4">
+          <div className="bg-card border border-border rounded-lg p-5 w-full max-w-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground">Add New User</h2>
+              <button onClick={() => setShowCreate(false)} className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { label: 'Username *', key: 'username', type: 'text' },
+                { label: 'Email *', key: 'email', type: 'email' },
+                { label: 'Full Name', key: 'full_name', type: 'text' },
+                { label: 'Password *', key: 'password', type: 'password' },
+              ].map(({ label, key, type }) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-foreground mb-1">{label}</label>
+                  <input
+                    type={type}
+                    value={(createForm as any)[key]}
+                    onChange={(e) => setCreateForm({ ...createForm, [key]: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  />
+                </div>
+              ))}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Username *
-                </label>
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.full_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, full_name: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Password *
-                </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Role
-                </label>
+                <label className="block text-xs font-medium text-foreground mb-1">Role</label>
                 <select
-                  value={formData.role}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  value={createForm.role}
+                  onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
                 >
                   <option value="VIEWER">Viewer</option>
                   <option value="ANALYST">Analyst</option>
+                  <option value="ENGINEER">Engineer</option>
+                  <option value="MANAGER">Manager</option>
+                  <option value="EXECUTIVE">Executive</option>
                   <option value="ADMIN">Admin</option>
                 </select>
               </div>
             </div>
-
-            <div className="flex gap-2 mt-6">
+            <div className="flex gap-2 mt-4">
               <button
-                onClick={handleCreateUser}
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                onClick={handleCreate}
+                disabled={creating}
+                className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
               >
-                Create User
+                {creating ? 'Creating...' : 'Create User'}
               </button>
               <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  resetForm();
-                }}
-                className="flex-1 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit User Modal */}
-      {editingUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold text-foreground mb-4">Edit User</h2>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  disabled
-                  value={formData.username}
-                  className="w-full px-4 py-2 bg-muted border border-border rounded-lg text-muted-foreground cursor-not-allowed"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.full_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, full_name: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Role
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                >
-                  <option value="VIEWER">Viewer</option>
-                  <option value="ANALYST">Analyst</option>
-                  <option value="ADMIN">Admin</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Status
-                </label>
-                <select
-                  value={editingUser.status}
-                  onChange={(e) =>
-                    handleChangeUserStatus(editingUser.id, e.target.value)
-                  }
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                >
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                  <option value="SUSPENDED">Suspended</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={handleUpdateUser}
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
-              >
-                Save Changes
-              </button>
-              <button
-                onClick={() => {
-                  setEditingUser(null);
-                  resetForm();
-                }}
-                className="flex-1 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
+                onClick={() => setShowCreate(false)}
+                className="flex-1 px-3 py-2 bg-muted text-foreground rounded text-sm hover:bg-accent"
               >
                 Cancel
               </button>

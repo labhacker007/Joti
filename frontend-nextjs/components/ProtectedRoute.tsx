@@ -46,8 +46,8 @@ function ProtectedRoute({
   requiredRole = null
 }: ProtectedRouteProps): React.JSX.Element {
   const {
-    accessToken, isImpersonating, assumedRole, logout,
-    cachedPermissions, setPermissions, clearPermissions
+    accessToken, user, isImpersonating, assumedRole, logout,
+    cachedPermissions, setPermissions, clearPermissions, setUser
   } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
@@ -94,9 +94,24 @@ function ProtectedRoute({
 
     try {
       const { usersAPI } = await import('../api/client');
-      const response = await usersAPI.getMyPermissions() as any;
-      const pages = response.data?.accessible_pages || [];
-      const effectiveRole = response.data?.effective_role || null;
+
+      // If user object is missing (e.g. fresh tab, page reload), hydrate it
+      const permissionsPromise = usersAPI.getMyPermissions();
+      const profilePromise = !user ? usersAPI.getProfile() : Promise.resolve(null);
+
+      const [permResponse, profileResponse] = await Promise.all([permissionsPromise, profilePromise]);
+
+      const permData = (permResponse as any).data || permResponse;
+      const pages = permData?.accessible_pages || [];
+      const effectiveRole = permData?.effective_role || null;
+
+      // Hydrate user object if it was missing
+      if (profileResponse) {
+        const profileData = (profileResponse as any).data || profileResponse;
+        if (profileData && profileData.id) {
+          setUser(profileData);
+        }
+      }
 
       // Cache permissions in store
       setPermissions(pages, effectiveRole);
@@ -117,7 +132,7 @@ function ProtectedRoute({
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [accessToken, setPermissions, checkAccess, pathname, logout, router]);
+  }, [accessToken, user, setPermissions, setUser, checkAccess, pathname, logout, router]);
 
   // Main permission check effect - runs on mount and when auth state changes
   useEffect(() => {

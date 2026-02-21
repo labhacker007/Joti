@@ -339,7 +339,10 @@ export default function ThreatIntelligence() {
       setLandscapeSummary(data?.summary || 'No summary generated.');
       setLastAnalysisRun({ time: new Date(), focus: focus || 'Full Landscape' });
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || 'Failed to generate landscape summary. Make sure a GenAI provider is configured in Admin → AI Engine.';
+      const detail = err?.response?.data?.detail
+        || (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')
+            ? 'Request timed out. AI landscape generation can take up to 2 minutes with local models.'
+            : err?.message || 'Failed to generate landscape summary. Make sure a GenAI provider is configured in Admin → AI Engine.');
       setError(detail);
     } finally {
       setLoadingKey('landscape', false);
@@ -702,13 +705,14 @@ export default function ThreatIntelligence() {
                   </div>
                   <p className="text-2xl font-bold text-foreground">{summary.top_mitre_techniques?.length || 0}</p>
                 </button>
-                <div className="bg-card border border-border rounded-xl p-4">
+                <button onClick={() => { setActivePanel('ioc_explorer'); setIntelTypeFilter(''); setIocTypeFilter(''); setSearchQuery(''); }}
+                  className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-all text-left group">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-muted-foreground font-medium">Total Intelligence</p>
-                    <Target className="w-4 h-4 text-primary opacity-60" />
+                    <Target className="w-4 h-4 text-primary opacity-60 group-hover:opacity-100" />
                   </div>
                   <p className="text-2xl font-bold text-foreground">{summary.total_intelligence || 0}</p>
-                </div>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -740,18 +744,29 @@ export default function ThreatIntelligence() {
                   </div>
                 )}
 
-                {/* Active Watchlist Keywords */}
+                {/* Active Watchlist Keywords — clickable to filter IOC Explorer */}
                 <div className="bg-card border border-border rounded-xl p-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                     <Eye className="w-4 h-4 text-primary" />
                     Active Watchlist Keywords
+                    <span className="text-[10px] text-muted-foreground font-normal ml-auto">click to filter</span>
                   </h3>
                   {summary.active_watchlist_keywords && summary.active_watchlist_keywords.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {summary.active_watchlist_keywords.map((kw, i) => (
-                        <span key={i} className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded-full">
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setActivePanel('ioc_explorer');
+                            setIntelTypeFilter('');
+                            setIocTypeFilter('');
+                            setSearchQuery(kw);
+                          }}
+                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded-full hover:bg-primary/25 transition-colors cursor-pointer"
+                          title={`Filter IOC Explorer for "${kw}"`}
+                        >
                           {kw}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   ) : (

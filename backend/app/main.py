@@ -37,6 +37,9 @@ def run_schema_migrations():
                 "ALTER TABLE feed_sources ADD COLUMN IF NOT EXISTS refresh_interval_minutes INTEGER",
                 "ALTER TABLE feed_sources ADD COLUMN IF NOT EXISTS auto_fetch_enabled BOOLEAN DEFAULT true",
                 "ALTER TABLE feed_sources ADD COLUMN IF NOT EXISTS high_fidelity BOOLEAN DEFAULT false",
+                # User profile customization columns (Feb 2026)
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_id VARCHAR(50)",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_preferences JSONB",
             ]
             
             for migration in migrations:

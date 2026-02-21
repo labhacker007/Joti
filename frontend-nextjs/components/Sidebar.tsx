@@ -76,8 +76,8 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
   const [orgFeeds, setOrgFeeds] = useState<FeedItem[]>([]);
   const [customFeeds, setCustomFeeds] = useState<FeedItem[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [orgFeedsOpen, setOrgFeedsOpen] = useState(true);
-  const [customFeedsOpen, setCustomFeedsOpen] = useState(true);
+  const [orgFeedsOpen, setOrgFeedsOpen] = useState(false);
+  const [customFeedsOpen, setCustomFeedsOpen] = useState(false);
 
   // Auto-open admin section if on an admin page, and collapse feeds
   useEffect(() => {
@@ -89,6 +89,24 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
   }, [pathname]);
 
   // Fetch org sources and custom feeds
+  const fetchCustomFeeds = React.useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const customRes = await userFeedsAPI.getMyFeeds();
+      // Backend returns { feeds: [...], total: N }
+      const raw = (customRes as any)?.feeds ?? (customRes as any)?.data ?? customRes;
+      const list = Array.isArray(raw) ? raw : [];
+      const items = list.map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        url: f.url,
+      }));
+      setCustomFeeds(items);
+    } catch {
+      // Non-critical
+    }
+  }, [accessToken]);
+
   useEffect(() => {
     if (!accessToken) return;
 
@@ -108,8 +126,10 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
         }
 
         if (customRes.status === 'fulfilled') {
-          const data = (customRes.value as any)?.data || customRes.value;
-          const items = (data || []).map((f: any) => ({
+          // Backend returns { feeds: [...], total: N }
+          const raw = (customRes.value as any)?.feeds ?? (customRes.value as any)?.data ?? customRes.value;
+          const list = Array.isArray(raw) ? raw : [];
+          const items = list.map((f: any) => ({
             id: f.id,
             name: f.name,
             url: f.url,
@@ -123,6 +143,17 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
 
     fetchFeeds();
   }, [accessToken]);
+
+  // Listen for custom feed additions from Feeds page
+  useEffect(() => {
+    const handleCustomFeedsUpdated = () => {
+      fetchCustomFeeds().then(() => {
+        setCustomFeedsOpen(true);
+      });
+    };
+    window.addEventListener('custom-feeds-updated', handleCustomFeedsUpdated);
+    return () => window.removeEventListener('custom-feeds-updated', handleCustomFeedsUpdated);
+  }, [fetchCustomFeeds]);
 
   const handleLogout = () => {
     logout();
@@ -378,16 +409,6 @@ export default function Sidebar({ userRole, collapsed, onToggle }: SidebarProps)
 
         {/* Bottom Panel */}
         <div className="border-t border-border px-1.5 py-2 space-y-0.5">
-          {/* Theme Switcher */}
-          <div
-            className={`flex items-center ${collapsed ? 'justify-center' : 'px-2 py-0.5'}`}
-          >
-            <ThemeSwitcher
-              selectedTheme={theme as any}
-              onThemeChange={(newTheme) => setTheme(newTheme as ThemeName)}
-            />
-          </div>
-
           {/* Admin Toggle (for admins) */}
           {isAdmin && (
             <button

@@ -34,6 +34,7 @@ import {
   Shield,
   ExternalLink,
   FileText,
+  X,
 } from 'lucide-react';
 import { genaiAPI, connectorsAPI, adminAPI, guardrailsAPI, skillsAPI } from '@/api/client';
 import { getErrorMessage } from '@/api/client';
@@ -136,12 +137,13 @@ interface JobInfo {
 }
 
 // Provider definitions
+// keyField and modelField MUST match backend CONFIGURATION_TEMPLATES["genai"] keys (lowercase)
 const PROVIDER_DEFS: ProviderConfig[] = [
   {
     provider: 'openai',
     label: 'OpenAI',
-    keyField: 'OPENAI_API_KEY',
-    modelField: 'OPENAI_MODEL',
+    keyField: 'openai_api_key',
+    modelField: 'openai_model',
     knownModels: [
       'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo',
       'o1-preview', 'o1-mini', 'o3-mini',
@@ -151,8 +153,8 @@ const PROVIDER_DEFS: ProviderConfig[] = [
   {
     provider: 'anthropic',
     label: 'Anthropic',
-    keyField: 'ANTHROPIC_API_KEY',
-    modelField: 'ANTHROPIC_MODEL',
+    keyField: 'anthropic_api_key',
+    modelField: 'anthropic_model',
     knownModels: [
       'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
       'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229',
@@ -162,8 +164,8 @@ const PROVIDER_DEFS: ProviderConfig[] = [
   {
     provider: 'gemini',
     label: 'Google Gemini',
-    keyField: 'GEMINI_API_KEY',
-    modelField: 'GEMINI_MODEL',
+    keyField: 'gemini_api_key',
+    modelField: 'gemini_model',
     knownModels: [
       'gemini-2.0-flash', 'gemini-2.0-flash-thinking-exp',
       'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro',
@@ -173,8 +175,8 @@ const PROVIDER_DEFS: ProviderConfig[] = [
   {
     provider: 'kimi',
     label: 'Kimi (Moonshot AI)',
-    keyField: 'KIMI_API_KEY',
-    modelField: 'KIMI_MODEL',
+    keyField: 'kimi_api_key',
+    modelField: 'kimi_model',
     knownModels: [
       'kimi-k2-0711-preview', 'moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k',
     ],
@@ -184,7 +186,7 @@ const PROVIDER_DEFS: ProviderConfig[] = [
     provider: 'ollama',
     label: 'Ollama (Local)',
     keyField: '',
-    urlField: 'OLLAMA_BASE_URL',
+    urlField: 'ollama_base_url',
     description: 'Llama 3.1, Mistral, CodeLlama (runs locally)',
     isLocal: true,
   },
@@ -240,6 +242,20 @@ export default function GenAIManagement() {
   const [savingProvider, setSavingProvider] = useState<string | null>(null);
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
 
+  // Provider test dialog
+  const [testDialog, setTestDialog] = useState<{ provider: string; prompt: string } | null>(null);
+  const [testDialogResult, setTestDialogResult] = useState<{
+    status: 'success' | 'failed';
+    provider: string;
+    prompt_sent?: string;
+    response?: string;
+    model?: string;
+    error?: string;
+    suggestion?: string;
+    test_type?: string;
+  } | null>(null);
+  const [testDialogLoading, setTestDialogLoading] = useState(false);
+
   // Model selection per provider
   const [selectedModels, setSelectedModels] = useState<Record<string, string>>({});
   const [customModelInputs, setCustomModelInputs] = useState<Record<string, string>>({});
@@ -251,7 +267,19 @@ export default function GenAIManagement() {
   const [functionEdits, setFunctionEdits] = useState<Record<string, { primary: string; secondary: string }>>({});
   const [guardrailCount, setGuardrailCount] = useState<{ active: number; total: number } | null>(null);
   const [skillCount, setSkillCount] = useState<{ active: number; total: number } | null>(null);
-  const [promptPreview, setPromptPreview] = useState<{ function: string; system_prompt: string; total_length: number } | null>(null);
+  const [promptPreview, setPromptPreview] = useState<{
+    function: string;
+    summary_type?: string;
+    system_prompt: string;
+    user_prompt?: string;
+    total_length: number;
+    skill_count?: number;
+    guardrail_count?: number;
+    skills_applied?: { name: string; category: string; description: string }[];
+    guardrails_applied?: { name: string; type: string; action: string }[];
+    error?: string;
+  } | null>(null);
+  const [promptPreviewTab, setPromptPreviewTab] = useState<'system' | 'user' | 'skills' | 'guardrails'>('system');
   const [promptPreviewLoading, setPromptPreviewLoading] = useState<string | null>(null);
 
   // Automation / scheduler states
@@ -267,6 +295,7 @@ export default function GenAIManagement() {
   const [schedulerJobs, setSchedulerJobs] = useState<Record<string, JobInfo>>({});
   const [savingAutomation, setSavingAutomation] = useState(false);
   const [runningJob, setRunningJob] = useState<string | null>(null);
+  const [jobRunResults, setJobRunResults] = useState<Record<string, { status: 'success' | 'error'; message: string; ts: string }>>({});
 
   useEffect(() => {
     loadData();
@@ -450,12 +479,33 @@ export default function GenAIManagement() {
 
   const handlePreviewPrompt = async (functionName: string) => {
     setPromptPreviewLoading(functionName);
+    setPromptPreviewTab('system');
     try {
       const res = (await adminAPI.previewPrompt(functionName)) as any;
       const data = res?.data || res;
-      setPromptPreview({ function: functionName, system_prompt: data.system_prompt || '', total_length: data.total_length || 0 });
-    } catch {
-      setPromptPreview({ function: functionName, system_prompt: 'Could not load prompt preview. Ensure the function is registered.', total_length: 0 });
+      if (data?.error && !data?.system_prompt) {
+        setPromptPreview({ function: functionName, system_prompt: `Error: ${data.error}`, total_length: 0, error: data.error });
+      } else {
+        setPromptPreview({
+          function: functionName,
+          summary_type: data.summary_type,
+          system_prompt: data.system_prompt || '',
+          user_prompt: data.user_prompt || '',
+          total_length: data.total_length || 0,
+          skill_count: data.skill_count ?? data.skills_applied?.length,
+          guardrail_count: data.guardrail_count ?? data.guardrails_applied?.length,
+          skills_applied: data.skills_applied || [],
+          guardrails_applied: data.guardrails_applied || [],
+          error: data.error,
+        });
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as any;
+      const detail = axiosErr?.response?.data?.detail || axiosErr?.response?.data?.error || '';
+      const httpStatus = axiosErr?.response?.status;
+      const base = getErrorMessage(err);
+      const msg = detail ? (httpStatus ? `HTTP ${httpStatus}: ${detail}` : detail) : base;
+      setPromptPreview({ function: functionName, system_prompt: `Failed to load preview: ${msg}`, total_length: 0, error: msg });
     } finally {
       setPromptPreviewLoading(null);
     }
@@ -493,11 +543,71 @@ export default function GenAIManagement() {
   const handleRunJob = async (jobId: string) => {
     try {
       setRunningJob(jobId);
-      await adminAPI.runSchedulerJob(jobId);
-      setSuccess(`Job "${jobId}" triggered`);
-      setTimeout(loadAutomationSettings, 2000);
-    } catch (err) {
-      setError(getErrorMessage(err));
+      // Clear previous result for this job
+      setJobRunResults((prev) => { const n = { ...prev }; delete n[jobId]; return n; });
+
+      // Snapshot the last_run before triggering so we can detect when the job finishes
+      const prevLastRun = schedulerJobs[jobId]?.last_run ?? null;
+
+      // Trigger the job — this only queues it in a background thread
+      const triggerRes = await adminAPI.runSchedulerJob(jobId) as any;
+      const triggerData = triggerRes?.data || triggerRes;
+      if (!triggerData?.success) {
+        throw new Error(triggerData?.message || `Failed to trigger job "${jobId}"`);
+      }
+
+      // Poll every 1.5s for up to 60s until last_run changes (job completed)
+      const maxWait = 60000;
+      const pollInterval = 1500;
+      const started = Date.now();
+      let completed = false;
+
+      while (Date.now() - started < maxWait) {
+        await new Promise((r) => setTimeout(r, pollInterval));
+        const settingsRes = (await adminAPI.getSchedulerSettings()) as any;
+        const settingsData = settingsRes?.data || settingsRes;
+        const jobs: Record<string, JobInfo> = settingsData?.jobs || {};
+        setSchedulerJobs(jobs);
+        if (settingsData?.settings) {
+          setSchedulerSettings((prev) => ({ ...prev, ...settingsData.settings }));
+        }
+
+        const updatedJob = jobs[jobId];
+        if (updatedJob && updatedJob.last_run !== prevLastRun) {
+          // Job has run — capture result
+          setJobRunResults((prev) => ({
+            ...prev,
+            [jobId]: {
+              status: updatedJob.last_status === 'success' ? 'success' : 'error',
+              message: updatedJob.last_message || (updatedJob.last_status === 'success' ? 'Completed successfully' : 'Job failed — check logs'),
+              ts: updatedJob.last_run || new Date().toISOString(),
+            },
+          }));
+          completed = true;
+          break;
+        }
+      }
+
+      if (!completed) {
+        setJobRunResults((prev) => ({
+          ...prev,
+          [jobId]: {
+            status: 'error',
+            message: 'Job timed out — it may still be running. Check status again in a moment.',
+            ts: new Date().toISOString(),
+          },
+        }));
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as any;
+      const detail = axiosErr?.response?.data?.detail || axiosErr?.response?.data?.error || '';
+      const httpStatus = axiosErr?.response?.status;
+      const base = getErrorMessage(err);
+      const msg = detail ? (httpStatus ? `HTTP ${httpStatus}: ${detail}` : detail) : base;
+      setJobRunResults((prev) => ({
+        ...prev,
+        [jobId]: { status: 'error', message: msg, ts: new Date().toISOString() },
+      }));
     } finally {
       setRunningJob(null);
     }
@@ -567,7 +677,7 @@ export default function GenAIManagement() {
           category: 'genai',
           key: provider.keyField,
           value: key.trim(),
-          is_secret: true,
+          is_sensitive: true,
         });
         setSavedKeys((prev) => ({ ...prev, [provider.keyField]: '********' }));
         setApiKeys((prev) => ({ ...prev, [provider.provider]: '' }));
@@ -601,7 +711,7 @@ export default function GenAIManagement() {
         category: 'genai',
         key: provider.modelField,
         value: model,
-        is_secret: false,
+        is_sensitive: false,
       });
 
       // If it was a custom entry, collapse it to the saved value in state
@@ -619,21 +729,48 @@ export default function GenAIManagement() {
     }
   };
 
-  const handleTestProvider = async (providerName: string) => {
+  const handleTestProvider = (providerName: string) => {
+    setTestDialogResult(null);
+    setTestDialog({
+      provider: providerName,
+      prompt: 'Summarize this threat in 2 sentences: A new ransomware campaign targeting healthcare organizations uses spear-phishing emails with malicious Excel attachments. The malware establishes persistence via scheduled tasks, communicates with C2 at malicious-domain[.]com, and encrypts files using AES-256.',
+    });
+  };
+
+  const handleRunTestDialog = async () => {
+    if (!testDialog) return;
     try {
-      setTestingProvider(providerName);
-      setError('');
-      const res = await genaiAPI.testProvider(providerName) as any;
+      setTestDialogLoading(true);
+      setTestDialogResult(null);
+      const res = await genaiAPI.testProvider(testDialog.provider, 'summary') as any;
       const data = res?.data || res;
-      if (data?.output || data?.success) {
-        setSuccess(`${providerName} test passed`);
-      } else {
-        setSuccess(`${providerName} test: ${data?.message || 'completed'}`);
-      }
+      const isFailed = data?.status === 'failed' || (!data?.generated_summary && !data?.generated_query && !data?.analysis && data?.error);
+      setTestDialogResult({
+        status: isFailed ? 'failed' : 'success',
+        provider: data?.provider || testDialog.provider,
+        prompt_sent: testDialog.prompt,
+        response: data?.generated_summary || data?.generated_query || data?.analysis || data?.output || data?.message,
+        model: data?.model,
+        error: data?.error,
+        suggestion: data?.suggestion,
+        test_type: data?.test_type || 'executive_summary',
+      });
     } catch (err: unknown) {
-      setError(`${providerName} test failed: ${getErrorMessage(err)}`);
+      // HTTP error — extract the detail message from the response body if available
+      const axiosErr = err as any;
+      const detail = axiosErr?.response?.data?.detail || axiosErr?.response?.data?.error || '';
+      const httpStatus = axiosErr?.response?.status;
+      const baseMsg = getErrorMessage(err);
+      const errorMsg = detail || baseMsg;
+      setTestDialogResult({
+        status: 'failed',
+        provider: testDialog.provider,
+        prompt_sent: testDialog.prompt,
+        error: httpStatus ? `HTTP ${httpStatus}: ${errorMsg}` : errorMsg,
+        suggestion: axiosErr?.response?.data?.suggestion,
+      });
     } finally {
-      setTestingProvider(null);
+      setTestDialogLoading(false);
     }
   };
 
@@ -766,6 +903,7 @@ export default function GenAIManagement() {
   }
 
   return (
+    <>
     <div className="container mx-auto p-6 max-w-6xl">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
@@ -898,16 +1036,14 @@ export default function GenAIManagement() {
                         Not Configured
                       </span>
                     )}
-                    {(isConnected || hasKey || (provider.isLocal && ollamaConnected)) && (
-                      <button
-                        onClick={() => handleTestProvider(provider.provider)}
-                        disabled={isTesting}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
-                      >
-                        <TestTube className={cn('w-3.5 h-3.5', isTesting && 'animate-pulse')} />
-                        {isTesting ? 'Testing...' : 'Test'}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleTestProvider(provider.provider)}
+                      disabled={isTesting || (!hasKey && !apiKeys[provider.provider]?.trim() && !provider.isLocal)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+                    >
+                      <TestTube className={cn('w-3.5 h-3.5', isTesting && 'animate-pulse')} />
+                      {isTesting ? 'Testing...' : 'Test'}
+                    </button>
                   </div>
                 </div>
 
@@ -1671,25 +1807,119 @@ export default function GenAIManagement() {
       {/* ====== PROMPT PREVIEW MODAL ====== */}
       {promptPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPromptPreview(null)}>
-          <div className="bg-card border border-border rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="bg-card border border-border rounded-xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-start justify-between px-5 py-4 border-b border-border">
               <div>
-                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-primary" /> System Prompt Preview
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  Final Prompt Preview
                 </h3>
-                <p className="text-[10px] text-muted-foreground">Function: <strong>{promptPreview.function}</strong> · {promptPreview.total_length} chars</p>
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  <span className="text-xs text-muted-foreground">Function: <span className="font-mono text-foreground">{promptPreview.function}</span></span>
+                  {promptPreview.summary_type && <span className="text-xs text-muted-foreground">· {promptPreview.summary_type}</span>}
+                  <span className="text-xs text-muted-foreground">· {promptPreview.total_length} chars</span>
+                  {promptPreview.skill_count !== undefined && (
+                    <span className="text-xs px-1.5 py-0.5 bg-blue-500/10 text-blue-600 rounded">{promptPreview.skill_count} skills active</span>
+                  )}
+                  {promptPreview.guardrail_count !== undefined && (
+                    <span className="text-xs px-1.5 py-0.5 bg-orange-500/10 text-orange-600 rounded">{promptPreview.guardrail_count} guardrails active</span>
+                  )}
+                </div>
               </div>
-              <button onClick={() => setPromptPreview(null)} className="text-muted-foreground hover:text-foreground p-1">
-                <XCircle className="w-4 h-4" />
+              <button onClick={() => setPromptPreview(null)} className="text-muted-foreground hover:text-foreground p-1 flex-shrink-0">
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <pre className="text-xs text-foreground/80 font-mono whitespace-pre-wrap leading-relaxed bg-muted/30 rounded-lg p-3">
-                {promptPreview.system_prompt}
-              </pre>
+
+            {/* Tab bar */}
+            <div className="flex border-b border-border px-5 gap-1">
+              {([
+                { key: 'system', label: 'System Prompt' },
+                { key: 'user', label: 'User Prompt' },
+                { key: 'skills', label: `Skills (${promptPreview.skills_applied?.length ?? 0})` },
+                { key: 'guardrails', label: `Guardrails (${promptPreview.guardrails_applied?.length ?? 0})` },
+              ] as const).map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setPromptPreviewTab(tab.key)}
+                  className={cn('px-3 py-2 text-xs font-medium border-b-2 transition-colors',
+                    promptPreviewTab === tab.key
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  )}
+                >{tab.label}</button>
+              ))}
             </div>
-            <div className="px-4 py-2 border-t border-border flex items-center gap-2 text-[10px] text-muted-foreground">
-              <Shield className="w-3 h-3" /> This prompt includes active guardrails and skill personas injected at runtime.
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {promptPreview.error && (
+                <div className="mb-3 p-3 bg-red-500/5 border border-red-500/20 rounded text-xs text-red-600 font-mono">
+                  {promptPreview.error}
+                </div>
+              )}
+
+              {promptPreviewTab === 'system' && (
+                <pre className="text-xs text-foreground/85 font-mono whitespace-pre-wrap leading-relaxed bg-muted/30 rounded-lg p-4 border border-border/50">
+                  {promptPreview.system_prompt || '(empty)'}
+                </pre>
+              )}
+
+              {promptPreviewTab === 'user' && (
+                <pre className="text-xs text-foreground/85 font-mono whitespace-pre-wrap leading-relaxed bg-muted/30 rounded-lg p-4 border border-border/50">
+                  {promptPreview.user_prompt || '(The user prompt is built dynamically at runtime from the actual article content, IOCs, and TTPs.)'}
+                </pre>
+              )}
+
+              {promptPreviewTab === 'skills' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground mb-3">Skills inject additional instructions into the system prompt at runtime, before the model call.</p>
+                  {(promptPreview.skills_applied || []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">No active skills.</p>
+                  ) : (
+                    (promptPreview.skills_applied || []).map((s, i) => (
+                      <div key={i} className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-foreground">{s.name}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-600 rounded">{s.category}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{s.description}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {promptPreviewTab === 'guardrails' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground mb-3">Guardrails validate input before and output after each model call.</p>
+                  {(promptPreview.guardrails_applied || []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">No active guardrails.</p>
+                  ) : (
+                    (promptPreview.guardrails_applied || []).map((g, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2.5 bg-muted/30 rounded-lg border border-border/50">
+                        <span className="text-xs font-medium text-foreground flex-1">{g.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded font-mono">{g.type}</span>
+                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium',
+                          g.action === 'reject' ? 'bg-red-500/10 text-red-600' :
+                          g.action === 'retry' ? 'bg-yellow-500/10 text-yellow-600' :
+                          g.action === 'fix' ? 'bg-blue-500/10 text-blue-600' :
+                          'bg-muted text-muted-foreground'
+                        )}>{g.action}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <Shield className="w-3 h-3" /> Skills and guardrails are injected dynamically at runtime — this preview shows the current active set.
+              </span>
+              <button onClick={() => setPromptPreview(null)} className="px-3 py-1.5 bg-muted rounded text-xs hover:bg-accent">Close</button>
             </div>
           </div>
         </div>
@@ -1700,7 +1930,7 @@ export default function GenAIManagement() {
         <div className="space-y-6">
           <p className="text-sm text-muted-foreground">
             Configure how frequently feeds are polled and enable automated GenAI processing.
-            Changes are applied immediately to running jobs.
+            Changes are applied immediately to running jobs after saving.
           </p>
 
           {/* ── Feed Polling ── */}
@@ -1710,81 +1940,66 @@ export default function GenAIManagement() {
               <h3 className="font-semibold text-foreground">Feed Polling Intervals</h3>
             </div>
             <div className="grid grid-cols-2 gap-6">
-              {/* Org Feeds */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Org Feeds — Poll Every
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={5}
-                    max={1440}
-                    value={schedulerSettings.org_feed_poll_interval_minutes}
-                    onChange={(e) => setSchedulerSettings((p) => ({ ...p, org_feed_poll_interval_minutes: parseInt(e.target.value) || 60 }))}
-                    className="w-24 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                  <span className="text-sm text-muted-foreground">minutes</span>
-                </div>
-                {schedulerJobs['feed_ingestion'] && (
-                  <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
-                    <div>Last run: {schedulerJobs['feed_ingestion'].last_run ? new Date(schedulerJobs['feed_ingestion'].last_run).toLocaleString() : '—'}</div>
-                    <div>Status: <span className={schedulerJobs['feed_ingestion'].last_status === 'success' ? 'text-green-500' : 'text-red-500'}>{schedulerJobs['feed_ingestion'].last_status || '—'}</span></div>
-                    <div>Runs: {schedulerJobs['feed_ingestion'].run_count}</div>
-                  </div>
-                )}
-                <button
-                  onClick={() => handleRunJob('feed_ingestion')}
-                  disabled={runningJob === 'feed_ingestion'}
-                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
-                >
-                  {runningJob === 'feed_ingestion' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                  Run Now
-                </button>
-              </div>
 
-              {/* Custom/Personal Feeds */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-sm font-medium text-foreground">
-                    Personal Feeds — Poll Every
-                  </label>
-                  <button
-                    onClick={() => setSchedulerSettings((p) => ({ ...p, custom_feed_enabled: !p.custom_feed_enabled }))}
-                    className={cn('relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none', schedulerSettings.custom_feed_enabled ? 'bg-green-500' : 'bg-muted')}
-                    title={schedulerSettings.custom_feed_enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
-                  >
-                    <span className={cn('inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform', schedulerSettings.custom_feed_enabled ? 'translate-x-5' : 'translate-x-0.5')} />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={5}
-                    max={1440}
-                    value={schedulerSettings.custom_feed_poll_interval_minutes}
-                    onChange={(e) => setSchedulerSettings((p) => ({ ...p, custom_feed_poll_interval_minutes: parseInt(e.target.value) || 30 }))}
-                    disabled={!schedulerSettings.custom_feed_enabled}
-                    className="w-24 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
-                  />
-                  <span className="text-sm text-muted-foreground">minutes</span>
-                </div>
-                {schedulerJobs['user_feed_ingestion'] && (
-                  <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
-                    <div>Last run: {schedulerJobs['user_feed_ingestion'].last_run ? new Date(schedulerJobs['user_feed_ingestion'].last_run).toLocaleString() : '—'}</div>
-                    <div>Status: <span className={schedulerJobs['user_feed_ingestion'].last_status === 'success' ? 'text-green-500' : 'text-red-500'}>{schedulerJobs['user_feed_ingestion'].last_status || '—'}</span></div>
-                    <div>Runs: {schedulerJobs['user_feed_ingestion'].run_count}</div>
+              {/* Org Feeds */}
+              {(['feed_ingestion', 'user_feed_ingestion'] as const).map((jobId, idx) => {
+                const isCustom = idx === 1;
+                const label = isCustom ? 'Personal Feeds — Poll Every' : 'Org Feeds — Poll Every';
+                const intervalKey = isCustom ? 'custom_feed_poll_interval_minutes' : 'org_feed_poll_interval_minutes';
+                const defaultVal = isCustom ? 30 : 60;
+                const job = schedulerJobs[jobId];
+                const result = jobRunResults[jobId];
+                const isRunning = runningJob === jobId;
+                return (
+                  <div key={jobId}>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-sm font-medium text-foreground">{label}</label>
+                      {isCustom && (
+                        <button
+                          onClick={() => setSchedulerSettings((p) => ({ ...p, custom_feed_enabled: !p.custom_feed_enabled }))}
+                          className={cn('relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none', schedulerSettings.custom_feed_enabled ? 'bg-green-500' : 'bg-muted')}
+                          title={schedulerSettings.custom_feed_enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                        >
+                          <span className={cn('inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform', schedulerSettings.custom_feed_enabled ? 'translate-x-5' : 'translate-x-0.5')} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number" min={5} max={1440}
+                        value={schedulerSettings[intervalKey]}
+                        onChange={(e) => setSchedulerSettings((p) => ({ ...p, [intervalKey]: parseInt(e.target.value) || defaultVal }))}
+                        className="w-24 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      />
+                      <span className="text-sm text-muted-foreground">minutes</span>
+                    </div>
+                    {job && (
+                      <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+                        <div>Last run: {job.last_run ? new Date(job.last_run).toLocaleString() : '—'} · Runs: {job.run_count}</div>
+                        {job.last_status && (
+                          <div className={cn('font-medium', job.last_status === 'success' ? 'text-green-600' : 'text-red-600')}>
+                            {job.last_status === 'success' ? '✓' : '✗'} {job.last_message || job.last_status}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Inline run result */}
+                    {result && (
+                      <div className={cn('mt-2 p-2 rounded text-xs border', result.status === 'success' ? 'bg-green-500/5 border-green-500/20 text-green-700' : 'bg-red-500/5 border-red-500/20 text-red-700')}>
+                        <span className="font-semibold">{result.status === 'success' ? '✓ Run completed:' : '✗ Run failed:'}</span>{' '}
+                        {result.message}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleRunJob(jobId)}
+                      disabled={isRunning}
+                      className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+                    >
+                      {isRunning ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Running…</> : <><Play className="w-3.5 h-3.5" /> Run Now</>}
+                    </button>
                   </div>
-                )}
-                <button
-                  onClick={() => handleRunJob('user_feed_ingestion')}
-                  disabled={runningJob === 'user_feed_ingestion' || !schedulerSettings.custom_feed_enabled}
-                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary text-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
-                >
-                  {runningJob === 'user_feed_ingestion' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                  Run Now
-                </button>
-              </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1796,111 +2011,104 @@ export default function GenAIManagement() {
             </div>
             <p className="text-xs text-muted-foreground mb-4">
               Schedule automatic AI processing for articles that haven&apos;t been analyzed yet.
-              Processes in small batches to avoid overloading.
+              Interval is always editable — toggle enables/disables the scheduled run.
+              Use Run Now to trigger immediately regardless of toggle state.
             </p>
 
             <div className="space-y-4">
-              {/* Auto Summarize */}
-              <div className="flex items-start justify-between p-4 bg-muted/30 rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Brain className="w-4 h-4 text-blue-500" />
-                    <span className="font-medium text-sm">Auto-Summarize New Articles</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Generates executive &amp; technical summaries for articles ingested without one.
-                    Processes up to 20 articles per run.
-                  </p>
-                  {schedulerJobs['genai_batch_summarize'] && (
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      <div>Last run: {schedulerJobs['genai_batch_summarize'].last_run ? new Date(schedulerJobs['genai_batch_summarize'].last_run).toLocaleString() : '—'}</div>
-                      <div>Status: <span className={schedulerJobs['genai_batch_summarize'].last_status === 'success' ? 'text-green-500' : 'text-red-500'}>{schedulerJobs['genai_batch_summarize'].last_status || '—'}</span></div>
-                      <div>Last result: {schedulerJobs['genai_batch_summarize'].last_message || '—'}</div>
+              {([
+                {
+                  jobId: 'genai_batch_summarize',
+                  icon: <Brain className="w-4 h-4 text-blue-500" />,
+                  label: 'Auto-Summarize New Articles',
+                  desc: 'Generates executive & technical summaries for articles ingested without one. Processes up to 20 articles per run.',
+                  enabledKey: 'genai_summarize_enabled' as const,
+                  intervalKey: 'genai_summarize_interval_minutes' as const,
+                  defaultInterval: 60,
+                },
+                {
+                  jobId: 'genai_batch_extract',
+                  icon: <Zap className="w-4 h-4 text-yellow-500" />,
+                  label: 'Auto-Extract IOCs & TTPs',
+                  desc: 'Extracts IOCs and MITRE ATT&CK TTPs from articles not yet analyzed. Processes up to 10 articles per run.',
+                  enabledKey: 'genai_extract_enabled' as const,
+                  intervalKey: 'genai_extract_interval_minutes' as const,
+                  defaultInterval: 120,
+                },
+              ]).map(({ jobId, icon, label, desc, enabledKey, intervalKey, defaultInterval }) => {
+                const job = schedulerJobs[jobId];
+                const result = jobRunResults[jobId];
+                const isRunning = runningJob === jobId;
+                const isEnabled = schedulerSettings[enabledKey];
+                return (
+                  <div key={jobId} className="p-4 bg-muted/30 rounded-lg space-y-3">
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {icon}
+                          <span className="font-medium text-sm">{label}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{desc}</p>
+                      </div>
+                      {/* Toggle */}
+                      <button
+                        onClick={() => setSchedulerSettings((p) => ({ ...p, [enabledKey]: !p[enabledKey] }))}
+                        className={cn('relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none mt-0.5', isEnabled ? 'bg-green-500' : 'bg-muted')}
+                        title={isEnabled ? 'Scheduled: ON — click to disable' : 'Scheduled: OFF — click to enable'}
+                      >
+                        <span className={cn('inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform', isEnabled ? 'translate-x-5' : 'translate-x-0.5')} />
+                      </button>
                     </div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-2 ml-4">
-                  <button
-                    onClick={() => setSchedulerSettings((p) => ({ ...p, genai_summarize_enabled: !p.genai_summarize_enabled }))}
-                    className={cn('relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none', schedulerSettings.genai_summarize_enabled ? 'bg-green-500' : 'bg-muted')}
-                    title={schedulerSettings.genai_summarize_enabled ? 'Enabled' : 'Disabled'}
-                  >
-                    <span className={cn('inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform', schedulerSettings.genai_summarize_enabled ? 'translate-x-5' : 'translate-x-0.5')} />
-                  </button>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                    <input
-                      type="number"
-                      min={15}
-                      max={1440}
-                      value={schedulerSettings.genai_summarize_interval_minutes}
-                      onChange={(e) => setSchedulerSettings((p) => ({ ...p, genai_summarize_interval_minutes: parseInt(e.target.value) || 60 }))}
-                      disabled={!schedulerSettings.genai_summarize_enabled}
-                      className="w-20 px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none disabled:opacity-50"
-                    />
-                    <span className="text-xs text-muted-foreground">min</span>
-                  </div>
-                  <button
-                    onClick={() => handleRunJob('genai_batch_summarize')}
-                    disabled={runningJob === 'genai_batch_summarize'}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs bg-secondary text-foreground rounded hover:bg-secondary/80 disabled:opacity-50"
-                  >
-                    {runningJob === 'genai_batch_summarize' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                    Run Now
-                  </button>
-                </div>
-              </div>
 
-              {/* Auto Extract */}
-              <div className="flex items-start justify-between p-4 bg-muted/30 rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="w-4 h-4 text-yellow-500" />
-                    <span className="font-medium text-sm">Auto-Extract IOCs &amp; TTPs</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Extracts IOCs and MITRE ATT&amp;CK TTPs from articles not yet analyzed.
-                    Processes up to 10 articles per run.
-                  </p>
-                  {schedulerJobs['genai_batch_extract'] && (
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      <div>Last run: {schedulerJobs['genai_batch_extract'].last_run ? new Date(schedulerJobs['genai_batch_extract'].last_run).toLocaleString() : '—'}</div>
-                      <div>Status: <span className={schedulerJobs['genai_batch_extract'].last_status === 'success' ? 'text-green-500' : 'text-red-500'}>{schedulerJobs['genai_batch_extract'].last_status || '—'}</span></div>
-                      <div>Last result: {schedulerJobs['genai_batch_extract'].last_message || '—'}</div>
+                    {/* Interval + Run Now row */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Every</span>
+                        <input
+                          type="number" min={15} max={1440}
+                          value={schedulerSettings[intervalKey]}
+                          onChange={(e) => setSchedulerSettings((p) => ({ ...p, [intervalKey]: parseInt(e.target.value) || defaultInterval }))}
+                          className="w-20 px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        />
+                        <span className="text-xs text-muted-foreground">min</span>
+                      </div>
+                      <button
+                        onClick={() => handleRunJob(jobId)}
+                        disabled={isRunning}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 font-medium"
+                      >
+                        {isRunning ? <><Loader2 className="w-3 h-3 animate-spin" /> Running…</> : <><Play className="w-3 h-3" /> Run Now</>}
+                      </button>
                     </div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-2 ml-4">
-                  <button
-                    onClick={() => setSchedulerSettings((p) => ({ ...p, genai_extract_enabled: !p.genai_extract_enabled }))}
-                    className={cn('relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none', schedulerSettings.genai_extract_enabled ? 'bg-green-500' : 'bg-muted')}
-                    title={schedulerSettings.genai_extract_enabled ? 'Enabled' : 'Disabled'}
-                  >
-                    <span className={cn('inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform', schedulerSettings.genai_extract_enabled ? 'translate-x-5' : 'translate-x-0.5')} />
-                  </button>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                    <input
-                      type="number"
-                      min={15}
-                      max={1440}
-                      value={schedulerSettings.genai_extract_interval_minutes}
-                      onChange={(e) => setSchedulerSettings((p) => ({ ...p, genai_extract_interval_minutes: parseInt(e.target.value) || 120 }))}
-                      disabled={!schedulerSettings.genai_extract_enabled}
-                      className="w-20 px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none disabled:opacity-50"
-                    />
-                    <span className="text-xs text-muted-foreground">min</span>
+
+                    {/* Last run status from scheduler */}
+                    {job && (job.last_run || job.run_count > 0) && (
+                      <div className="text-xs text-muted-foreground">
+                        Last run: {job.last_run ? new Date(job.last_run).toLocaleString() : '—'} · Total runs: {job.run_count}
+                        {job.last_status && (
+                          <span className={cn('ml-2 font-medium', job.last_status === 'success' ? 'text-green-600' : 'text-red-600')}>
+                            {job.last_status === 'success' ? '✓' : '✗'} {job.last_message}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Inline result from most recent Run Now */}
+                    {result && (
+                      <div className={cn('p-2.5 rounded border text-xs', result.status === 'success' ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20')}>
+                        <div className={cn('font-semibold mb-0.5', result.status === 'success' ? 'text-green-700' : 'text-red-700')}>
+                          {result.status === 'success' ? '✓ Run completed' : '✗ Run failed'} · {new Date(result.ts).toLocaleTimeString()}
+                        </div>
+                        <div className={cn('font-mono break-all', result.status === 'success' ? 'text-green-700/80' : 'text-red-700/80')}>
+                          {result.message}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => handleRunJob('genai_batch_extract')}
-                    disabled={runningJob === 'genai_batch_extract'}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs bg-secondary text-foreground rounded hover:bg-secondary/80 disabled:opacity-50"
-                  >
-                    {runningJob === 'genai_batch_extract' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                    Run Now
-                  </button>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1918,5 +2126,120 @@ export default function GenAIManagement() {
         </div>
       )}
     </div>
+
+    {/* ====== PROVIDER TEST DIALOG ====== */}
+
+    {testDialog && (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+        <div className="bg-card border border-border rounded-xl p-6 w-full max-w-2xl shadow-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <TestTube className="w-5 h-5 text-primary" />
+                Test {PROVIDER_DEFS.find(p => p.provider === testDialog.provider)?.label || testDialog.provider}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Send a sample prompt and verify the model responds correctly</p>
+            </div>
+            <button onClick={() => { setTestDialog(null); setTestDialogResult(null); }} className="text-muted-foreground hover:text-foreground">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {/* Prompt Input */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Test Prompt</label>
+              <textarea
+                value={testDialog.prompt}
+                onChange={(e) => setTestDialog(prev => prev ? { ...prev, prompt: e.target.value } : null)}
+                rows={4}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
+              />
+              <p className="text-xs text-muted-foreground mt-1">The prompt above will be sent as a summarization request to test the provider connection and response quality.</p>
+            </div>
+
+            {/* Result */}
+            {testDialogResult && (
+              <div className={cn(
+                'rounded-lg border p-4 space-y-3',
+                testDialogResult.status === 'success' ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'
+              )}>
+                {/* Status header */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {testDialogResult.status === 'success' ? (
+                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  )}
+                  <span className={cn('text-sm font-semibold', testDialogResult.status === 'success' ? 'text-green-700' : 'text-red-700')}>
+                    {testDialogResult.status === 'success' ? 'Test Passed' : 'Test Failed'}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Provider: <span className="font-mono text-foreground">{testDialogResult.provider}</span>
+                  </span>
+                  {testDialogResult.test_type && (
+                    <span className="text-xs text-muted-foreground">
+                      · Type: <span className="font-mono text-foreground">{testDialogResult.test_type}</span>
+                    </span>
+                  )}
+                  {testDialogResult.model && (
+                    <span className="ml-auto text-xs text-muted-foreground font-mono">{testDialogResult.model}</span>
+                  )}
+                </div>
+
+                {/* Success response */}
+                {testDialogResult.response && (
+                  <div>
+                    <p className="text-xs font-medium text-foreground mb-1">Model Response:</p>
+                    <div className="bg-background rounded-md p-3 text-xs text-foreground/80 leading-relaxed max-h-60 overflow-y-auto whitespace-pre-wrap border border-border/50">
+                      {testDialogResult.response}
+                    </div>
+                  </div>
+                )}
+
+                {/* Error detail */}
+                {testDialogResult.error && (
+                  <div>
+                    <p className="text-xs font-semibold text-red-600 mb-1">What went wrong:</p>
+                    <div className="bg-background rounded-md p-3 text-xs text-red-600/90 font-mono border border-red-500/20 whitespace-pre-wrap break-all">
+                      {testDialogResult.error}
+                    </div>
+                  </div>
+                )}
+
+                {/* Suggestion / remediation */}
+                {testDialogResult.suggestion && (
+                  <div className="flex gap-2 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-md">
+                    <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-yellow-700 mb-0.5">How to fix:</p>
+                      <p className="text-xs text-yellow-700/80 leading-relaxed">{testDialogResult.suggestion}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleRunTestDialog}
+                disabled={testDialogLoading || !testDialog.prompt.trim()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium text-sm"
+              >
+                {testDialogLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                {testDialogLoading ? 'Sending...' : 'Send Test Prompt'}
+              </button>
+              <button
+                onClick={() => { setTestDialog(null); setTestDialogResult(null); }}
+                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

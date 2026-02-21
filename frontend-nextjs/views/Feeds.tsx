@@ -24,6 +24,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { articlesAPI, userFeedsAPI, sourcesAPI, genaiAPI } from '@/api/client';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import { useTheme } from '@/contexts/ThemeContext';
 import { formatRelativeTime, cn } from '@/lib/utils';
 import { Pagination } from '@/components/Pagination';
 import { isSafeExternalUrl } from '@/utils/url';
@@ -104,6 +106,7 @@ interface FeedsProps {
 
 export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -180,7 +183,9 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
       } else if (userFeedFilter) {
         try {
           const res = (await userFeedsAPI.getMyFeeds()) as any;
-          const feeds = res?.data || res || [];
+          // Backend returns { feeds: [...], total: N }
+          const raw = res?.feeds ?? res?.data ?? res;
+          const feeds = Array.isArray(raw) ? raw : [];
           const feed = feeds.find((f: any) => String(f.id) === String(userFeedFilter));
           setActiveSourceName(feed?.name || `Feed #${userFeedFilter}`);
         } catch {
@@ -323,6 +328,8 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
       setNewFeedUrl('');
       setNewFeedName('');
       setNewFeedType('rss');
+      // Notify sidebar to refresh custom feeds list
+      window.dispatchEvent(new CustomEvent('custom-feeds-updated'));
       // Trigger ingest after adding
       fetchArticles();
     } catch (err: any) {
@@ -433,7 +440,7 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
 
   return (
     <div className="space-y-4 pb-8">
-      {/* Header Row */}
+      {/* Header Row: Title + Quote | View Toggle + Theme (top-right) */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 shrink-0">
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -445,21 +452,36 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
           </p>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder=""
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-44 pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
+        {/* Top-right: View Toggle + Theme Switcher */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex bg-muted rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('list')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                viewMode === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+              )}
+              title="List View"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('card')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                viewMode === 'card' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+              )}
+              title="Card View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+          <ThemeSwitcher selectedTheme={theme as any} onThemeChange={(t) => setTheme(t as any)} />
         </div>
       </div>
 
-      {/* Toolbar Row: Action buttons | Time Range (centered) | View Toggle (right) */}
-      <div className="flex items-center gap-2">
+      {/* Toolbar Row: Action buttons | Time Range (centered) | Search (right) */}
+      <div className="flex items-center gap-2 mt-4">
         {/* Left: Action buttons */}
         <div className="flex items-center gap-2">
           <button
@@ -517,28 +539,16 @@ export default function Feeds({ sourceId, userFeedId }: FeedsProps) {
           </div>
         </div>
 
-        {/* Right: View Toggle */}
-        <div className="flex bg-muted rounded-lg p-0.5">
-          <button
-            onClick={() => setViewMode('list')}
-            className={cn(
-              'p-1.5 rounded-md transition-colors',
-              viewMode === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-            )}
-            title="List View"
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('card')}
-            className={cn(
-              'p-1.5 rounded-md transition-colors',
-              viewMode === 'card' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-            )}
-            title="Card View"
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
+        {/* Right: Search */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="w-44 pl-8 pr-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
         </div>
       </div>
 

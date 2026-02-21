@@ -263,7 +263,7 @@ export const usersAPI = {
    * Get current user's profile
    */
   getProfile: async () => {
-    return get('/users/me');
+    return get('/auth/me');
   },
 
   /**
@@ -276,11 +276,38 @@ export const usersAPI = {
   /**
    * Change current user's password
    */
-  changePassword: async (currentPassword: string, newPassword: string) => {
+  changePassword: async (currentPassword: string, newPassword: string, confirmPassword: string) => {
     return post('/users/me/change-password', {
       current_password: currentPassword,
       new_password: newPassword,
+      confirm_password: confirmPassword,
     });
+  },
+
+  /**
+   * Update own profile (name, avatar)
+   */
+  updateMe: async (data: { full_name?: string; avatar_id?: string }) => {
+    return put('/users/me', data);
+  },
+
+  /**
+   * Get notification preferences
+   */
+  getNotificationPreferences: async () => {
+    return get('/users/me/notification-preferences');
+  },
+
+  /**
+   * Update notification preferences
+   */
+  updateNotificationPreferences: async (data: {
+    browser_push_enabled?: boolean;
+    watchlist_alerts?: boolean;
+    digest_daily?: boolean;
+    push_subscription?: Record<string, any> | null;
+  }) => {
+    return put('/users/me/notification-preferences', data);
   },
 
   /**
@@ -579,7 +606,7 @@ export const articlesAPI = {
    * Generate AI threat landscape summary
    */
   getAILandscape: async (params?: { time_range?: string; focus_area?: string }) => {
-    return post('/articles/intelligence/ai-landscape', params || {});
+    return post('/articles/intelligence/ai-landscape', params || {}, { timeout: 120000 });
   },
 
   /**
@@ -1138,6 +1165,9 @@ export const guardrailsAPI = {
   },
   test: async (data: { guardrail_type: string; config: Record<string, any>; test_input: string }) => {
     return post('/admin/genai-guardrails/test', data);
+  },
+  testLive: async (data: { guardrail_id: number; test_content?: string; function_name?: string }) => {
+    return post('/admin/genai-guardrails/test-live', data, { timeout: 120000 });
   },
   exportAll: async () => {
     return get('/admin/genai-guardrails/export');

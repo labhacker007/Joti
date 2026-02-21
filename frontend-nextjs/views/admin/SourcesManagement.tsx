@@ -46,6 +46,7 @@ export default function SourcesManagement() {
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [ingesting, setIngesting] = useState<string | null>(null);
   const [ingestingAll, setIngestingAll] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('all');
   const [form, setForm] = useState<AddSourceForm>({
     name: '',
     url: '',
@@ -226,6 +227,12 @@ export default function SourcesManagement() {
 
   const activeCount = sources.filter((s) => s.is_active).length;
 
+  const filteredSources = statusFilter === 'active'
+    ? sources.filter((s) => s.is_active)
+    : statusFilter === 'disabled'
+    ? sources.filter((s) => !s.is_active)
+    : sources;
+
   const sourceTypeLabels: Record<string, string> = {
     rss: 'RSS Feed',
     atom: 'Atom Feed',
@@ -285,28 +292,49 @@ export default function SourcesManagement() {
         </div>
       </div>
 
-      {/* Stats Row */}
+      {/* Stats Row — clickable to filter */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-card border border-border rounded-lg p-3">
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={cn(
+            'bg-card border rounded-lg p-3 text-left transition-all hover:shadow-sm',
+            statusFilter === 'all' ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/50'
+          )}
+        >
           <p className="text-xs text-muted-foreground">Total Sources</p>
           <p className="text-lg font-bold text-foreground flex items-center gap-2">
             <Rss className="w-4 h-4 text-blue-600" />
             {sources.length}
           </p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-3">
+          {statusFilter === 'all' && <p className="text-[10px] text-primary mt-0.5">Showing all</p>}
+        </button>
+        <button
+          onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}
+          className={cn(
+            'bg-card border rounded-lg p-3 text-left transition-all hover:shadow-sm',
+            statusFilter === 'active' ? 'border-green-500 ring-1 ring-green-500' : 'border-border hover:border-green-500/50'
+          )}
+        >
           <p className="text-xs text-muted-foreground">Active Sources</p>
           <p className="text-lg font-bold text-green-600 flex items-center gap-2">
             <Activity className="w-4 h-4" />
             {activeCount}
           </p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-3">
+          {statusFilter === 'active' && <p className="text-[10px] text-green-600 mt-0.5">Filtered</p>}
+        </button>
+        <button
+          onClick={() => setStatusFilter(statusFilter === 'disabled' ? 'all' : 'disabled')}
+          className={cn(
+            'bg-card border rounded-lg p-3 text-left transition-all hover:shadow-sm',
+            statusFilter === 'disabled' ? 'border-orange-500 ring-1 ring-orange-500' : 'border-border hover:border-orange-500/50'
+          )}
+        >
           <p className="text-xs text-muted-foreground">Disabled</p>
           <p className="text-lg font-bold text-muted-foreground flex items-center gap-2">
             {sources.length - activeCount}
           </p>
-        </div>
+          {statusFilter === 'disabled' && <p className="text-[10px] text-orange-500 mt-0.5">Filtered</p>}
+        </button>
       </div>
 
       {error && (
@@ -415,8 +443,17 @@ export default function SourcesManagement() {
               Add your first source
             </button>
           </div>
+        ) : filteredSources.length === 0 ? (
+          <div className="text-center py-8 border border-dashed border-border rounded-lg">
+            <p className="text-muted-foreground text-sm">
+              No {statusFilter === 'active' ? 'active' : 'disabled'} sources
+            </p>
+            <button onClick={() => setStatusFilter('all')} className="text-xs text-primary hover:underline mt-1">
+              Show all sources
+            </button>
+          </div>
         ) : (
-          sources.map((source) => (
+          filteredSources.map((source) => (
             <div
               key={source.id}
               className="border border-border rounded-lg p-4 bg-card hover:bg-card/80 transition"

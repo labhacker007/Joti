@@ -299,6 +299,122 @@ async def get_me_permissions(
     }
 
 
+# ============ SELF-SERVICE PROFILE ENDPOINTS ============
+
+class MeProfileUpdate(BaseModel):
+    """Self-service profile update (name and avatar only — not role/email)."""
+    full_name: Optional[str] = None
+    avatar_id: Optional[str] = None
+
+
+class MeChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+
+class NotificationPreferencesUpdate(BaseModel):
+    browser_push_enabled: Optional[bool] = None
+    watchlist_alerts: Optional[bool] = None
+    digest_daily: Optional[bool] = None
+    push_subscription: Optional[dict] = None  # WebPush subscription object
+
+
+@router.put("/me")
+async def update_own_profile(
+    payload: MeProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update the current user's own profile (name and avatar only)."""
+    VALID_AVATAR_IDS = {
+        "owl", "fox", "wolf", "bear", "lion", "tiger", "panda", "koala",
+        "penguin", "parrot", "eagle", "hawk", "dolphin", "shark", "whale",
+        "octopus", "crab", "bee", "butterfly", "dragon", "phoenix", "unicorn",
+        "robot", "alien", "ninja", "wizard", "knight", "astronaut", "scientist",
+        "detective", "hacker", "agent", "analyst", "hunter", "guardian",
+        "sentinel", "phantom", "ghost", "specter", "viper", "cobra", "python",
+        "falcon", "raven", "sparrow", "hawk2", "lynx", "panther", "jaguar",
+        "cheetah", "leopard",
+    }
+    if payload.avatar_id is not None and payload.avatar_id not in VALID_AVATAR_IDS:
+        raise HTTPException(status_code=400, detail=f"Invalid avatar_id. Choose from the predefined set.")
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name.strip() or None
+    if payload.avatar_id is not None:
+        current_user.avatar_id = payload.avatar_id
+    db.commit()
+    db.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.post("/me/change-password")
+async def change_own_password(
+    payload: MeChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change the current user's password."""
+    from app.auth.security import verify_password, hash_password, blacklist_all_user_tokens
+    import re as _re
+
+    if not current_user.hashed_password:
+        raise HTTPException(status_code=400, detail="OAuth/SAML users cannot change password here.")
+
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=400, detail="New passwords do not match.")
+
+    if len(payload.new_password) < 12:
+        raise HTTPException(status_code=400, detail="Password must be at least 12 characters long.")
+
+    if not (_re.search(r"[A-Z]", payload.new_password) and
+            _re.search(r"[a-z]", payload.new_password) and
+            _re.search(r"\d", payload.new_password) and
+            _re.search(r"[^A-Za-z0-9]", payload.new_password)):
+        raise HTTPException(status_code=400, detail="Password must contain uppercase, lowercase, digit, and special character.")
+
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Current password is incorrect.")
+
+    if payload.current_password == payload.new_password:
+        raise HTTPException(status_code=400, detail="New password must differ from current password.")
+
+    current_user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    blacklist_all_user_tokens(current_user.id)
+    logger.info("password_changed", user_id=current_user.id)
+    return {"message": "Password changed successfully. Please log in again."}
+
+
+@router.get("/me/notification-preferences")
+async def get_notification_preferences(
+    current_user: User = Depends(get_current_user),
+):
+    """Get current user's notification preferences."""
+    prefs = current_user.notification_preferences or {}
+    return {
+        "browser_push_enabled": prefs.get("browser_push_enabled", False),
+        "watchlist_alerts": prefs.get("watchlist_alerts", True),
+        "digest_daily": prefs.get("digest_daily", False),
+        "push_subscription": prefs.get("push_subscription", None),
+    }
+
+
+@router.put("/me/notification-preferences")
+async def update_notification_preferences(
+    payload: NotificationPreferencesUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update current user's notification preferences."""
+    prefs = dict(current_user.notification_preferences or {})
+    update = payload.model_dump(exclude_unset=True)
+    prefs.update(update)
+    current_user.notification_preferences = prefs
+    db.commit()
+    return {"message": "Notification preferences updated.", "preferences": prefs}
+
+
 @router.get("/available-roles")
 async def get_available_roles(
     current_user: User = Depends(get_current_user)

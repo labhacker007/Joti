@@ -118,6 +118,53 @@ Configure AI providers (Ollama, OpenAI, Claude, Gemini) through the web UI after
 
 No environment variables are needed for GenAI — all API keys, model selections, and function mappings are managed in the admin panel.
 
+### Using Ollama (local models)
+
+The backend runs inside Docker and connects to Ollama on your host machine via `host.docker.internal:11434`.
+
+By default, Ollama on Windows and macOS only listens on `127.0.0.1` (loopback), which Docker containers cannot reach. You must configure Ollama to listen on all interfaces before starting it.
+
+**Windows:**
+
+1. Open **Start → Edit the system environment variables → Environment Variables**
+2. Under *User variables*, click **New**:
+   - Variable name: `OLLAMA_HOST`
+   - Variable value: `0.0.0.0:11434`
+3. Click OK, then **quit Ollama from the system tray** and reopen it.
+
+**macOS:**
+
+```bash
+launchctl setenv OLLAMA_HOST "0.0.0.0:11434"
+# Then restart Ollama from Applications or:
+pkill ollama && ollama serve &
+```
+
+**Linux (systemd):**
+
+```bash
+sudo systemctl edit ollama.service
+# Add under [Service]:
+# Environment="OLLAMA_HOST=0.0.0.0:11434"
+sudo systemctl restart ollama
+```
+
+**Verify it worked** — after restarting Ollama, check it is now bound to all interfaces:
+
+```powershell
+# Windows PowerShell
+netstat -ano | findstr 11434
+# Should show 0.0.0.0:11434, not 127.0.0.1:11434
+```
+
+```bash
+# macOS / Linux
+ss -tlnp | grep 11434
+# Should show 0.0.0.0:11434
+```
+
+No changes to the Joti codebase or `.env` are needed — `OLLAMA_BASE_URL` defaults to `http://host.docker.internal:11434` which is correct once Ollama is bound to `0.0.0.0`.
+
 ## Ports
 
 Default ports can be changed in `.env`:
